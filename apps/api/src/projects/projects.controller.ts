@@ -20,6 +20,13 @@ export class ProjectsController {
     return this.projectsService.create(dto);
   }
 
+  @Get(":id/summary")
+  @ApiOperation({ summary: "Сводка по проекту (задачи, бюджеты)" })
+  @ApiParam({ name: "id" })
+  getSummary(@Param("id") id: string) {
+    return this.projectsService.getSummary(id);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Проект по id" })
   @ApiParam({ name: "id" })

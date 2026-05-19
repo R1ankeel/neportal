@@ -3,13 +3,7 @@ import Link from "next/link";
 const nav = [
   { href: "/dashboard", label: "Главная" },
   { href: "/projects", label: "Проекты" },
-  { href: "/tasks", label: "Задачи" },
-  { href: "/budgets", label: "Бюджеты" },
-] as const;
-
-const comingSoon = [
-  { href: "#", label: "Сотрудники", disabled: true },
-  { href: "#", label: "Отсутствия", disabled: true },
+  { href: "/employees", label: "Сотрудники" },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -29,19 +23,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {item.label}
             </Link>
           ))}
-          <div className="mt-4 hidden w-full border-t border-zinc-200 pt-3 text-sm text-zinc-400 md:block dark:border-zinc-800">
-            Скоро
-          </div>
-          {comingSoon.map((item) => (
-            <span
-              key={item.label}
-              className="rounded-lg px-3 py-2 text-base text-zinc-400 md:text-base"
-              title="В разработке"
-            >
-              {item.label}
-            </span>
-          ))}
         </nav>
+        <p className="mt-6 hidden text-sm text-zinc-400 md:block">
+          Задачи и бюджеты — внутри проекта.
+        </p>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>

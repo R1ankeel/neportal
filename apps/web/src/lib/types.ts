@@ -54,3 +54,21 @@ export type ApiBudgetExpense = {
   source: string;
   user?: { id: string; fullName: string; email: string | null };
 };
+
+export type ApiProjectSummary = {
+  tasksTotal: number;
+  tasksNew: number;
+  tasksInProgress: number;
+  tasksDone: number;
+  budgetsTotal: number;
+  budgetsRemainingTotal: number;
+};
+
+export type ApiNote = {
+  id: string;
+  text: string;
+  source: string;
+  createdAt: string;
+  creator?: { id: string; fullName: string };
+  project?: { id: string; name: string } | null;
+};

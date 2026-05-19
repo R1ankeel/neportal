@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CreateBudgetExpenseDto } from "./dto/create-budget-expense.dto";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
 import { BudgetsService } from "./budgets.service";
@@ -11,8 +11,9 @@ export class BudgetsController {
 
   @Get()
   @ApiOperation({ summary: "Список бюджетов" })
-  findAll() {
-    return this.budgetsService.findAll();
+  @ApiQuery({ name: "projectId", required: false, description: "Фильтр по проекту" })
+  findAll(@Query("projectId") projectId?: string) {
+    return this.budgetsService.findAll(projectId);
   }
 
   @Post()

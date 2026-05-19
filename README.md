@@ -6,7 +6,7 @@ Monorepo на [pnpm](https://pnpm.io/) и [Turborepo](https://turbo.build/) дл
 
 | Путь | Описание |
 |------|----------|
-| `apps/web` | Next.js 15 (App Router) + Tailwind — MVP-панель (дашборд, проекты, задачи, бюджеты) |
+| `apps/web` | Next.js 15 (App Router) + Tailwind — MVP вокруг **проектов**: `/projects`, `/projects/[id]` (вкладки: обзор, задачи, заметки, бюджеты, отсутствия), `/employees`; глобальные `/tasks` и `/budgets` без пункта в меню |
 | `apps/api` | NestJS + TypeScript |
 | `apps/bot` | Node.js + TypeScript + [grammY](https://grammy.dev/) |
 | `packages/database` | Prisma schema и Prisma Client |
@@ -92,7 +92,7 @@ pnpm build
 - **Swagger:** `http://localhost:4000/docs` (порт — `API_PORT`)
 - Контекст организации: `NEPORTAL_ORG_SLUG` (по умолчанию `neportal-demo`) или явный `NEPORTAL_ORGANIZATION_ID` в `.env`.
 
-Эндпоинты: `GET /health`, `GET /users`, `GET /users/:id`, `GET|POST /projects`, `GET /projects/:id`, `GET|POST /tasks`, `PATCH /tasks/:id/status`, `GET|POST /budgets`, `GET /budgets/:id`, `GET|POST /budgets/:id/expenses`.
+Эндпоинты: `GET /health`, `GET /users`, `GET /users/:id`, `GET|POST /projects`, `GET /projects/:id`, `GET /projects/:id/summary` (сводка по задачам и бюджетам проекта), `GET|POST /tasks` (опционально `?projectId=`), `PATCH /tasks/:id/status`, `GET|POST /budgets` (опционально `?projectId=`), `GET /budgets/:id`, `GET|POST /budgets/:id/expenses`, `GET /notes` (опционально `?projectId=`).
 
 **apps/web:** страницы делают серверный `fetch` к `API_URL` (или `NEXT_PUBLIC_API_URL`) из `.env`. Для локальной разработки задайте тот же хост, что и у API (см. `.env.example`).
 

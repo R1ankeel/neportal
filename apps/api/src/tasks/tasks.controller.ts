@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CreateTaskDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
 
@@ -10,8 +10,9 @@ export class TasksController {
 
   @Get()
   @ApiOperation({ summary: "Список задач" })
-  findAll() {
-    return this.tasksService.findAll();
+  @ApiQuery({ name: "projectId", required: false, description: "Фильтр по проекту" })
+  findAll(@Query("projectId") projectId?: string) {
+    return this.tasksService.findAll(projectId);
   }
 
   @Post()

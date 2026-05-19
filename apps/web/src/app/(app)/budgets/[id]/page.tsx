@@ -32,10 +32,22 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <nav className="text-base text-zinc-500 dark:text-zinc-400">
-        <Link href="/budgets" className="hover:underline">
-          ← Бюджеты
-        </Link>
+      <nav className="flex flex-wrap gap-x-2 gap-y-1 text-base text-zinc-500 dark:text-zinc-400">
+        {budget.project ? (
+          <>
+            <Link href={`/projects/${budget.project.id}`} className="hover:underline">
+              ← {budget.project.name}
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href={`/projects/${budget.project.id}/budgets`} className="hover:underline">
+              Бюджеты проекта
+            </Link>
+          </>
+        ) : (
+          <Link href="/budgets" className="hover:underline">
+            ← Бюджеты
+          </Link>
+        )}
       </nav>
 
       <header className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

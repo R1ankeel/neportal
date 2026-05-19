@@ -15,9 +15,21 @@ export class BudgetsService {
     return this.organization.getOrganizationId();
   }
 
-  findAll() {
+  async findAll(projectId?: string) {
+    if (projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: projectId, organizationId: this.orgId() },
+      });
+      if (!project) {
+        throw new NotFoundException(`Project with id "${projectId}" not found`);
+      }
+    }
+
     return this.prisma.budget.findMany({
-      where: { organizationId: this.orgId() },
+      where: {
+        organizationId: this.orgId(),
+        ...(projectId ? { projectId } : {}),
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         createdBy: { select: { id: true, fullName: true } },

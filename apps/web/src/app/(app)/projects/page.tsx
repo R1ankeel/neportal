@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { apiGet } from "@/lib/api";
 import type { ApiProject } from "@/lib/types";
 
@@ -16,7 +17,7 @@ export default async function ProjectsPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Проекты</h1>
-        <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">Список проектов организации</p>
+        <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">Выберите проект — внутри задачи, бюджеты и заметки</p>
       </header>
 
       {error ? (
@@ -31,7 +32,10 @@ export default async function ProjectsPage() {
         ) : (
           projects.map((p) => (
             <li key={p.id}>
-              <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <Link
+                href={`/projects/${p.id}`}
+                className="block rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">{p.name}</h2>
@@ -46,7 +50,7 @@ export default async function ProjectsPage() {
                 {p.createdBy ? (
                   <p className="mt-3 text-base text-zinc-500 dark:text-zinc-400">Создал: {p.createdBy.fullName}</p>
                 ) : null}
-              </article>
+              </Link>
             </li>
           ))
         )}
