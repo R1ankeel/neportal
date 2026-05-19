@@ -1,0 +1,20 @@
+{
+  "name": "@neportal/bot",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "lint": "echo \"No linter configured for @neportal/bot\""
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "grammy": "^1.36.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.50",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
