@@ -10,7 +10,7 @@ Monorepo на [pnpm](https://pnpm.io/) и [Turborepo](https://turbo.build/) дл
 | `apps/api` | NestJS + TypeScript |
 | `apps/bot` | Node.js + TypeScript + [grammY](https://grammy.dev/) |
 | `packages/database` | Prisma schema и Prisma Client |
-| `packages/shared` | Общие типы и enums |
+| `packages/shared` | Общие типы, enums и **`loadRootEnv()`** — поиск и загрузка корневого `.env` |
 | `packages/permissions` | Роли и права |
 | `packages/ai-contracts` | Zod-схемы для AI intent parsing |
 
@@ -19,9 +19,21 @@ Monorepo на [pnpm](https://pnpm.io/) и [Turborepo](https://turbo.build/) дл
 - Node.js 20+
 - pnpm (версия зафиксирована в `package.json` → `packageManager`; рекомендуется [Corepack](https://nodejs.org/api/corepack.html))
 
+## Переменные окружения (один `.env` в корне)
+
+- Файл **`.env` создаётся только в корне** монорепозитория (`cp .env.example .env`). Секреты и URL не коммитьте.
+- **Копировать** `.env` в `apps/api`, `apps/bot`, `packages/database` **не нужно** — все команды из корня подхватывают корневой файл.
+- Загрузка:
+  - **API и бот** при старте вызывают `loadRootEnv()` из `@neportal/shared`: подъём от `process.cwd()` до 8 уровней вверх в поисках `.env`, затем `dotenv.config` (секреты в лог не пишутся).
+  - Опционально переменная **`NEPORTAL_ENV_PATH`** в **окружении ОС** (до запуска Node): если задана и файл существует — он загружается вместо поиска по дереву каталогов.
+  - Скрипты **`pnpm db:*`** в корне оборачивают Prisma в **`dotenv-cli`**: `dotenv -e .env -- …`, рабочая директория пакета `@neportal/database` сохраняется, схема — `packages/database/prisma/schema.prisma`.
+  - **Web** (`pnpm --filter @neportal/web dev|build|start`) подгружает **`../../.env`** относительно `apps/web` через тот же `dotenv-cli`.
+
+Запускайте `pnpm`, `pnpm db:*` и `pnpm --filter …` **из корня репозитория** (Windows PowerShell, macOS, Linux), чтобы `cwd` и пути к `.env` совпадали с ожидаемыми.
+
 ## Быстрый старт
 
-1. Скопируйте переменные окружения и при необходимости отредактируйте их:
+1. Скопируйте переменные окружения в **корень** репозитория и при необходимости отредактируйте:
 
 ```bash
 cp .env.example .env
@@ -33,22 +45,27 @@ cp .env.example .env
 docker compose up -d
 ```
 
-3. Установите зависимости и сгенерируйте Prisma Client:
+3. Установите зависимости и Prisma Client:
 
 ```bash
 pnpm install
 pnpm db:generate
 ```
 
-4. Запуск в режиме разработки (все приложения и пакеты с `dev`). Первый запуск сначала соберёт внутренние пакеты (`turbo` → `dependsOn: ^build`), затем поднимет dev-серверы.
+4. Миграции и сид (из корня, с подхватом `DATABASE_URL` из корневого `.env`):
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+```
+
+5. Запуск в режиме разработки — все приложения с `dev` (`turbo` сначала соберёт зависимости `^build`):
 
 ```bash
 pnpm dev
 ```
 
-Запускайте команды из **корня** репозитория, чтобы бот подхватил `.env`. При необходимости можно задать `NEPORTAL_ENV_PATH` с абсолютным путём к `.env`.
-
-Отдельные приложения:
+Отдельные приложения (тоже из **корня**):
 
 ```bash
 pnpm --filter @neportal/web dev
@@ -56,11 +73,20 @@ pnpm --filter @neportal/api dev
 pnpm --filter @neportal/bot dev
 ```
 
-Сборка всего монорепозитория:
+6. Сборка всего монорепозитория:
 
 ```bash
 pnpm build
 ```
+
+## Troubleshooting
+
+| Симптом | Что сделать |
+|--------|-------------|
+| `Environment variable not found: DATABASE_URL` (Prisma / API) | Убедитесь, что в **корне** есть `.env` с `DATABASE_URL`. Команды `pnpm db:*` и `pnpm --filter @neportal/api dev` запускайте из корня клона. Не копируйте `.env` в `packages/database`. |
+| `Set TELEGRAM_BOT_TOKEN in the root .env file` | Задайте `TELEGRAM_BOT_TOKEN` в **корневом** `.env`, затем снова `pnpm --filter @neportal/bot dev` из корня. |
+| Странные пути вроде `C:\Windows\System32` в ошибках, «не находит» проект или `.env` | Текущая директория не корень репозитория: выполните `cd` в каталог с `package.json` монорепозитория и повторите команду. |
+| Запуск Prisma из `packages/database` без переменных | Используйте скрипты **`pnpm db:migrate`** / **`pnpm db:seed`** из корня (они подставляют корневой `.env` через `dotenv-cli`). |
 
 ## Порты по умолчанию
 
@@ -81,7 +107,7 @@ pnpm build
 | `pnpm db:seed` | `prisma db seed` — демо-данные **Neportal Demo** (`slug`: `neportal-demo`) |
 | `pnpm db:studio` | Prisma Studio |
 
-Из каталога пакета (`pnpm --filter @neportal/database exec …`) доступны те же команды через скрипты `db:migrate`, `db:seed`, `db:studio` в `packages/database/package.json`.
+Прямой вызов `pnpm --filter @neportal/database exec prisma …` **без** корневого `dotenv -e .env` не подставит переменные из корневого `.env`; для повседневной работы используйте команды **`pnpm db:*`** из корня.
 
 Сид запускается через `tsx` (локальный devDependency пакета `@neportal/database`). Для демо-пользователей заданы уникальные строковые `telegramId` вида `seed-demo-*`, чтобы не пересекаться с реальными Telegram ID.
 
@@ -102,9 +128,9 @@ pnpm build
 
 ## Telegram-бот
 
-В `.env` задайте `TELEGRAM_BOT_TOKEN` и **`API_URL`** (бот дергает `POST /tasks` и `GET /users` на том же хосте, что и web).
+В **корневом** `.env` задайте `TELEGRAM_BOT_TOKEN` и **`API_URL`** (бот дергает `POST /tasks` и `GET /users` на том же хосте, что и web).
 
-Команды MVP: `/start`, `/demo`, `/task <текст>` (создание задачи: автор — Иван из сида, исполнитель — Вася, если найдены в `GET /users`).
+Команды MVP: `/start`, `/demo`, `/task <текст>` (создание задачи в выбранном по умолчанию проекте организации: предпочтительно «Реклама VK», иначе первый из `GET /projects`; автор — Иван из сида, исполнитель — Вася, если найдены в `GET /users`). Если проектов нет, бот ответит, что нужно создать проект в Web.
 
 Для локальной разработки по умолчанию используется long polling (`BOT_MODE` не задан или `polling`). Для webhook установите `BOT_MODE=webhook` и `TELEGRAM_WEBHOOK_URL`.
 

@@ -16,6 +16,9 @@
     "dev": "tsc -p tsconfig.json --watch",
     "lint": "echo \"No linter configured for @neportal/shared\""
   },
+  "dependencies": {
+    "dotenv": "^16.5.0"
+  },
   "devDependencies": {
     "typescript": "^5.8.3"
   }

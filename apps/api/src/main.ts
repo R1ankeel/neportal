@@ -2,7 +2,15 @@ import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { loadRootEnv } from "@neportal/shared";
 import { AppModule } from "./app.module";
+
+const envPath = loadRootEnv();
+if (envPath) {
+  console.log(`Loaded env from: ${envPath}`);
+} else {
+  console.log("Root .env file not found. Environment variables should be provided by the system.");
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

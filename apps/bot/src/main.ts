@@ -1,11 +1,21 @@
-import path from "node:path";
-import { config } from "dotenv";
 import { Bot } from "grammy";
-import { createTask, fetchUsers, pickAssigneeId, pickCreatorId, getApiBaseUrl } from "./api";
+import { loadRootEnv } from "@neportal/shared";
+import {
+  createTask,
+  fetchProjects,
+  fetchUsers,
+  pickAssigneeId,
+  pickCreatorId,
+  pickDefaultProjectId,
+  getApiBaseUrl,
+} from "./api";
 
-config({
-  path: process.env.NEPORTAL_ENV_PATH ?? path.resolve(process.cwd(), ".env"),
-});
+const envPath = loadRootEnv();
+if (envPath) {
+  console.log(`Loaded env from: ${envPath}`);
+} else {
+  console.log("Root .env file not found. Environment variables should be provided by the system.");
+}
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token || token === "change_me") {
@@ -48,7 +58,7 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   }
 
   try {
-    const users = await fetchUsers();
+    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
     const creatorId = pickCreatorId(users);
     const assigneeId = pickAssigneeId(users);
     if (!creatorId) {
@@ -56,13 +66,21 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
       return;
     }
 
+    const projectId = pickDefaultProjectId(projects);
+    if (!projectId) {
+      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+      return;
+    }
+
     const task = await createTask({
       title,
       creatorId,
       assigneeId,
+      projectId,
     });
 
-    await ctx.reply(`Задача создана: ${task.title}`);
+    const projectName = task.project?.name ?? projects.find((p) => p.id === projectId)?.name ?? "проект";
+    await ctx.reply(`Задача создана в проекте «${projectName}»: ${task.title}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(msg);

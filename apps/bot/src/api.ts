@@ -12,6 +12,11 @@ export type ApiUser = {
   role: string;
 };
 
+export type ApiProject = {
+  id: string;
+  name: string;
+};
+
 export async function fetchUsers(): Promise<ApiUser[]> {
   const res = await fetch(`${getApiBaseUrl()}/users`, {
     headers: { Accept: "application/json" },
@@ -23,11 +28,30 @@ export async function fetchUsers(): Promise<ApiUser[]> {
   return res.json() as Promise<ApiUser[]>;
 }
 
+export async function fetchProjects(): Promise<ApiProject[]> {
+  const res = await fetch(`${getApiBaseUrl()}/projects`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /projects → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiProject[]>;
+}
+
+/** Нет проектов → null; иначе предпочтительно «Реклама VK», иначе id первого в списке. */
+export function pickDefaultProjectId(projects: ApiProject[]): string | null {
+  if (projects.length === 0) return null;
+  const preferred = projects.find((p) => p.name === "Реклама VK");
+  return preferred?.id ?? projects[0].id;
+}
+
 export async function createTask(body: {
   title: string;
   creatorId: string;
   assigneeId?: string;
-}): Promise<{ id: string; title: string }> {
+  projectId?: string;
+}): Promise<{ id: string; title: string; project?: { id: string; name: string } | null }> {
   const res = await fetch(`${getApiBaseUrl()}/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -37,7 +61,7 @@ export async function createTask(body: {
     const text = await res.text().catch(() => "");
     throw new Error(`POST /tasks → ${res.status} ${text}`.trim());
   }
-  return res.json() as Promise<{ id: string; title: string }>;
+  return res.json() as Promise<{ id: string; title: string; project?: { id: string; name: string } | null }>;
 }
 
 /** Иван (OWNER) — автор в сиде; иначе первый OWNER / первый пользователь. */

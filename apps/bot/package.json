@@ -9,7 +9,7 @@
     "lint": "echo \"No linter configured for @neportal/bot\""
   },
   "dependencies": {
-    "dotenv": "^16.5.0",
+    "@neportal/shared": "workspace:*",
     "grammy": "^1.36.0"
   },
   "devDependencies": {

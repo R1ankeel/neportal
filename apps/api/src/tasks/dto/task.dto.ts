@@ -13,7 +13,10 @@ export class CreateTaskDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: "Проект той же организации" })
+  @ApiPropertyOptional({
+    description: "Проект той же организации; если не передан — задача без проекта (глобальная)",
+    example: "clxxxxxxxxxxxxxxxxxxxxxxxx",
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)
