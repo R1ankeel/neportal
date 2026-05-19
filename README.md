@@ -27,7 +27,7 @@ Monorepo на [pnpm](https://pnpm.io/) и [Turborepo](https://turbo.build/) дл
   - **API и бот** при старте вызывают `loadRootEnv()` из `@neportal/shared`: подъём от `process.cwd()` до 8 уровней вверх в поисках `.env`, затем `dotenv.config` (секреты в лог не пишутся).
   - Опционально переменная **`NEPORTAL_ENV_PATH`** в **окружении ОС** (до запуска Node): если задана и файл существует — он загружается вместо поиска по дереву каталогов.
   - Скрипты **`pnpm db:*`** в корне оборачивают Prisma в **`dotenv-cli`**: `dotenv -e .env -- …`, рабочая директория пакета `@neportal/database` сохраняется, схема — `packages/database/prisma/schema.prisma`.
-  - **Web** (`pnpm --filter @neportal/web dev|build|start`) подгружает **`../../.env`** относительно `apps/web` через тот же `dotenv-cli`.
+  - **Web** (`pnpm --filter @neportal/web dev|build|start`) подгружает **`../../.env`** относительно `apps/web` через `dotenv-cli`. Для **`build`** и **`start`** после загрузки `.env` принудительно выставляется **`NODE_ENV=production`**, иначе значение `NODE_ENV=development` из `.env` ломает production-сборку Next.js (в т.ч. ошибка про `<Html>` при пререндере `/404`).
 
 Запускайте `pnpm`, `pnpm db:*` и `pnpm --filter …` **из корня репозитория** (Windows PowerShell, macOS, Linux), чтобы `cwd` и пути к `.env` совпадали с ожидаемыми.
 
@@ -87,6 +87,7 @@ pnpm build
 | `Set TELEGRAM_BOT_TOKEN in the root .env file` | Задайте `TELEGRAM_BOT_TOKEN` в **корневом** `.env`, затем снова `pnpm --filter @neportal/bot dev` из корня. |
 | Странные пути вроде `C:\Windows\System32` в ошибках, «не находит» проект или `.env` | Текущая директория не корень репозитория: выполните `cd` в каталог с `package.json` монорепозитория и повторите команду. |
 | Запуск Prisma из `packages/database` без переменных | Используйте скрипты **`pnpm db:migrate`** / **`pnpm db:seed`** из корня (они подставляют корневой `.env` через `dotenv-cli`). |
+| `next build` / `<Html> should not be imported outside of pages/_document` при пререндере `/404` | Часто из‑за **`NODE_ENV=development`** из `.env` на этапе сборки. В `@neportal/web` скрипт `build` уже задаёт **`NODE_ENV=production`** поверх `.env`; не отключайте это при кастомных командах. |
 
 ## Порты по умолчанию
 
