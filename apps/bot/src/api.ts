@@ -64,6 +64,24 @@ export async function createTask(body: {
   return res.json() as Promise<{ id: string; title: string; project?: { id: string; name: string } | null }>;
 }
 
+export async function createNote(body: {
+  text: string;
+  creatorId: string;
+  projectId?: string;
+  source?: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
+}): Promise<{ id: string; text: string; project?: { id: string; name: string } | null }> {
+  const res = await fetch(`${getApiBaseUrl()}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /notes → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<{ id: string; text: string; project?: { id: string; name: string } | null }>;
+}
+
 /** Иван (OWNER) — автор в сиде; иначе первый OWNER / первый пользователь. */
 export function pickCreatorId(users: ApiUser[]): string | undefined {
   const ivan = users.find((u) => u.fullName.includes("Иван") && u.role === "OWNER");

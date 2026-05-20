@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import {
+  createNote,
   createTask,
   fetchProjects,
   fetchUsers,
@@ -30,7 +31,8 @@ bot.command("start", async (ctx) => {
     [
       "Привет! Я бот Neportal.",
       "",
-      "Создавай задачи текстом: /task <название>",
+      "Создавай задачи: /task <название>",
+      "Создавай заметки: /note <текст>",
       "Список команд: /demo",
     ].join("\n"),
   );
@@ -44,6 +46,7 @@ bot.command("demo", async (ctx) => {
       "/start — приветствие",
       "/demo — эта справка",
       "/task <текст> — создать задачу в Neportal (через API)",
+      "/note <текст> — создать заметку в проекте по умолчанию",
       "",
       `API: ${getApiBaseUrl()}`,
     ].join("\n"),
@@ -90,6 +93,47 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
 
 bot.hears(/^\/task(?:@\w+)?\s*$/i, async (ctx) => {
   await ctx.reply("Использование: /task Подготовить отчёт");
+});
+
+bot.hears(/^\/note(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
+  const text = ctx.match[1].trim();
+  if (!text) {
+    await ctx.reply("Использование: /note <текст заметки>");
+    return;
+  }
+
+  try {
+    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+    const creatorId = pickCreatorId(users);
+    if (!creatorId) {
+      await ctx.reply("Не удалось определить автора заметки. Проверьте сид и GET /users.");
+      return;
+    }
+
+    const projectId = pickDefaultProjectId(projects);
+    if (!projectId) {
+      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+      return;
+    }
+
+    const note = await createNote({
+      text,
+      creatorId,
+      projectId,
+      source: "TELEGRAM_TEXT",
+    });
+
+    const projectName = note.project?.name ?? projects.find((p) => p.id === projectId)?.name ?? "проект";
+    await ctx.reply(`Заметка создана в проекте «${projectName}»: ${note.text}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(msg);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
+bot.hears(/^\/note(?:@\w+)?\s*$/i, async (ctx) => {
+  await ctx.reply("Использование: /note <текст заметки>");
 });
 
 const mode = process.env.BOT_MODE ?? "polling";

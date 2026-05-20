@@ -1,4 +1,5 @@
 import { apiGet } from "@/lib/api";
+import { formatDateTime, noteSourceLabel } from "@/lib/format";
 import type { ApiNote } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +30,21 @@ export default async function ProjectNotesPage({ params }: { params: Promise<{ i
         <ul className="space-y-3">
           {notes.map((n) => (
             <li key={n.id} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <p className="text-sm text-zinc-500">{new Date(n.createdAt).toLocaleString("ru-RU")}</p>
-              <p className="mt-2 text-lg">{n.text}</p>
+              <p className="text-lg leading-relaxed">{n.text}</p>
+              <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+                <div>
+                  <dt className="sr-only">Автор</dt>
+                  <dd>{n.creator?.fullName ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="sr-only">Источник</dt>
+                  <dd>{noteSourceLabel(n.source)}</dd>
+                </div>
+                <div>
+                  <dt className="sr-only">Дата</dt>
+                  <dd>{formatDateTime(n.createdAt)}</dd>
+                </div>
+              </dl>
             </li>
           ))}
         </ul>

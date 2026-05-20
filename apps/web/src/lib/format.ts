@@ -48,3 +48,13 @@ const taskStatusRu: Record<string, string> = {
 export function taskStatusLabel(status: string): string {
   return taskStatusRu[status] ?? status;
 }
+
+const noteSourceRu: Record<string, string> = {
+  WEB: "Web",
+  TELEGRAM_TEXT: "Telegram",
+  TELEGRAM_VOICE: "Голос Telegram",
+};
+
+export function noteSourceLabel(source: string): string {
+  return noteSourceRu[source] ?? source;
+}
