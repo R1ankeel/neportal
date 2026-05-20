@@ -58,3 +58,18 @@ const noteSourceRu: Record<string, string> = {
 export function noteSourceLabel(source: string): string {
   return noteSourceRu[source] ?? source;
 }
+
+export function expenseSourceLabel(source: string): string {
+  return noteSourceRu[source] ?? source;
+}
+
+const expenseStatusRu: Record<string, string> = {
+  PENDING: "На согласовании",
+  APPROVED: "Одобрен",
+  REJECTED: "Отклонён",
+  CANCELLED: "Отменён",
+};
+
+export function expenseStatusLabel(status: string): string {
+  return expenseStatusRu[status] ?? status;
+}

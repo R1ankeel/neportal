@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiGet } from "@/lib/api";
-import { budgetRemainder, formatDateTime, formatMoney, parseAmount } from "@/lib/format";
+import { budgetRemainder, expenseSourceLabel, expenseStatusLabel, formatDateTime, formatMoney, parseAmount } from "@/lib/format";
 import type { ApiBudget, ApiBudgetExpense, ApiUser } from "@/lib/types";
 import { AddExpenseForm } from "./AddExpenseForm";
 
@@ -80,15 +80,19 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
             <li className="py-6 text-lg text-zinc-500">Расходов пока нет</li>
           ) : (
             expenses.map((e) => (
-              <li key={e.id} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <li key={e.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-lg font-medium">{formatMoney(parseAmount(e.amount), e.currency)}</p>
-                  <p className="text-base text-zinc-500">
-                    {e.user?.fullName ?? "—"} · {formatDateTime(e.expenseDate)}
-                  </p>
-                  {e.description ? <p className="mt-1 text-base text-zinc-600">{e.description}</p> : null}
+                  <p className="text-base text-zinc-500">{formatDateTime(e.expenseDate)}</p>
+                  {e.description ? <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">{e.description}</p> : null}
+                  <p className="mt-1 text-sm text-zinc-500">{e.user?.fullName ?? "—"}</p>
                 </div>
-                <span className="shrink-0 text-sm font-medium text-zinc-500">{e.status}</span>
+                <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                  <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {expenseSourceLabel(e.source)}
+                  </span>
+                  <span className="text-sm font-medium text-zinc-500">{expenseStatusLabel(e.status)}</span>
+                </div>
               </li>
             ))
           )}

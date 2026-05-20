@@ -1,12 +1,18 @@
 import { Bot } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import {
+  createBudgetExpense,
   createNote,
   createTask,
+  fetchBudgets,
   fetchProjects,
   fetchUsers,
+  formatMoney,
+  parseAmount,
   pickAssigneeId,
   pickCreatorId,
+  pickDefaultBudget,
+  pickDefaultProject,
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
@@ -33,6 +39,7 @@ bot.command("start", async (ctx) => {
       "",
       "Создавай задачи: /task <название>",
       "Создавай заметки: /note <текст>",
+      "Добавляй расходы: /expense <сумма> <описание>",
       "Список команд: /demo",
     ].join("\n"),
   );
@@ -47,6 +54,7 @@ bot.command("demo", async (ctx) => {
       "/demo — эта справка",
       "/task <текст> — создать задачу в Neportal (через API)",
       "/note <текст> — создать заметку в проекте по умолчанию",
+      "/expense <сумма> <описание> — добавить расход в бюджет проекта",
       "",
       `API: ${getApiBaseUrl()}`,
     ].join("\n"),
@@ -134,6 +142,69 @@ bot.hears(/^\/note(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
 
 bot.hears(/^\/note(?:@\w+)?\s*$/i, async (ctx) => {
   await ctx.reply("Использование: /note <текст заметки>");
+});
+
+bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) => {
+  const amountRaw = ctx.match[1].replace(",", ".");
+  const amount = Number(amountRaw);
+  const description = ctx.match[2].trim() || undefined;
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    await ctx.reply("Использование: /expense <сумма> <описание>");
+    return;
+  }
+
+  try {
+    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+    const userId = pickCreatorId(users);
+    if (!userId) {
+      await ctx.reply("Не удалось определить пользователя. Проверьте сид и GET /users.");
+      return;
+    }
+
+    const project = pickDefaultProject(projects);
+    if (!project) {
+      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+      return;
+    }
+
+    const budgets = await fetchBudgets(project.id);
+    const budget = pickDefaultBudget(budgets);
+    if (!budget) {
+      await ctx.reply(`В проекте «${project.name}» нет бюджетов. Создайте бюджет в Web.`);
+      return;
+    }
+
+    const result = await createBudgetExpense(budget.id, {
+      userId,
+      amount,
+      description,
+      source: "TELEGRAM_TEXT",
+    });
+
+    const updatedBudget = result.budget;
+    const remaining =
+      parseAmount(updatedBudget.initialAmount) - parseAmount(updatedBudget.spentAmount);
+
+    await ctx.reply(
+      [
+        `Расход создан в бюджете «${updatedBudget.title}»: ${formatMoney(amount, updatedBudget.currency)}`,
+        `Остаток бюджета: ${formatMoney(remaining, updatedBudget.currency)}`,
+      ].join("\n"),
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(msg);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
+bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
+  await ctx.reply("Использование: /expense <сумма> <описание>");
+});
+
+bot.hears(/^\/expense(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
+  await ctx.reply("Использование: /expense <сумма> <описание>");
 });
 
 const mode = process.env.BOT_MODE ?? "polling";

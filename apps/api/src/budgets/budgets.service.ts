@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "@neportal/database";
+import { ExpenseStatus, PrismaService } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateBudgetExpenseDto } from "./dto/create-budget-expense.dto";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
@@ -110,19 +110,32 @@ export class BudgetsService {
       throw new NotFoundException(`User with id "${dto.userId}" not found in this organization`);
     }
 
-    return this.prisma.budgetExpense.create({
-      data: {
-        organizationId: org,
-        budgetId,
-        userId: dto.userId,
-        amount: dto.amount,
-        currency: dto.currency ?? "RUB",
-        description: dto.description,
-        expenseDate: dto.expenseDate,
-        source: dto.source,
-        status: dto.status ?? undefined,
-      },
-      include: { user: { select: { id: true, fullName: true } } },
+    const expenseDate = dto.expenseDate ?? new Date();
+    const status = dto.status ?? ExpenseStatus.APPROVED;
+
+    return this.prisma.$transaction(async (tx) => {
+      const expense = await tx.budgetExpense.create({
+        data: {
+          organizationId: org,
+          budgetId,
+          userId: dto.userId,
+          amount: dto.amount,
+          currency: dto.currency ?? "RUB",
+          description: dto.description,
+          expenseDate,
+          source: dto.source,
+          status,
+        },
+        include: { user: { select: { id: true, fullName: true } } },
+      });
+
+      const budget = await tx.budget.update({
+        where: { id: budgetId },
+        data: { spentAmount: { increment: dto.amount } },
+        include: { project: { select: { id: true, name: true } } },
+      });
+
+      return { ...expense, budget };
     });
   }
 

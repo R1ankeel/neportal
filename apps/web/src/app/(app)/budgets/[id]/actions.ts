@@ -48,8 +48,14 @@ export async function addBudgetExpense(
     return { ok: false, message: text || `Ошибка ${res.status}` };
   }
 
+  const data = (await res.json()) as { budget?: { project?: { id: string } | null } };
+
   revalidatePath(`/budgets/${budgetId}`);
   revalidatePath("/budgets");
   revalidatePath("/dashboard");
+  if (data.budget?.project?.id) {
+    revalidatePath(`/projects/${data.budget.project.id}/budgets`);
+    revalidatePath(`/projects/${data.budget.project.id}`);
+  }
   return { ok: true, saved: true };
 }

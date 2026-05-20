@@ -9,10 +9,10 @@ export class CreateBudgetExpenseDto {
   @IsNotEmpty()
   userId!: string;
 
-  @ApiProperty({ example: 1500.5 })
+  @ApiProperty({ example: 1500.5, description: "Положительная сумма расхода" })
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   amount!: number;
 
   @ApiPropertyOptional({ example: "RUB" })
@@ -25,10 +25,14 @@ export class CreateBudgetExpenseDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ description: "Дата расхода", example: "2026-05-19T12:00:00.000Z" })
+  @ApiPropertyOptional({
+    description: "Дата расхода (по умолчанию — текущая)",
+    example: "2026-05-19T12:00:00.000Z",
+  })
+  @IsOptional()
   @Type(() => Date)
   @IsDate()
-  expenseDate!: Date;
+  expenseDate?: Date;
 
   @ApiProperty({ enum: ExpenseSource })
   @IsEnum(ExpenseSource)

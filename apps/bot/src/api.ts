@@ -17,6 +17,15 @@ export type ApiProject = {
   name: string;
 };
 
+export type ApiBudget = {
+  id: string;
+  title: string;
+  initialAmount: string | number;
+  spentAmount: string | number;
+  currency: string;
+  project?: { id: string; name: string } | null;
+};
+
 export async function fetchUsers(): Promise<ApiUser[]> {
   const res = await fetch(`${getApiBaseUrl()}/users`, {
     headers: { Accept: "application/json" },
@@ -44,6 +53,76 @@ export function pickDefaultProjectId(projects: ApiProject[]): string | null {
   if (projects.length === 0) return null;
   const preferred = projects.find((p) => p.name === "Реклама VK");
   return preferred?.id ?? projects[0].id;
+}
+
+export function pickDefaultProject(projects: ApiProject[]): ApiProject | null {
+  if (projects.length === 0) return null;
+  const preferred = projects.find((p) => p.name === "Реклама VK");
+  return preferred ?? projects[0];
+}
+
+export async function fetchBudgets(projectId: string): Promise<ApiBudget[]> {
+  const url = new URL(`${getApiBaseUrl()}/budgets`);
+  url.searchParams.set("projectId", projectId);
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /budgets → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiBudget[]>;
+}
+
+/** Нет бюджетов → null; иначе предпочтительно название с «Реклама VK», иначе первый. */
+export function pickDefaultBudget(budgets: ApiBudget[]): ApiBudget | null {
+  if (budgets.length === 0) return null;
+  const preferred = budgets.find((b) => b.title.includes("Реклама VK"));
+  return preferred ?? budgets[0];
+}
+
+export function parseAmount(value: string | number | undefined | null): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function formatMoney(amount: number, currency = "RUB"): string {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export async function createBudgetExpense(
+  budgetId: string,
+  body: {
+    userId: string;
+    amount: number;
+    description?: string;
+    source: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
+  },
+): Promise<{
+  id: string;
+  amount: string | number;
+  budget: ApiBudget;
+}> {
+  const res = await fetch(`${getApiBaseUrl()}/budgets/${budgetId}/expenses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      userId: body.userId,
+      amount: body.amount,
+      currency: "RUB",
+      description: body.description,
+      source: body.source,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /budgets/${budgetId}/expenses → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<{ id: string; amount: string | number; budget: ApiBudget }>;
 }
 
 export async function createTask(body: {
