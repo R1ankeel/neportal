@@ -18,7 +18,10 @@ pnpm --filter @neportal/web dev
 
 - Базовый URL: `API_URL` или `NEXT_PUBLIC_API_URL` (fallback `http://localhost:4000`).
 - `apiGet`, `apiPostJson`, `apiPatchJson` — серверный `fetch` с `cache: "no-store"`.
-- Вложения: `getAttachmentOpenUrl(attachmentId)` → `GET /budget-expense-attachments/:id/open`.
+- Вложения расходов:
+  - `getAttachmentPreviewUrl(id)` → inline-просмотр в модальном окне
+  - `getAttachmentDownloadUrl(id)` → скачивание файла
+  - Для `<img>` / `<iframe>` в браузере нужен `NEXT_PUBLIC_API_URL` (или `API_URL` на SSR).
 
 Типы ответов: `src/lib/types.ts`. Форматирование денег/дат: `src/lib/format.ts`.
 
@@ -46,7 +49,7 @@ pnpm --filter @neportal/web dev
 | `/employees` | Сотрудники организации |
 | `/tasks` | Глобальный список задач (без пункта в меню) |
 | `/budgets` | Глобальный список бюджетов |
-| `/budgets/[id]` | Карточка бюджета, расходы, форма добавления |
+| `/budgets/[id]` | Карточка бюджета, расходы, форма добавления, модальный просмотр чеков |
 
 Вкладки проекта: компонент `ProjectTabs` — Обзор, Задачи, Заметки, Бюджеты, Отсутствия.
 
@@ -69,6 +72,7 @@ apps/web/src/
 ├── components/ProjectTabs.tsx
 └── app/(app)/budgets/[id]/
     ├── page.tsx
+    ├── ExpenseAttachments.tsx  # модальный просмотр и ссылки на download
     ├── AddExpenseForm.tsx
     └── actions.ts
 ```

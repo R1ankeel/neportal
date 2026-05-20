@@ -10,6 +10,15 @@ export function getApiBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
+export function getAttachmentPreviewUrl(attachmentId: string): string {
+  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/preview`;
+}
+
+export function getAttachmentDownloadUrl(attachmentId: string): string {
+  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/download`;
+}
+
+/** @deprecated Используйте getAttachmentPreviewUrl / getAttachmentDownloadUrl */
 export function getAttachmentOpenUrl(attachmentId: string): string {
   return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/open`;
 }

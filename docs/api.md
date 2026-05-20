@@ -108,7 +108,9 @@
 |-------|------|----------|
 | GET | `/budget-expenses/:expenseId/attachments` | Список вложений расхода |
 | POST | `/budget-expenses/:expenseId/attachments` | Прикрепить чек (метаданные Telegram) |
-| GET | `/budget-expense-attachments/:id/open` | Получить URL для открытия файла (302 redirect) |
+| GET | `/budget-expense-attachments/:id/preview` | Предпросмотр чека (прокси из Telegram, `Content-Disposition: inline`) |
+| GET | `/budget-expense-attachments/:id/download` | Скачать чек (прокси из Telegram, `Content-Disposition: attachment`) |
+| GET | `/budget-expense-attachments/:id/open` | **Deprecated** — redirect на Telegram URL |
 
 **POST attachment** — пример для бота:
 
@@ -123,11 +125,13 @@
 
 `storageKey` в S3 опционален; для MVP достаточно `telegramFileId`.
 
+**Preview / download** — backend вызывает Telegram `getFile`, скачивает файл и отдаёт клиенту. `TELEGRAM_BOT_TOKEN` используется только на сервере API (тот же `.env`, что у бота). Web показывает чек в модальном окне через `/preview`, скачивание — через `/download`.
+
 ## Коды ошибок
 
 - **400** — валидация DTO, бизнес-ограничения (сумма ≤ 0, неверный статус).
 - **404** — сущность не найдена или не принадлежит org.
-- **502** — ошибка Telegram API при открытии вложения.
+- **502** — ошибка Telegram API при загрузке вложения.
 
 ## Модули NestJS
 
