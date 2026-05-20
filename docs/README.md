@@ -39,5 +39,5 @@ Neportal — монорепозиторий для внутреннего пор
 
 - **Нет аутентификации** в API: все запросы обслуживаются в контексте одной организации (`NEPORTAL_ORG_SLUG` или `NEPORTAL_ORGANIZATION_ID`).
 - **Web** не реализует логин; страницы доверяют API и демо-данным сида.
-- **Отсутствия** и часть сущностей в схеме БД есть, но UI/API для них может быть неполным — см. [database.md](database.md) и [web.md](web.md).
+- **Отсутствия** — бот `/sick`, `/vacation`, API `GET/POST /absences`, вкладка проекта в Web — см. [api.md](api.md), [bot.md](bot.md).
 - **S3 / Yandex Cloud** в `.env.example` — заготовки под голос, GPT и хранение файлов; в MVP чеки из Telegram хранятся как `telegramFileId`, открытие — через redirect API.

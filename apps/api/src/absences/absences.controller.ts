@@ -1,0 +1,54 @@
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { AbsenceStatus, AbsenceType } from "@neportal/database";
+import {
+  CreateAbsenceDto,
+  UpdateAbsenceStatusDto,
+} from "./dto/absence.dto";
+import { AbsencesService } from "./absences.service";
+
+@ApiTags("absences")
+@Controller("absences")
+export class AbsencesController {
+  constructor(private readonly absencesService: AbsencesService) {}
+
+  @Get()
+  @ApiOperation({ summary: "Список отсутствий" })
+  @ApiQuery({ name: "projectId", required: false, description: "Только участники проекта + affectedTasks" })
+  @ApiQuery({ name: "userId", required: false })
+  @ApiQuery({ name: "type", required: false, enum: AbsenceType })
+  @ApiQuery({ name: "status", required: false, enum: AbsenceStatus })
+  findAll(
+    @Query("projectId") projectId?: string,
+    @Query("userId") userId?: string,
+    @Query("type") type?: AbsenceType,
+    @Query("status") status?: AbsenceStatus,
+  ) {
+    return this.absencesService.findAll({ projectId, userId, type, status });
+  }
+
+  @Get(":id")
+  @ApiOperation({ summary: "Отсутствие по id" })
+  @ApiParam({ name: "id" })
+  @ApiQuery({
+    name: "projectId",
+    required: false,
+    description: "Если указан — вернуть affectedTasks для этого проекта",
+  })
+  findOne(@Param("id") id: string, @Query("projectId") projectId?: string) {
+    return this.absencesService.findOne(id, projectId);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Создать отсутствие (по умолчанию status APPROVED)" })
+  create(@Body() dto: CreateAbsenceDto) {
+    return this.absencesService.create(dto);
+  }
+
+  @Patch(":id/status")
+  @ApiOperation({ summary: "Обновить статус отсутствия" })
+  @ApiParam({ name: "id" })
+  updateStatus(@Param("id") id: string, @Body() dto: UpdateAbsenceStatusDto) {
+    return this.absencesService.updateStatus(id, dto);
+  }
+}

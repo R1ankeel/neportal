@@ -73,3 +73,22 @@ const expenseStatusRu: Record<string, string> = {
 export function expenseStatusLabel(status: string): string {
   return expenseStatusRu[status] ?? status;
 }
+
+const absenceTypeRu: Record<string, string> = {
+  SICK_LEAVE: "Больничный",
+  VACATION: "Отпуск",
+};
+
+export function absenceTypeLabel(type: string): string {
+  return absenceTypeRu[type] ?? type;
+}
+
+const absenceStatusRu: Record<string, string> = {
+  PENDING: "На рассмотрении",
+  APPROVED: "Одобрен",
+  REJECTED: "Отклонён",
+};
+
+export function absenceStatusLabel(status: string): string {
+  return absenceStatusRu[status] ?? status;
+}

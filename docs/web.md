@@ -45,7 +45,7 @@ pnpm --filter @neportal/web dev
 | `/projects/[id]/tasks` | Задачи проекта, смена статуса |
 | `/projects/[id]/notes` | Заметки |
 | `/projects/[id]/budgets` | Бюджеты проекта |
-| `/projects/[id]/absences` | Отсутствия (заготовка UI) |
+| `/projects/[id]/absences` | Больничные и отпуска участников проекта, затронутые задачи |
 | `/employees` | Сотрудники организации |
 | `/tasks` | Глобальный список задач (без пункта в меню) |
 | `/budgets` | Глобальный список бюджетов |

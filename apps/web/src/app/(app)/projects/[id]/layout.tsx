@@ -43,7 +43,7 @@ export default async function ProjectLayout({
           <p className="mt-3 text-lg text-zinc-400">Без описания</p>
         )}
 
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <Stat label="Задач" value={String(summary.tasksTotal)} />
           <Stat label="Новые" value={String(summary.tasksNew)} />
           <Stat label="В работе" value={String(summary.tasksInProgress)} />
@@ -53,6 +53,12 @@ export default async function ProjectLayout({
             label="Остаток бюджетов"
             value={formatMoney(summary.budgetsRemainingTotal, "RUB")}
             emphasize
+          />
+          <Stat label="Отсутствий" value={String(summary.absencesTotal)} />
+          <Stat
+            label="Сейчас отсутствуют"
+            value={String(summary.absencesActiveNow)}
+            emphasize={summary.absencesActiveNow > 0}
           />
         </dl>
       </header>

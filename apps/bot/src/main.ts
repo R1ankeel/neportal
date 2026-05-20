@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import {
+  createAbsence,
   createBudgetExpense,
   createExpenseAttachment,
   createNote,
@@ -17,6 +18,7 @@ import {
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
+import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 
 const envPath = loadRootEnv();
@@ -42,6 +44,8 @@ bot.command("start", async (ctx) => {
       "Создавай задачи: /task <название>",
       "Создавай заметки: /note <текст>",
       "Добавляй расходы: /expense <сумма> <описание>",
+      "Больничный: /sick до 25.05.2026 номер 123456",
+      "Отпуск: /vacation с 01.06.2026 по 10.06.2026",
       "Список команд: /demo",
     ].join("\n"),
   );
@@ -57,6 +61,8 @@ bot.command("demo", async (ctx) => {
       "/task <текст> — создать задачу в Neportal (через API)",
       "/note <текст> — создать заметку в проекте по умолчанию",
       "/expense <сумма> <описание> — добавить расход в бюджет проекта",
+      "/sick до 25.05.2026 номер 123456 — больничный",
+      "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -220,6 +226,107 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
 
 bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
   await ctx.reply("Использование: /expense <сумма> <описание>");
+});
+
+const SICK_USAGE = "Использование: /sick до 25.05.2026 номер 123456";
+const VACATION_USAGE = "Использование: /vacation с 01.06.2026 по 10.06.2026";
+
+bot.hears(/^\/sick(?:@\w+)?(?:\s+до)?\s+(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+номер\s+(\S+))?$/i, async (ctx) => {
+  const endIso = parseRuDate(ctx.match[1]);
+  if (!endIso) {
+    await ctx.reply(SICK_USAGE);
+    return;
+  }
+
+  const documentNumber = ctx.match[2]?.trim() || undefined;
+  const startIso = todayIsoDate();
+
+  try {
+    const users = await fetchUsers();
+    const userId = pickCreatorId(users);
+    if (!userId) {
+      await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
+      return;
+    }
+
+    await createAbsence({
+      userId,
+      type: "SICK_LEAVE",
+      startDate: startIso,
+      endDate: endIso,
+      documentNumber,
+      status: "APPROVED",
+    });
+
+    await ctx.reply(
+      [
+        `Больничный добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`,
+        `Номер: ${documentNumber ?? "не указан"}.`,
+      ].join("\n"),
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(msg);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
+bot.hears(/^\/sick(?:@\w+)?\s*$/i, async (ctx) => {
+  await ctx.reply(SICK_USAGE);
+});
+
+bot.hears(/^\/sick(?:@\w+)?\s+.+$/i, async (ctx) => {
+  await ctx.reply(SICK_USAGE);
+});
+
+bot.hears(
+  /^\/vacation(?:@\w+)?(?:\s+с)?\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+(?:по\s+)?(\d{1,2}\.\d{1,2}\.\d{4})$/i,
+  async (ctx) => {
+    const startIso = parseRuDate(ctx.match[1]);
+    const endIso = parseRuDate(ctx.match[2]);
+    if (!startIso || !endIso) {
+      await ctx.reply(VACATION_USAGE);
+      return;
+    }
+
+    if (endIso < startIso) {
+      await ctx.reply("Дата окончания не может быть раньше даты начала.");
+      return;
+    }
+
+    try {
+      const users = await fetchUsers();
+      const userId = pickCreatorId(users);
+      if (!userId) {
+        await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
+        return;
+      }
+
+      await createAbsence({
+        userId,
+        type: "VACATION",
+        startDate: startIso,
+        endDate: endIso,
+        status: "APPROVED",
+      });
+
+      await ctx.reply(
+        `Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(msg);
+      await ctx.reply(`Ошибка API: ${msg}`);
+    }
+  },
+);
+
+bot.hears(/^\/vacation(?:@\w+)?\s*$/i, async (ctx) => {
+  await ctx.reply(VACATION_USAGE);
+});
+
+bot.hears(/^\/vacation(?:@\w+)?\s+.+$/i, async (ctx) => {
+  await ctx.reply(VACATION_USAGE);
 });
 
 bot.hears(/^\/expense(?:@\w+)?\s+(.+)$/ims, async (ctx) => {

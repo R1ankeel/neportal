@@ -71,6 +71,8 @@ export type ApiProjectSummary = {
   tasksDone: number;
   budgetsTotal: number;
   budgetsRemainingTotal: number;
+  absencesTotal: number;
+  absencesActiveNow: number;
 };
 
 export type ApiNote = {
@@ -80,4 +82,23 @@ export type ApiNote = {
   createdAt: string;
   creator?: { id: string; fullName: string };
   project?: { id: string; name: string } | null;
+};
+
+export type ApiAbsenceAffectedTask = {
+  id: string;
+  title: string;
+  status: string;
+  deadlineAt: string | null;
+};
+
+export type ApiAbsence = {
+  id: string;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  documentNumber: string | null;
+  comment: string | null;
+  user: { id: string; fullName: string; role: string };
+  affectedTasks: ApiAbsenceAffectedTask[];
 };

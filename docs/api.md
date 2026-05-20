@@ -127,6 +127,46 @@
 
 **Preview / download** — backend вызывает Telegram `getFile`, скачивает файл и отдаёт клиенту. `TELEGRAM_BOT_TOKEN` используется только на сервере API (тот же `.env`, что у бота). Web показывает чек в модальном окне через `/preview`, скачивание — через `/download`.
 
+## Absences
+
+| Метод | Путь | Query | Описание |
+|-------|------|-------|----------|
+| GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?` | Список отсутствий |
+| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` — `affectedTasks` |
+| POST | `/absences` | — | Создать отсутствие |
+| PATCH | `/absences/:id/status` | — | Сменить статус |
+
+**POST /absences** (`CreateAbsenceDto`):
+
+```json
+{
+  "userId": "cuid",
+  "type": "SICK_LEAVE",
+  "startDate": "2026-05-20",
+  "endDate": "2026-05-25",
+  "documentNumber": "123456",
+  "comment": "опционально",
+  "status": "APPROVED"
+}
+```
+
+По умолчанию `status` = `APPROVED`. `endDate` не может быть раньше `startDate`. `userId` должен быть в текущей организации.
+
+**GET /absences?projectId=…`** — только отсутствия участников проекта (`ProjectMember`). В каждом элементе:
+
+- поля отсутствия и `user` (`id`, `fullName`, `role`);
+- `affectedTasks` — задачи проекта с `assigneeId` = пользователь отсутствия, `deadlineAt` в периоде `[startDate, endDate]` включительно, статус не `DONE` и не `CANCELLED`.
+
+**PATCH /absences/:id/status**:
+
+```json
+{ "status": "APPROVED" }
+```
+
+Типы: `SICK_LEAVE`, `VACATION`. Статусы: `PENDING`, `APPROVED`, `REJECTED`.
+
+**GET /projects/:id/summary** — дополнительно `absencesTotal`, `absencesActiveNow` (одобренные отсутствия, пересекающиеся с сегодняшним днём).
+
 ## Коды ошибок
 
 - **400** — валидация DTO, бизнес-ограничения (сумма ≤ 0, неверный статус).
@@ -143,7 +183,8 @@ app.module
 ├── TasksModule
 ├── BudgetsModule
 ├── BudgetExpensesModule # attachments + open
-└── NotesModule
+├── NotesModule
+└── AbsencesModule
 ```
 
 Prisma подключается через `PrismaModule` из `@neportal/database`.

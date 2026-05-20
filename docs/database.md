@@ -71,9 +71,17 @@ erDiagram
 - `telegramFileId` — для чеков из бота.
 - `uploadedBy` — пользователь, загрузивший файл.
 
-### Absence / Reminder
+### Absence
 
-Модели в схеме для отпусков/больничных и напоминаний по задачам; UI и полный API могут быть не реализованы в MVP.
+- Типы: `SICK_LEAVE`, `VACATION` (`AbsenceType`).
+- Статусы: `PENDING`, `APPROVED`, `REJECTED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`.
+- Поля: `userId`, `startDate`, `endDate`, опционально `documentNumber`, `comment`.
+- REST: модуль `AbsencesModule` — см. [api.md](api.md).
+- В выдаче по проекту — `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия).
+
+### Reminder
+
+Модель для напоминаний по задачам; UI и API в MVP не реализованы.
 
 ## Enum'ы (кратко)
 
@@ -118,6 +126,6 @@ pnpm db:studio     # GUI
 | `telegramId` | `seed-demo-ivan`, `seed-demo-vasya`, … — не пересекаются с реальными Telegram ID |
 | Проект | «Реклама VK», участники с ролями |
 | Бюджет | 50 000 RUB, название «Реклама VK» |
-| Задача | «Подготовить отчет», автор Иван, исполнитель Вася |
+| Задачи | «Подготовить отчет» (Вася); «Подписать договор…» (Иван, deadline 22.05.2026 — для демо affectedTasks) |
 
 Бот и документация предполагают проект **«Реклама VK»** как проект по умолчанию.

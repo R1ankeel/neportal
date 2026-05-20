@@ -196,3 +196,47 @@ export function pickAssigneeId(users: ApiUser[]): string | undefined {
   if (vasya) return vasya.id;
   return users.find((u) => u.role === "EMPLOYEE")?.id;
 }
+
+export type ApiAbsence = {
+  id: string;
+  type: "SICK_LEAVE" | "VACATION";
+  status: string;
+  startDate: string;
+  endDate: string;
+  documentNumber: string | null;
+  user: { id: string; fullName: string; role: string };
+};
+
+export async function createAbsence(body: {
+  userId: string;
+  type: "SICK_LEAVE" | "VACATION";
+  startDate: string;
+  endDate: string;
+  documentNumber?: string;
+  status?: "APPROVED";
+}): Promise<ApiAbsence> {
+  const res = await fetch(`${getApiBaseUrl()}/absences`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      ...body,
+      status: body.status ?? "APPROVED",
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /absences → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiAbsence>;
+}
+
+export async function fetchAbsences(projectId: string): Promise<ApiAbsence[]> {
+  const url = new URL(`${getApiBaseUrl()}/absences`);
+  url.searchParams.set("projectId", projectId);
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /absences → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiAbsence[]>;
+}

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
-import { TaskStatus } from "@neportal/database";
+import { AbsenceStatus, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateProjectDto } from "./dto/create-project.dto";
 
@@ -11,6 +11,8 @@ export type ProjectSummaryDto = {
   tasksDone: number;
   budgetsTotal: number;
   budgetsRemainingTotal: number;
+  absencesTotal: number;
+  absencesActiveNow: number;
 };
 
 @Injectable()
@@ -54,7 +56,18 @@ export class ProjectsService {
       throw new NotFoundException(`Project with id "${projectId}" not found`);
     }
 
-    const [taskGroups, budgets] = await Promise.all([
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setUTCHours(23, 59, 59, 999);
+
+    const members = await this.prisma.projectMember.findMany({
+      where: { projectId },
+      select: { userId: true },
+    });
+    const memberUserIds = members.map((m) => m.userId);
+
+    const [taskGroups, budgets, absencesTotal, absencesActiveNow] = await Promise.all([
       this.prisma.task.groupBy({
         by: ["status"],
         where: { organizationId: this.orgId(), projectId },
@@ -64,6 +77,25 @@ export class ProjectsService {
         where: { organizationId: this.orgId(), projectId },
         select: { initialAmount: true, spentAmount: true },
       }),
+      memberUserIds.length === 0
+        ? Promise.resolve(0)
+        : this.prisma.absence.count({
+            where: {
+              organizationId: this.orgId(),
+              userId: { in: memberUserIds },
+            },
+          }),
+      memberUserIds.length === 0
+        ? Promise.resolve(0)
+        : this.prisma.absence.count({
+            where: {
+              organizationId: this.orgId(),
+              userId: { in: memberUserIds },
+              status: AbsenceStatus.APPROVED,
+              startDate: { lte: todayEnd },
+              endDate: { gte: todayStart },
+            },
+          }),
     ]);
 
     const countFor = (status: TaskStatus) =>
@@ -83,6 +115,8 @@ export class ProjectsService {
       tasksDone: countFor(TaskStatus.DONE),
       budgetsTotal: budgets.length,
       budgetsRemainingTotal,
+      absencesTotal,
+      absencesActiveNow,
     };
   }
 

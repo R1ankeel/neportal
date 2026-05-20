@@ -105,6 +105,19 @@ async function main() {
     },
   });
 
+  await prisma.task.create({
+    data: {
+      organizationId: org.id,
+      projectId: project.id,
+      title: "Подписать договор с подрядчиком",
+      description: "Дедлайн в период демо-больничного",
+      creatorId: ivan.id,
+      assigneeId: ivan.id,
+      status: TaskStatus.NEW,
+      deadlineAt: new Date("2026-05-22T12:00:00.000Z"),
+    },
+  });
+
   console.log("Seed completed: Neportal Demo organization and demo data created.");
 }
 

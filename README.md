@@ -60,7 +60,7 @@ pnpm dev
 ## MVP: что важно знать
 
 - API **без авторизации**; одна организация — `NEPORTAL_ORG_SLUG=neportal-demo` (после сида).
-- Бот: `/task`, `/note`, `/expense` + прикрепление чека фото/документом → [docs/bot.md](docs/bot.md).
+- Бот: `/task`, `/note`, `/expense`, `/sick`, `/vacation` + прикрепление чека → [docs/bot.md](docs/bot.md).
 - REST-справочник → [docs/api.md](docs/api.md).
 
 ## Troubleshooting
