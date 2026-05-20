@@ -12,12 +12,14 @@ import {
   formatMoney,
   parseAmount,
   pickAssigneeId,
+  pickAbsenceUserId,
   pickCreatorId,
   pickDefaultBudget,
   pickDefaultProject,
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
+import { devLog } from "./dev-log";
 import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 
@@ -231,26 +233,52 @@ bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
 const SICK_USAGE = "Использование: /sick до 25.05.2026 номер 123456";
 const VACATION_USAGE = "Использование: /vacation с 01.06.2026 по 10.06.2026";
 
-bot.hears(/^\/sick(?:@\w+)?(?:\s+до)?\s+(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+номер\s+(\S+))?$/i, async (ctx) => {
-  const endIso = parseRuDate(ctx.match[1]);
-  if (!endIso) {
+/** grammY: bot.hears не ловит Telegram-команды — только bot.command. */
+function parseSickPayload(payload: string): { endIso: string; documentNumber?: string } | null {
+  const m = payload.trim().match(/^(?:до\s+)?(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+номер\s+(\S+))?$/iu);
+  if (!m) return null;
+  const endIso = parseRuDate(m[1]);
+  if (!endIso) return null;
+  return { endIso, documentNumber: m[2]?.trim() || undefined };
+}
+
+function parseVacationPayload(payload: string): { startIso: string; endIso: string } | null {
+  const trimmed = payload.trim();
+  const m =
+    trimmed.match(/^с\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+по\s+(\d{1,2}\.\d{1,2}\.\d{4})$/iu) ??
+    trimmed.match(/^(\d{1,2}\.\d{1,2}\.\d{4})\s+(\d{1,2}\.\d{1,2}\.\d{4})$/iu);
+  if (!m) return null;
+  const startIso = parseRuDate(m[1]);
+  const endIso = parseRuDate(m[2]);
+  if (!startIso || !endIso) return null;
+  return { startIso, endIso };
+}
+
+bot.command("sick", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  devLog("parsed sick command", { payload });
+
+  const parsed = parseSickPayload(payload);
+  if (!parsed) {
     await ctx.reply(SICK_USAGE);
     return;
   }
 
-  const documentNumber = ctx.match[2]?.trim() || undefined;
+  const { endIso, documentNumber } = parsed;
   const startIso = todayIsoDate();
 
   try {
     const users = await fetchUsers();
-    const userId = pickCreatorId(users);
-    if (!userId) {
+    const employee = pickAbsenceUserId(users);
+    if (!employee) {
       await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
       return;
     }
 
+    devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
+
     await createAbsence({
-      userId,
+      userId: employee.id,
       type: "SICK_LEAVE",
       startDate: startIso,
       endDate: endIso,
@@ -266,67 +294,51 @@ bot.hears(/^\/sick(?:@\w+)?(?:\s+до)?\s+(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+ном�
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(msg);
-    await ctx.reply(`Ошибка API: ${msg}`);
+    console.error(`[bot] sick command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });
 
-bot.hears(/^\/sick(?:@\w+)?\s*$/i, async (ctx) => {
-  await ctx.reply(SICK_USAGE);
-});
+bot.command("vacation", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  devLog("parsed vacation command", { payload });
 
-bot.hears(/^\/sick(?:@\w+)?\s+.+$/i, async (ctx) => {
-  await ctx.reply(SICK_USAGE);
-});
+  const parsed = parseVacationPayload(payload);
+  if (!parsed) {
+    await ctx.reply(VACATION_USAGE);
+    return;
+  }
 
-bot.hears(
-  /^\/vacation(?:@\w+)?(?:\s+с)?\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+(?:по\s+)?(\d{1,2}\.\d{1,2}\.\d{4})$/i,
-  async (ctx) => {
-    const startIso = parseRuDate(ctx.match[1]);
-    const endIso = parseRuDate(ctx.match[2]);
-    if (!startIso || !endIso) {
-      await ctx.reply(VACATION_USAGE);
+  const { startIso, endIso } = parsed;
+  if (endIso < startIso) {
+    await ctx.reply("Дата окончания не может быть раньше даты начала.");
+    return;
+  }
+
+  try {
+    const users = await fetchUsers();
+    const employee = pickAbsenceUserId(users);
+    if (!employee) {
+      await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
       return;
     }
 
-    if (endIso < startIso) {
-      await ctx.reply("Дата окончания не может быть раньше даты начала.");
-      return;
-    }
+    devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
 
-    try {
-      const users = await fetchUsers();
-      const userId = pickCreatorId(users);
-      if (!userId) {
-        await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
-        return;
-      }
+    await createAbsence({
+      userId: employee.id,
+      type: "VACATION",
+      startDate: startIso,
+      endDate: endIso,
+      status: "APPROVED",
+    });
 
-      await createAbsence({
-        userId,
-        type: "VACATION",
-        startDate: startIso,
-        endDate: endIso,
-        status: "APPROVED",
-      });
-
-      await ctx.reply(
-        `Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`,
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(msg);
-      await ctx.reply(`Ошибка API: ${msg}`);
-    }
-  },
-);
-
-bot.hears(/^\/vacation(?:@\w+)?\s*$/i, async (ctx) => {
-  await ctx.reply(VACATION_USAGE);
-});
-
-bot.hears(/^\/vacation(?:@\w+)?\s+.+$/i, async (ctx) => {
-  await ctx.reply(VACATION_USAGE);
+    await ctx.reply(`Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] vacation command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
 });
 
 bot.hears(/^\/expense(?:@\w+)?\s+(.+)$/ims, async (ctx) => {

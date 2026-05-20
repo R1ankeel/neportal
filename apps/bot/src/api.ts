@@ -1,3 +1,5 @@
+import { devLog, devLogApiError } from "./dev-log";
+
 /**
  * Базовый URL REST API (тот же, что для apps/web).
  */
@@ -190,6 +192,13 @@ export function pickCreatorId(users: ApiUser[]): string | undefined {
   return owner?.id ?? users[0]?.id;
 }
 
+/** Сотрудник для отсутствия: Иван Иванов OWNER, иначе первый пользователь в списке. */
+export function pickAbsenceUserId(users: ApiUser[]): { id: string; fullName: string } | undefined {
+  const ivan = users.find((u) => u.fullName === "Иван Иванов" && u.role === "OWNER");
+  const user = ivan ?? users[0];
+  return user ? { id: user.id, fullName: user.fullName } : undefined;
+}
+
 /** Вася (EMPLOYEE) — исполнитель в сиде; иначе первый EMPLOYEE. */
 export function pickAssigneeId(users: ApiUser[]): string | undefined {
   const vasya = users.find((u) => u.fullName.includes("Вася"));
@@ -215,17 +224,26 @@ export async function createAbsence(body: {
   documentNumber?: string;
   status?: "APPROVED";
 }): Promise<ApiAbsence> {
+  const payload = {
+    userId: body.userId,
+    type: body.type,
+    startDate: body.startDate,
+    endDate: body.endDate,
+    ...(body.documentNumber != null ? { documentNumber: body.documentNumber } : {}),
+    status: body.status ?? "APPROVED",
+  };
+
+  devLog("POST /absences payload", payload as Record<string, unknown>);
+
   const res = await fetch(`${getApiBaseUrl()}/absences`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      ...body,
-      status: body.status ?? "APPROVED",
-    }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`POST /absences → ${res.status} ${text}`.trim());
+    devLogApiError("POST /absences", res.status, text);
+    throw new Error(`Не удалось создать отсутствие (${res.status}). ${text}`.trim());
   }
   return res.json() as Promise<ApiAbsence>;
 }

@@ -45,8 +45,9 @@ pnpm --filter @neportal/bot dev
 
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…` предпочитается заголовок, содержащий «Реклама VK», иначе первый.
-3. **Автор расхода / создатель задачи / сотрудник отсутствия:** пользователь с именем **Иван** и ролью `OWNER`, иначе первый OWNER, иначе первый пользователь.
-4. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE`.
+3. **Автор расхода / создатель задачи:** **Иван** (`OWNER`), иначе первый OWNER, иначе первый пользователь (`pickCreatorId`).
+4. **Сотрудник отсутствия** (`/sick`, `/vacation`): **Иван Иванов** `OWNER`, иначе первый пользователь в `GET /users` (`pickAbsenceUserId`).
+5. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE`.
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
 
@@ -60,7 +61,13 @@ pnpm --filter @neportal/bot dev
 
 ### Больничный и отпуск
 
-Даты в формате **DD.MM.YYYY** (`apps/bot/src/parse-ru-date.ts` → ISO `YYYY-MM-DD`).
+Обработчики зарегистрированы через **`bot.command("sick")` / `bot.command("vacation")`**, а не `bot.hears`: в grammY сообщения-команды (`/sick …`) по умолчанию **не попадают** в `hears`.
+
+Даты в формате **DD.MM.YYYY** (`apps/bot/src/parse-ru-date.ts` → ISO `YYYY-MM-DD`, например `25.05.2026` → `2026-05-25`).
+
+`createAbsence()` делает `POST ${API_URL}/absences` с телом `{ userId, type, startDate, endDate, documentNumber?, status: "APPROVED" }`.
+
+**Dev-логи** (консоль бота, без токенов): payload команды, выбранный пользователь, тело POST, при ошибке — `status` и body. Отключить: `BOT_DEV_LOG=0`.
 
 | Команда | Примеры | Логика |
 |---------|---------|--------|
@@ -82,9 +89,17 @@ pnpm --filter @neportal/bot dev
 
 - `fetchUsers`, `fetchProjects`, `fetchBudgets`
 - `createTask`, `createNote`, `createBudgetExpense`, `createExpenseAttachment`, `createAbsence`, `fetchAbsences`
-- `pickCreatorId`, `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`
+- `pickCreatorId`, `pickAbsenceUserId`, `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`
 
-Ошибки API пробрасываются в ответ пользователю (`Ошибка API: …`).
+При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.
+
+## Troubleshooting
+
+| Симптом | Причина / решение |
+|---------|-------------------|
+| `/sick` молчит или не создаёт запись | Раньше: `bot.hears` не ловит команды. Сейчас: `bot.command`. Перезапустите `pnpm --filter @neportal/bot dev`. |
+| `GET /absences` пустой после `/sick` | Проверьте логи `[bot] POST /absences`, `API_URL` в `.env`, что API запущен на `:4000`. |
+| Ошибка 400/404 от API | В логе будет body ответа; проверьте `pnpm db:seed` и `userId`. |
 
 ## Ограничения
 
