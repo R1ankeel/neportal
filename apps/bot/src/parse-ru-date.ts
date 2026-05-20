@@ -38,3 +38,29 @@ export function formatIsoDateRu(iso: string): string {
   if (!y || !m || !d) return iso;
   return `${d}.${m}.${y}`;
 }
+
+const DATE_RE = /\d{1,2}\.\d{1,2}\.\d{4}/g;
+
+/** Текст команды /deadline: последняя DD.MM.YYYY — дата, всё до неё — название задачи. */
+export function parseDeadlineCommandPayload(
+  payload: string,
+): { title: string; dateIso: string } | null {
+  const trimmed = payload.trim();
+  if (!trimmed) return null;
+
+  let lastMatch: RegExpExecArray | null = null;
+  let m: RegExpExecArray | null;
+  DATE_RE.lastIndex = 0;
+  while ((m = DATE_RE.exec(trimmed)) !== null) {
+    lastMatch = m;
+  }
+  if (!lastMatch) return null;
+
+  const dateIso = parseRuDate(lastMatch[0]);
+  if (!dateIso) return null;
+
+  const title = trimmed.slice(0, lastMatch.index).trim();
+  if (!title) return null;
+
+  return { title, dateIso };
+}

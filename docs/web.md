@@ -42,7 +42,7 @@ pnpm --filter @neportal/web dev
 | `/dashboard` | Главная |
 | `/projects` | Список проектов |
 | `/projects/[id]` | Обзор проекта |
-| `/projects/[id]/tasks` | Задачи проекта, смена статуса |
+| `/projects/[id]/tasks` | Задачи проекта: дедлайн (`deadlineAt` или «—»), смена статуса |
 | `/projects/[id]/notes` | Заметки |
 | `/projects/[id]/budgets` | Бюджеты проекта |
 | `/projects/[id]/absences` | Больничные и отпуска участников проекта, затронутые задачи |

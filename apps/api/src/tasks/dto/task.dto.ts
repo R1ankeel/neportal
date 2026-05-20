@@ -1,6 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { TaskStatus } from "@neportal/database";
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateIf,
+} from "class-validator";
 
 export class CreateTaskDto {
   @ApiProperty({ example: "Сделать отчёт" })
@@ -43,4 +51,16 @@ export class UpdateTaskStatusDto {
   @ApiProperty({ enum: TaskStatus })
   @IsEnum(TaskStatus)
   status!: TaskStatus;
+}
+
+export class UpdateTaskDeadlineDto {
+  @ApiPropertyOptional({
+    description: "ISO date или datetime; для date-only — конец дня UTC. null — сбросить дедлайн",
+    example: "2026-05-22",
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value != null)
+  @IsDateString()
+  deadlineAt?: string | null;
 }

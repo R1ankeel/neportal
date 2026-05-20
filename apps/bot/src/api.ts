@@ -148,6 +148,45 @@ export async function createExpenseAttachment(
   return res.json() as Promise<{ id: string }>;
 }
 
+export type ApiTask = {
+  id: string;
+  title: string;
+  deadlineAt: string | null;
+  status: string;
+  project?: { id: string; name: string } | null;
+};
+
+export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
+  const url = new URL(`${getApiBaseUrl()}/tasks`);
+  if (projectId) url.searchParams.set("projectId", projectId);
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTask[]>;
+}
+
+export async function updateTaskDeadline(
+  taskId: string,
+  deadlineAt: string | null,
+): Promise<ApiTask> {
+  const payload = { deadlineAt };
+  devLog("PATCH /tasks/:id/deadline payload", { taskId, ...payload });
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/deadline`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`PATCH /tasks/${taskId}/deadline`, res.status, text);
+    throw new Error(`Не удалось установить дедлайн (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTask>;
+}
+
 export async function createTask(body: {
   title: string;
   creatorId: string;

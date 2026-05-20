@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
 import { TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
-import { CreateTaskDto, UpdateTaskStatusDto } from "./dto/task.dto";
+import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 
 @Injectable()
 export class TasksService {
@@ -13,6 +13,20 @@ export class TasksService {
 
   private orgId() {
     return this.organization.getOrganizationId();
+  }
+
+  private parseDateInput(value: string): Date {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) {
+      throw new BadRequestException(`Invalid date: "${value}"`);
+    }
+    return d;
+  }
+
+  private endOfDay(date: Date): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999),
+    );
   }
 
   async findAll(projectId?: string) {
@@ -114,6 +128,30 @@ export class TasksService {
     return this.prisma.task.update({
       where: { id },
       data,
+      include: {
+        creator: { select: { id: true, fullName: true } },
+        assignee: { select: { id: true, fullName: true } },
+        project: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async updateDeadline(id: string, dto: UpdateTaskDeadlineDto) {
+    const existing = await this.prisma.task.findFirst({
+      where: { id, organizationId: this.orgId() },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Task with id "${id}" not found`);
+    }
+
+    let deadlineAt: Date | null = null;
+    if (dto.deadlineAt != null) {
+      deadlineAt = this.endOfDay(this.parseDateInput(dto.deadlineAt));
+    }
+
+    return this.prisma.task.update({
+      where: { id },
+      data: { deadlineAt },
       include: {
         creator: { select: { id: true, fullName: true } },
         assignee: { select: { id: true, fullName: true } },

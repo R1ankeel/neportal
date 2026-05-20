@@ -9,6 +9,47 @@ import {
 
 const prisma = new PrismaClient();
 
+const DEMO_CONTRACT_TASK_TITLE = "Подписать договор с подрядчиком";
+
+/** Демо-задача для affectedTasks при больничном Ивана (без дублей по title в проекте). */
+async function ensureDemoContractTask(
+  organizationId: string,
+  projectId: string,
+  ivanId: string,
+) {
+  const deadlineAt = new Date(Date.UTC(2026, 4, 22, 23, 59, 59, 999));
+
+  const existing = await prisma.task.findFirst({
+    where: {
+      organizationId,
+      projectId,
+      title: DEMO_CONTRACT_TASK_TITLE,
+    },
+  });
+
+  const data = {
+    description: "Дедлайн в период демо-больничного",
+    creatorId: ivanId,
+    assigneeId: ivanId,
+    status: TaskStatus.NEW,
+    deadlineAt,
+  };
+
+  if (existing) {
+    await prisma.task.update({ where: { id: existing.id }, data });
+    return;
+  }
+
+  await prisma.task.create({
+    data: {
+      organizationId,
+      projectId,
+      title: DEMO_CONTRACT_TASK_TITLE,
+      ...data,
+    },
+  });
+}
+
 async function main() {
   await prisma.organization.deleteMany({ where: { slug: "neportal-demo" } });
 
@@ -105,18 +146,7 @@ async function main() {
     },
   });
 
-  await prisma.task.create({
-    data: {
-      organizationId: org.id,
-      projectId: project.id,
-      title: "Подписать договор с подрядчиком",
-      description: "Дедлайн в период демо-больничного",
-      creatorId: ivan.id,
-      assigneeId: ivan.id,
-      status: TaskStatus.NEW,
-      deadlineAt: new Date("2026-05-22T12:00:00.000Z"),
-    },
-  });
+  await ensureDemoContractTask(org.id, project.id, ivan.id);
 
   console.log("Seed completed: Neportal Demo organization and demo data created.");
 }

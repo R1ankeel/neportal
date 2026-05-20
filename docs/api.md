@@ -41,6 +41,7 @@
 |-------|------|-------|----------|
 | GET | `/tasks` | `projectId?` | Список задач |
 | POST | `/tasks` | — | Создать задачу |
+| PATCH | `/tasks/:id/deadline` | — | Установить или сбросить дедлайн |
 | PATCH | `/tasks/:id/status` | — | Сменить статус |
 
 **POST /tasks** — тело (`CreateTaskDto`):
@@ -57,6 +58,14 @@
 ```
 
 `projectId` опционален — без него задача «глобальная» в рамках org.
+
+**PATCH /tasks/:id/deadline** (`UpdateTaskDeadlineDto`):
+
+```json
+{ "deadlineAt": "2026-05-22" }
+```
+
+Для date-only время нормализуется до **конца дня UTC** (`23:59:59.999`). `deadlineAt: null` — сброс дедлайна.
 
 **PATCH /tasks/:id/status**:
 

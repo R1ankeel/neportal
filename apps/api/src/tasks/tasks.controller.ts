@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { CreateTaskDto, UpdateTaskStatusDto } from "./dto/task.dto";
+import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
 
 @ApiTags("tasks")
@@ -19,6 +19,13 @@ export class TasksController {
   @ApiOperation({ summary: "Создать задачу" })
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);
+  }
+
+  @Patch(":id/deadline")
+  @ApiOperation({ summary: "Установить или сбросить дедлайн задачи" })
+  @ApiParam({ name: "id" })
+  updateDeadline(@Param("id") id: string, @Body() dto: UpdateTaskDeadlineDto) {
+    return this.tasksService.updateDeadline(id, dto);
   }
 
   @Patch(":id/status")

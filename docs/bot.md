@@ -38,6 +38,7 @@ pnpm --filter @neportal/bot dev
 | `/expense <сумма> <описание>` | `POST /budgets/:id/expenses` |
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
+| `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
 
 ### Проект и бюджет по умолчанию
 
@@ -83,12 +84,25 @@ pnpm --filter @neportal/bot dev
 
 Отображение в Web: вкладка **Отсутствия** проекта (`GET /absences?projectId=…`).
 
+### Дедлайн задачи
+
+`bot.command("deadline")` — последняя дата **DD.MM.YYYY** в аргументе, всё до неё — точное название задачи.
+
+| Пример | Действие |
+|--------|----------|
+| `/deadline Подготовить отчет 22.05.2026` | `GET /tasks?projectId=…` → поиск по `title` → `PATCH /tasks/:id/deadline` |
+
+Ответ: «Дедлайн задачи «…» установлен на …». Ошибки: задача не найдена; несколько совпадений.
+
+Для проверки **affectedTasks**: в сиде есть задача «Подписать договор с подрядчиком» (исполнитель Иван, deadline 22.05.2026) + `/sick до 25.05.2026` для Ивана.
+
 ## HTTP-клиент бота
 
 Файл `apps/bot/src/api.ts` — обёртки над REST:
 
 - `fetchUsers`, `fetchProjects`, `fetchBudgets`
 - `createTask`, `createNote`, `createBudgetExpense`, `createExpenseAttachment`, `createAbsence`, `fetchAbsences`
+- `fetchTasks`, `updateTaskDeadline`
 - `pickCreatorId`, `pickAbsenceUserId`, `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`
 
 При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.

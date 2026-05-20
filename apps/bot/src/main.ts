@@ -8,7 +8,9 @@ import {
   createTask,
   fetchBudgets,
   fetchProjects,
+  fetchTasks,
   fetchUsers,
+  updateTaskDeadline,
   formatMoney,
   parseAmount,
   pickAssigneeId,
@@ -20,7 +22,12 @@ import {
   getApiBaseUrl,
 } from "./api";
 import { devLog } from "./dev-log";
-import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
+import {
+  formatIsoDateRu,
+  parseDeadlineCommandPayload,
+  parseRuDate,
+  todayIsoDate,
+} from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 
 const envPath = loadRootEnv();
@@ -48,6 +55,7 @@ bot.command("start", async (ctx) => {
       "Добавляй расходы: /expense <сумма> <описание>",
       "Больничный: /sick до 25.05.2026 номер 123456",
       "Отпуск: /vacation с 01.06.2026 по 10.06.2026",
+      "Дедлайн: /deadline Подготовить отчет 22.05.2026",
       "Список команд: /demo",
     ].join("\n"),
   );
@@ -65,6 +73,7 @@ bot.command("demo", async (ctx) => {
       "/expense <сумма> <описание> — добавить расход в бюджет проекта",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -232,6 +241,7 @@ bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
 
 const SICK_USAGE = "Использование: /sick до 25.05.2026 номер 123456";
 const VACATION_USAGE = "Использование: /vacation с 01.06.2026 по 10.06.2026";
+const DEADLINE_USAGE = "Использование: /deadline <название задачи> <дата>";
 
 /** grammY: bot.hears не ловит Telegram-команды — только bot.command. */
 function parseSickPayload(payload: string): { endIso: string; documentNumber?: string } | null {
@@ -295,6 +305,48 @@ bot.command("sick", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] sick command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("deadline", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  devLog("parsed deadline command", { payload });
+
+  const parsed = parseDeadlineCommandPayload(payload);
+  if (!parsed) {
+    await ctx.reply(DEADLINE_USAGE);
+    return;
+  }
+
+  const { title, dateIso } = parsed;
+
+  try {
+    const projects = await fetchProjects();
+    const projectId = pickDefaultProjectId(projects);
+    if (!projectId) {
+      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+      return;
+    }
+
+    const tasks = await fetchTasks(projectId);
+    const matches = tasks.filter((t) => t.title === title);
+
+    if (matches.length === 0) {
+      await ctx.reply("Задача не найдена.");
+      return;
+    }
+    if (matches.length > 1) {
+      await ctx.reply("Найдено несколько задач с таким названием. Уточнение пока не реализовано.");
+      return;
+    }
+
+    await updateTaskDeadline(matches[0].id, dateIso);
+
+    await ctx.reply(`Дедлайн задачи «${title}» установлен на ${formatIsoDateRu(dateIso)}.`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] deadline command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });
