@@ -10,6 +10,10 @@ export function getApiBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
+export function getAttachmentOpenUrl(attachmentId: string): string {
+  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/open`;
+}
+
 export async function apiGet<T>(path: string, query?: Record<string, string | undefined>): Promise<T> {
   let urlPath = path.startsWith("/") ? path : `/${path}`;
   if (query) {

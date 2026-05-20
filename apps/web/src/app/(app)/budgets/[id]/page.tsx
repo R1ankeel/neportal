@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { apiGet } from "@/lib/api";
+import { apiGet, getAttachmentOpenUrl } from "@/lib/api";
 import { budgetRemainder, expenseSourceLabel, expenseStatusLabel, formatDateTime, formatMoney, parseAmount } from "@/lib/format";
 import type { ApiBudget, ApiBudgetExpense, ApiUser } from "@/lib/types";
 import { AddExpenseForm } from "./AddExpenseForm";
@@ -80,7 +80,7 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
             <li className="py-6 text-lg text-zinc-500">Расходов пока нет</li>
           ) : (
             expenses.map((e) => {
-              const attachmentCount = e.attachments?.length ?? 0;
+              const attachments = e.attachments ?? [];
               return (
               <li key={e.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -88,11 +88,23 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
                   <p className="text-base text-zinc-500">{formatDateTime(e.expenseDate)}</p>
                   {e.description ? <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">{e.description}</p> : null}
                   <p className="mt-1 text-sm text-zinc-500">{e.user?.fullName ?? "—"}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    {attachmentCount > 0
-                      ? `Чек прикреплён · ${attachmentCount} ${attachmentCount === 1 ? "вложение" : attachmentCount < 5 ? "вложения" : "вложений"}`
-                      : "Без чека"}
-                  </p>
+                  {attachments.length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      {attachments.map((a, idx) => (
+                        <a
+                          key={a.id}
+                          href={getAttachmentOpenUrl(a.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {attachments.length === 1 ? "Открыть чек" : `Открыть чек ${idx + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-zinc-500">Без чека</p>
+                  )}
                 </div>
                 <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                   <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
