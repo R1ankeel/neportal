@@ -125,6 +125,27 @@ export async function createBudgetExpense(
   return res.json() as Promise<{ id: string; amount: string | number; budget: ApiBudget }>;
 }
 
+export async function createExpenseAttachment(
+  expenseId: string,
+  body: {
+    telegramFileId: string;
+    originalFilename?: string;
+    mimeType?: string;
+    uploadedById: string;
+  },
+): Promise<{ id: string }> {
+  const res = await fetch(`${getApiBaseUrl()}/budget-expenses/${expenseId}/attachments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /budget-expenses/${expenseId}/attachments → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<{ id: string }>;
+}
+
 export async function createTask(body: {
   title: string;
   creatorId: string;

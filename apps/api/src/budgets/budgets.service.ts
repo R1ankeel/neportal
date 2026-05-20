@@ -95,7 +95,18 @@ export class BudgetsService {
     return this.prisma.budgetExpense.findMany({
       where: { budgetId, organizationId: this.orgId() },
       orderBy: { expenseDate: "desc" },
-      include: { user: { select: { id: true, fullName: true, email: true } } },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        attachments: {
+          select: {
+            id: true,
+            mimeType: true,
+            originalFilename: true,
+            telegramFileId: true,
+            createdAt: true,
+          },
+        },
+      },
     });
   }
 

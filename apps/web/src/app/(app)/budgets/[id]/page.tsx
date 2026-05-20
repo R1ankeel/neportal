@@ -79,13 +79,20 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
           {expenses.length === 0 ? (
             <li className="py-6 text-lg text-zinc-500">Расходов пока нет</li>
           ) : (
-            expenses.map((e) => (
+            expenses.map((e) => {
+              const attachmentCount = e.attachments?.length ?? 0;
+              return (
               <li key={e.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-lg font-medium">{formatMoney(parseAmount(e.amount), e.currency)}</p>
                   <p className="text-base text-zinc-500">{formatDateTime(e.expenseDate)}</p>
                   {e.description ? <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">{e.description}</p> : null}
                   <p className="mt-1 text-sm text-zinc-500">{e.user?.fullName ?? "—"}</p>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {attachmentCount > 0
+                      ? `Чек прикреплён · ${attachmentCount} ${attachmentCount === 1 ? "вложение" : attachmentCount < 5 ? "вложения" : "вложений"}`
+                      : "Без чека"}
+                  </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                   <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -94,7 +101,8 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
                   <span className="text-sm font-medium text-zinc-500">{expenseStatusLabel(e.status)}</span>
                 </div>
               </li>
-            ))
+            );
+            })
           )}
         </ul>
       </section>

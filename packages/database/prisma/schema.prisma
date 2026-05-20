@@ -297,7 +297,7 @@ model BudgetExpenseAttachment {
   expenseId String
   expense   BudgetExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
 
-  storageKey        String
+  storageKey        String?
   mimeType          String?
   originalFilename  String?
   telegramFileId    String?

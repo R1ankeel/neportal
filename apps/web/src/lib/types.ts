@@ -44,6 +44,14 @@ export type ApiBudget = {
   project?: { id: string; name: string } | null;
 };
 
+export type ApiBudgetExpenseAttachment = {
+  id: string;
+  mimeType: string | null;
+  originalFilename: string | null;
+  telegramFileId: string | null;
+  createdAt: string;
+};
+
 export type ApiBudgetExpense = {
   id: string;
   amount: string | number;
@@ -53,6 +61,7 @@ export type ApiBudgetExpense = {
   status: string;
   source: string;
   user?: { id: string; fullName: string; email: string | null };
+  attachments?: ApiBudgetExpenseAttachment[];
 };
 
 export type ApiProjectSummary = {

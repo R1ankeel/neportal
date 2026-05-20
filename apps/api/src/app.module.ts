@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { BudgetExpensesModule } from "./budget-expenses/budget-expenses.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { NotesModule } from "./notes/notes.module";
 import { OrganizationModule } from "./organization/organization.module";
@@ -17,6 +18,7 @@ import { UsersModule } from "./users/users.module";
     ProjectsModule,
     TasksModule,
     BudgetsModule,
+    BudgetExpensesModule,
     NotesModule,
   ],
   controllers: [AppController],

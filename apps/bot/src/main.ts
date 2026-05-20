@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import {
   createBudgetExpense,
+  createExpenseAttachment,
   createNote,
   createTask,
   fetchBudgets,
@@ -16,6 +17,7 @@ import {
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
+import { getLastExpense, setLastExpense } from "./last-expense";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -55,6 +57,10 @@ bot.command("demo", async (ctx) => {
       "/task <текст> — создать задачу в Neportal (через API)",
       "/note <текст> — создать заметку в проекте по умолчанию",
       "/expense <сумма> <описание> — добавить расход в бюджет проекта",
+      "",
+      "Пример с чеком:",
+      "/expense 1500 реклама VK",
+      "затем отправьте фото или документ чека",
       "",
       `API: ${getApiBaseUrl()}`,
     ].join("\n"),
@@ -190,8 +196,21 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
       [
         `Расход создан в бюджете «${updatedBudget.title}»: ${formatMoney(amount, updatedBudget.currency)}`,
         `Остаток бюджета: ${formatMoney(remaining, updatedBudget.currency)}`,
+        "",
+        "Отправьте фото или документ чека, чтобы прикрепить его к этому расходу.",
       ].join("\n"),
     );
+
+    const telegramUserId = ctx.from?.id;
+    if (telegramUserId) {
+      setLastExpense(telegramUserId, {
+        expenseId: result.id,
+        budgetTitle: updatedBudget.title,
+        amount,
+        createdAt: new Date(),
+        uploadedById: userId,
+      });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(msg);
@@ -205,6 +224,60 @@ bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
 
 bot.hears(/^\/expense(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   await ctx.reply("Использование: /expense <сумма> <описание>");
+});
+
+async function handleReceiptAttachment(
+  ctx: { from?: { id: number }; reply: (text: string) => Promise<unknown> },
+  file: { telegramFileId: string; originalFilename?: string; mimeType?: string },
+): Promise<void> {
+  const telegramUserId = ctx.from?.id;
+  if (!telegramUserId) {
+    await ctx.reply("Не удалось определить пользователя Telegram.");
+    return;
+  }
+
+  const lastExpense = getLastExpense(telegramUserId);
+  if (!lastExpense) {
+    await ctx.reply("Не нашёл недавний расход. Сначала создайте расход командой /expense.");
+    return;
+  }
+
+  try {
+    await createExpenseAttachment(lastExpense.expenseId, {
+      telegramFileId: file.telegramFileId,
+      originalFilename: file.originalFilename,
+      mimeType: file.mimeType,
+      uploadedById: lastExpense.uploadedById,
+    });
+
+    await ctx.reply(
+      `Чек прикреплён к расходу ${formatMoney(lastExpense.amount)} по бюджету «${lastExpense.budgetTitle}».`,
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(msg);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+}
+
+bot.on("message:photo", async (ctx) => {
+  const photos = ctx.message.photo;
+  if (photos.length === 0) return;
+  const largest = photos[photos.length - 1];
+  await handleReceiptAttachment(ctx, {
+    telegramFileId: largest.file_id,
+    originalFilename: "photo.jpg",
+    mimeType: "image/jpeg",
+  });
+});
+
+bot.on("message:document", async (ctx) => {
+  const doc = ctx.message.document;
+  await handleReceiptAttachment(ctx, {
+    telegramFileId: doc.file_id,
+    originalFilename: doc.file_name,
+    mimeType: doc.mime_type,
+  });
 });
 
 const mode = process.env.BOT_MODE ?? "polling";
