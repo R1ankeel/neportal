@@ -12,7 +12,7 @@ import {
   type ApiUser,
 } from "./api";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
-import { todayIsoDate } from "./parse-ru-date";
+import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
 export type ResolvedCreateTask = {
   intent: "create_task";
@@ -125,7 +125,7 @@ export async function resolveIntent(intent: AiIntent): Promise<ResolveResult> {
           intent: "create_note",
           project,
           creatorId,
-          text: intent.payload.text,
+          text: replaceIsoDatesInText(intent.payload.text),
         },
       };
     }

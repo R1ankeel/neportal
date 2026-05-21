@@ -39,6 +39,13 @@ export function formatIsoDateRu(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
+const ISO_DATE_IN_TEXT_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+
+/** Заменяет YYYY-MM-DD в произвольном тексте на DD.MM.YYYY (для заметок и описаний). */
+export function replaceIsoDatesInText(text: string): string {
+  return text.replace(ISO_DATE_IN_TEXT_RE, (iso) => formatIsoDateRu(iso));
+}
+
 const DATE_RE = /\d{1,2}\.\d{1,2}\.\d{4}/g;
 
 /** Текст команды /deadline: последняя DD.MM.YYYY — дата, всё до неё — название задачи. */

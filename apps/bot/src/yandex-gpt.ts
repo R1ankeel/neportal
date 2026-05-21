@@ -102,7 +102,7 @@ create_task.payload:
 { "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
 create_note.payload:
-{ "projectHint"?: string, "text": string }
+{ "projectHint"?: string, "text": string } — в text даты пиши DD.MM.YYYY, не YYYY-MM-DD
 
 create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
@@ -121,12 +121,13 @@ unknown.payload:
   "intent": "create_note",
   "confidence": 0.9,
   "requiresConfirmation": true,
-  "payload": { "text": "клиент попросил завтра проверить статистику VK" }
+  "payload": { "text": "клиент попросил 22.05.2026 проверить статистику VK" }
 }
 
 Правила:
-- Даты только YYYY-MM-DD; если год не указан — 2026.
-- «Завтра» считай от текущей даты из контекста.
+- Поля deadlineDate, startDate, endDate — только YYYY-MM-DD; если год не указан — 2026.
+- В payload.text и description даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
+- «Завтра» в тексте заметки — DD.MM.YYYY от текущей даты из контекста.
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
 - Если команда непонятна: intent unknown, низкая confidence.
