@@ -12,7 +12,13 @@ export type ApiUser = {
   id: string;
   fullName: string;
   role: string;
+  telegramId?: string | null;
 };
+
+export type UserNameMatchResult =
+  | { kind: "none" }
+  | { kind: "one"; user: ApiUser }
+  | { kind: "many"; users: ApiUser[] };
 
 export type ApiProject = {
   id: string;
@@ -37,6 +43,57 @@ export async function fetchUsers(): Promise<ApiUser[]> {
     throw new Error(`GET /users → ${res.status} ${text}`.trim());
   }
   return res.json() as Promise<ApiUser[]>;
+}
+
+export async function fetchUserByTelegramId(
+  telegramId: string,
+): Promise<ApiUser | null> {
+  const res = await fetch(
+    `${getApiBaseUrl()}/users/by-telegram/${encodeURIComponent(telegramId)}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `GET /users/by-telegram/${telegramId} → ${res.status} ${text}`.trim(),
+    );
+  }
+  return res.json() as Promise<ApiUser>;
+}
+
+export async function linkTelegramUser(
+  userId: string,
+  telegramId: string,
+): Promise<ApiUser> {
+  const res = await fetch(`${getApiBaseUrl()}/users/${userId}/telegram`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ telegramId }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `PATCH /users/${userId}/telegram → ${res.status} ${text}`.trim(),
+    );
+  }
+  return res.json() as Promise<ApiUser>;
+}
+
+/** Поиск по ФИО для /link: includes, без выбора при неоднозначности. */
+export function findUserByNameHint(
+  users: ApiUser[],
+  hint: string,
+): UserNameMatchResult {
+  const q = hint.trim().toLowerCase();
+  if (!q) return { kind: "none" };
+
+  const matches = users.filter((u) =>
+    u.fullName.toLowerCase().includes(q),
+  );
+  if (matches.length === 0) return { kind: "none" };
+  if (matches.length === 1) return { kind: "one", user: matches[0] };
+  return { kind: "many", users: matches };
 }
 
 export async function fetchProjects(): Promise<ApiProject[]> {

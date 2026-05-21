@@ -68,7 +68,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const resolvedResult = await resolveIntent(intent);
+  const resolvedResult = await resolveIntent(intent, telegramUserId);
   if (!resolvedResult.ok) {
     await ctx.reply(resolvedResult.message);
     return;

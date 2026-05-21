@@ -4,13 +4,13 @@ import {
   fetchProjects,
   fetchTasks,
   fetchUsers,
-  pickAbsenceUserId,
+  findUserByNameHint,
   pickAssigneeId,
-  pickCreatorId,
   type ApiBudget,
   type ApiProject,
   type ApiUser,
 } from "./api";
+import { getCurrentUserOrFallbackByTelegramId } from "./current-user";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
@@ -68,16 +68,23 @@ export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }
   | { ok: false; message: string };
 
-export async function resolveIntent(intent: AiIntent): Promise<ResolveResult> {
+export async function resolveIntent(
+  intent: AiIntent,
+  telegramUserId?: number,
+): Promise<ResolveResult> {
   if (intent.intent === "unknown") {
     return { ok: false, message: "Не понял команду. Попробуйте переформулировать или используйте /demo." };
   }
 
-  const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+  const [users, projects, currentUser] = await Promise.all([
+    fetchUsers(),
+    fetchProjects(),
+    getCurrentUserOrFallbackByTelegramId(telegramUserId),
+  ]);
 
   switch (intent.intent) {
     case "create_task": {
-      const creatorId = pickCreatorId(users);
+      const creatorId = currentUser?.id;
       if (!creatorId) {
         return { ok: false, message: "Не удалось определить автора задачи." };
       }
@@ -109,7 +116,7 @@ export async function resolveIntent(intent: AiIntent): Promise<ResolveResult> {
     }
 
     case "create_note": {
-      const creatorId = pickCreatorId(users);
+      const creatorId = currentUser?.id;
       if (!creatorId) {
         return { ok: false, message: "Не удалось определить автора заметки." };
       }
@@ -131,7 +138,7 @@ export async function resolveIntent(intent: AiIntent): Promise<ResolveResult> {
     }
 
     case "create_expense": {
-      const userId = pickCreatorId(users);
+      const userId = currentUser?.id;
       if (!userId) {
         return { ok: false, message: "Не удалось определить пользователя для расхода." };
       }
@@ -161,12 +168,28 @@ export async function resolveIntent(intent: AiIntent): Promise<ResolveResult> {
     }
 
     case "create_absence": {
-      const absenceDefault = pickAbsenceUserId(users);
-      const user = intent.payload.userHint
-        ? findUserByHint(users, intent.payload.userHint)
-        : absenceDefault
-          ? users.find((u) => u.id === absenceDefault.id)
-          : undefined;
+      let user: ApiUser | undefined;
+
+      if (intent.payload.userHint) {
+        const hint = intent.payload.userHint.trim();
+        const match = findUserByNameHint(users, hint);
+        if (match.kind === "none") {
+          return {
+            ok: false,
+            message: `Не нашёл сотрудника «${hint}». Уточните имя.`,
+          };
+        }
+        if (match.kind === "many") {
+          const names = match.users.map((u) => u.fullName).join(", ");
+          return {
+            ok: false,
+            message: `Нашёл несколько сотрудников: ${names}. Уточните ФИО.`,
+          };
+        }
+        user = match.user;
+      } else {
+        user = currentUser;
+      }
 
       if (!user) {
         return { ok: false, message: "Не удалось определить сотрудника." };

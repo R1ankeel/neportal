@@ -9,18 +9,20 @@ import {
   fetchBudgets,
   fetchProjects,
   fetchTasks,
+  fetchUserByTelegramId,
   fetchUsers,
+  findUserByNameHint,
+  linkTelegramUser,
   updateTaskDeadline,
   formatMoney,
   parseAmount,
   pickAssigneeId,
-  pickAbsenceUserId,
-  pickCreatorId,
   pickDefaultBudget,
   pickDefaultProject,
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
+import { getCurrentUserOrFallback } from "./current-user";
 import { devLog } from "./dev-log";
 import {
   formatIsoDateRu,
@@ -47,19 +49,38 @@ if (!token || token === "change_me") {
 const bot = new Bot(token);
 
 bot.command("start", async (ctx) => {
-  await ctx.reply(
-    [
-      "Привет! Я бот Neportal.",
-      "",
-      "Создавай задачи: /task <название>",
-      "Создавай заметки: /note <текст>",
-      "Добавляй расходы: /expense <сумма> <описание>",
-      "Больничный: /sick до 25.05.2026 номер 123456",
-      "Отпуск: /vacation с 01.06.2026 по 10.06.2026",
-      "Дедлайн: /deadline Подготовить отчет 22.05.2026",
-      "Список команд: /demo",
-    ].join("\n"),
+  const lines = ["Привет! Я бот Neportal.", ""];
+
+  try {
+    const telegramId = ctx.from?.id;
+    if (telegramId) {
+      const linked = await fetchUserByTelegramId(String(telegramId));
+      if (linked) {
+        lines.push(`Вы привязаны как ${linked.fullName}.`, "");
+      } else {
+        lines.push(
+          "Чтобы действия создавались от вашего имени, привяжите аккаунт: /link Вася Пупкин",
+          "",
+        );
+      }
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] start link check: ${msg}`);
+  }
+
+  lines.push(
+    "Создавай задачи: /task <название>",
+    "Создавай заметки: /note <текст>",
+    "Добавляй расходы: /expense <сумма> <описание>",
+    "Больничный: /sick до 25.05.2026 номер 123456",
+    "Отпуск: /vacation с 01.06.2026 по 10.06.2026",
+    "Дедлайн: /deadline Подготовить отчет 22.05.2026",
+    "Привязка Telegram: /link <ФИО> · /me",
+    "Список команд: /demo",
   );
+
+  await ctx.reply(lines.join("\n"));
 });
 
 bot.command("demo", async (ctx) => {
@@ -75,6 +96,8 @@ bot.command("demo", async (ctx) => {
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
+      "/link Вася Пупкин — привязать Telegram к сотруднику",
+      "/me — проверить привязку",
       "",
       "Можно писать обычным текстом, например:",
       "- Поставь Васе задачу подготовить отчет до 23 мая",
@@ -91,6 +114,64 @@ bot.command("demo", async (ctx) => {
   );
 });
 
+bot.command("link", async (ctx) => {
+  const hint = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  if (!hint) {
+    await ctx.reply("Использование: /link <ФИО>, например /link Вася Пупкин");
+    return;
+  }
+
+  const telegramId = ctx.from?.id;
+  if (!telegramId) {
+    await ctx.reply("Не удалось определить Telegram ID.");
+    return;
+  }
+
+  try {
+    const users = await fetchUsers();
+    const match = findUserByNameHint(users, hint);
+    if (match.kind === "none") {
+      await ctx.reply(`Не нашёл сотрудника «${hint}». Проверьте имя.`);
+      return;
+    }
+    if (match.kind === "many") {
+      const names = match.users.map((u) => u.fullName).join(", ");
+      await ctx.reply(`Нашёл несколько сотрудников: ${names}. Уточните ФИО.`);
+      return;
+    }
+
+    await linkTelegramUser(match.user.id, String(telegramId));
+    await ctx.reply(`Telegram привязан к сотруднику: ${match.user.fullName}.`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] link command error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("me", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) {
+    await ctx.reply("Не удалось определить Telegram ID.");
+    return;
+  }
+
+  try {
+    const linked = await fetchUserByTelegramId(String(telegramId));
+    if (linked) {
+      await ctx.reply(`Вы привязаны как: ${linked.fullName} · ${linked.role}`);
+      return;
+    }
+    await ctx.reply(
+      "Telegram не привязан. Используйте /link <ФИО>, например /link Вася Пупкин.",
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] me command error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
 bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   const title = ctx.match[1].trim();
   if (!title) {
@@ -99,8 +180,12 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   }
 
   try {
-    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
-    const creatorId = pickCreatorId(users);
+    const [users, projects, currentUser] = await Promise.all([
+      fetchUsers(),
+      fetchProjects(),
+      getCurrentUserOrFallback(ctx),
+    ]);
+    const creatorId = currentUser?.id;
     const assigneeId = pickAssigneeId(users);
     if (!creatorId) {
       await ctx.reply("Не удалось определить автора задачи. Проверьте сид и GET /users.");
@@ -141,8 +226,11 @@ bot.hears(/^\/note(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   }
 
   try {
-    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
-    const creatorId = pickCreatorId(users);
+    const [projects, currentUser] = await Promise.all([
+      fetchProjects(),
+      getCurrentUserOrFallback(ctx),
+    ]);
+    const creatorId = currentUser?.id;
     if (!creatorId) {
       await ctx.reply("Не удалось определить автора заметки. Проверьте сид и GET /users.");
       return;
@@ -185,8 +273,11 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
   }
 
   try {
-    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
-    const userId = pickCreatorId(users);
+    const [projects, currentUser] = await Promise.all([
+      fetchProjects(),
+      getCurrentUserOrFallback(ctx),
+    ]);
+    const userId = currentUser?.id;
     if (!userId) {
       await ctx.reply("Не удалось определить пользователя. Проверьте сид и GET /users.");
       return;
@@ -285,8 +376,7 @@ bot.command("sick", async (ctx) => {
   const startIso = todayIsoDate();
 
   try {
-    const users = await fetchUsers();
-    const employee = pickAbsenceUserId(users);
+    const employee = await getCurrentUserOrFallback(ctx);
     if (!employee) {
       await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
       return;
@@ -375,8 +465,7 @@ bot.command("vacation", async (ctx) => {
   }
 
   try {
-    const users = await fetchUsers();
-    const employee = pickAbsenceUserId(users);
+    const employee = await getCurrentUserOrFallback(ctx);
     if (!employee) {
       await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
       return;

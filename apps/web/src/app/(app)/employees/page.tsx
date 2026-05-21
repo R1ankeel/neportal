@@ -30,6 +30,7 @@ export default async function EmployeesPage() {
               <th className="px-4 py-3 font-semibold">Имя</th>
               <th className="px-4 py-3 font-semibold">Роль</th>
               <th className="hidden px-4 py-3 font-semibold sm:table-cell">Email</th>
+              <th className="px-4 py-3 font-semibold">Telegram</th>
             </tr>
           </thead>
           <tbody>
@@ -38,6 +39,18 @@ export default async function EmployeesPage() {
                 <td className="px-4 py-3 font-medium">{u.fullName}</td>
                 <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{u.role}</td>
                 <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">{u.email ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {u.telegramId ? (
+                    <span className="text-emerald-700 dark:text-emerald-400">Привязан</span>
+                  ) : (
+                    <span className="text-zinc-500 dark:text-zinc-500">Не привязан</span>
+                  )}
+                  {u.telegramId ? (
+                    <span className="mt-0.5 block text-xs text-zinc-400 dark:text-zinc-500">
+                      {u.telegramId}
+                    </span>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>
