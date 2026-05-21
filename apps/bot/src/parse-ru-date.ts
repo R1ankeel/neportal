@@ -68,14 +68,43 @@ const WEEKDAY_PATTERNS: ReadonlyArray<{ pattern: RegExp; dow: number }> = [
   { pattern: /суббот/iu, dow: 6 },
 ];
 
-function extractWeekdayFromText(text: string, baseDate: string): string | null {
+/** День недели из текста (0=вс … 6=сб) или null. */
+export function getWeekdayMentionDow(text: string): number | null {
   const lower = text.toLowerCase();
   for (const { pattern, dow } of WEEKDAY_PATTERNS) {
-    if (pattern.test(lower)) {
-      return nextWeekdayFromIso(baseDate, dow);
-    }
+    if (pattern.test(lower)) return dow;
   }
   return null;
+}
+
+function extractWeekdayFromText(text: string, baseDate: string): string | null {
+  const dow = getWeekdayMentionDow(text);
+  if (dow === null) return null;
+  return nextWeekdayFromIso(baseDate, dow);
+}
+
+/** Есть ли в тексте явная отсылка к сроку (день недели, завтра, дата). */
+export function hasRussianDateHint(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (/послезавтра|завтра|сегодня/u.test(lower)) return true;
+  if (getWeekdayMentionDow(text) !== null) return true;
+  if (/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/iu.test(text)) return true;
+  if (/\d{4}-\d{2}-\d{2}/.test(text) || /\d{1,2}\.\d{1,2}\.\d{4}/.test(text)) return true;
+  return false;
+}
+
+/** Дедлайн из сообщения пользователя; день недели важнее ISO от модели. */
+export function resolveDeadlineFromUserMessage(
+  userText: string,
+  baseDate: string = todayIsoDate(),
+): string | null {
+  const trimmed = userText.trim();
+  if (!trimmed) return null;
+
+  const dow = getWeekdayMentionDow(trimmed);
+  if (dow !== null) return nextWeekdayFromIso(baseDate, dow);
+
+  return extractDeadlineFromRussianText(trimmed, baseDate).deadlineDate;
 }
 
 /**
@@ -113,6 +142,9 @@ export function extractDeadlineFromRussianText(
 ): { deadlineDate: string | null } {
   const lower = text.toLowerCase();
 
+  const weekday = extractWeekdayFromText(text, baseDate);
+  if (weekday) return { deadlineDate: weekday };
+
   if (/послезавтра/u.test(lower)) {
     return { deadlineDate: addDaysToIsoDate(baseDate, 2) };
   }
@@ -122,9 +154,6 @@ export function extractDeadlineFromRussianText(
   if (/сегодня/u.test(lower)) {
     return { deadlineDate: baseDate };
   }
-
-  const weekday = extractWeekdayFromText(text, baseDate);
-  if (weekday) return { deadlineDate: weekday };
 
   const absMatch = text.match(/(?:до|к|на|в)\s+(\d{1,2}\.\d{1,2}\.\d{4})/iu);
   if (absMatch) {

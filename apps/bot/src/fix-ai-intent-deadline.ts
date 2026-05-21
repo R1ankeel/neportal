@@ -1,5 +1,42 @@
 import { preprocessAiIntentInput } from "./ai-contracts";
-import { coerceDeadlineDateLoose, extractDeadlineFromRussianText } from "./parse-ru-date";
+import {
+  coerceDeadlineDateLoose,
+  extractDeadlineFromRussianText,
+  hasRussianDateHint,
+  resolveDeadlineFromUserMessage,
+} from "./parse-ru-date";
+
+function applyDeadlineFields(
+  p: Record<string, unknown>,
+  intent: string,
+  opts: { baseDate: string; userText?: string },
+): void {
+  const userText = opts.userText?.trim();
+
+  if (userText) {
+    const fromUser = resolveDeadlineFromUserMessage(userText, opts.baseDate);
+    if (fromUser && hasRussianDateHint(userText)) {
+      p.deadlineDate = fromUser;
+      return;
+    }
+  }
+
+  if (typeof p.deadlineDate === "string") {
+    const coerced = coerceDeadlineDateLoose(p.deadlineDate, opts.baseDate);
+    if (coerced) p.deadlineDate = coerced;
+    else delete p.deadlineDate;
+  }
+
+  if (!p.deadlineDate && intent === "create_task") {
+    const combined = [p.title, p.description]
+      .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      .join(" ");
+    if (combined) {
+      const extracted = extractDeadlineFromRussianText(combined, opts.baseDate);
+      if (extracted.deadlineDate) p.deadlineDate = extracted.deadlineDate;
+    }
+  }
+}
 
 /** Исправляет deadlineDate от модели до Zod-валидации. */
 export function fixAiIntentBeforeValidation(
@@ -21,21 +58,7 @@ export function fixAiIntentBeforeValidation(
   const p = { ...(payload as Record<string, unknown>) };
 
   if (intent === "create_task" || intent === "set_task_deadline") {
-    if (typeof p.deadlineDate === "string") {
-      const coerced = coerceDeadlineDateLoose(p.deadlineDate, opts.baseDate);
-      if (coerced) p.deadlineDate = coerced;
-      else delete p.deadlineDate;
-    }
-
-    if (!p.deadlineDate && intent === "create_task") {
-      const combined = [opts.userText, p.title, p.description]
-        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
-        .join(" ");
-      if (combined) {
-        const extracted = extractDeadlineFromRussianText(combined, opts.baseDate);
-        if (extracted.deadlineDate) p.deadlineDate = extracted.deadlineDate;
-      }
-    }
+    applyDeadlineFields(p, intent as string, opts);
   }
 
   return { ...obj, payload: p };

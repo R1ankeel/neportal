@@ -4,16 +4,25 @@ type CreateTaskPayload = Extract<AiIntent, { intent: "create_task" }>["payload"]
 import {
   coerceDeadlineDateLoose,
   extractDeadlineFromRussianText,
+  hasRussianDateHint,
+  resolveDeadlineFromUserMessage,
   stripDeadlineMarkersFromText,
   todayIsoDate,
 } from "./parse-ru-date";
 
 /** Дополняет payload, если модель положила «завтра» в description вместо deadlineDate. */
-export function normalizeCreateTaskPayload(payload: CreateTaskPayload): CreateTaskPayload {
-  const baseDate = todayIsoDate();
+export function normalizeCreateTaskPayload(
+  payload: CreateTaskPayload,
+  opts?: { userText?: string; baseDate?: string },
+): CreateTaskPayload {
+  const baseDate = opts?.baseDate ?? todayIsoDate();
   let { title, description, deadlineDate, ...rest } = payload;
 
-  if (deadlineDate) {
+  const userText = opts?.userText?.trim();
+  if (userText && hasRussianDateHint(userText)) {
+    const fromUser = resolveDeadlineFromUserMessage(userText, baseDate);
+    if (fromUser) deadlineDate = fromUser;
+  } else if (deadlineDate) {
     deadlineDate = coerceDeadlineDateLoose(deadlineDate, baseDate);
   }
 

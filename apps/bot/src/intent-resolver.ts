@@ -75,6 +75,7 @@ export type ResolveResult =
 export async function resolveIntent(
   intent: AiIntent,
   telegramUserId?: number,
+  userText?: string,
 ): Promise<ResolveResult> {
   if (intent.intent === "unknown") {
     return { ok: false, message: "Не понял команду. Попробуйте переформулировать или используйте /demo." };
@@ -94,7 +95,9 @@ export async function resolveIntent(
   switch (intent.intent) {
     case "create_task": {
       const creatorId = currentUser.id;
-      const payload = normalizeCreateTaskPayload(intent.payload);
+      const payload = normalizeCreateTaskPayload(intent.payload, {
+        userText,
+      });
 
       const project = findProjectByHint(projects, payload.projectHint);
       if (!project) {
