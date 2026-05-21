@@ -11,7 +11,8 @@ Neportal — монорепозиторий для внутреннего пор
 | [REST API](api.md) | Эндпоинты, тела запросов, Swagger, ограничения MVP |
 | [База данных](database.md) | Prisma-модели, enum'ы, миграции, демо-данные |
 | [Веб-приложение](web.md) | Next.js, маршруты, серверный fetch к API |
-| [Telegram-бот](bot.md) | Команды, интеграция с API, чеки к расходам |
+| [Telegram-бот](bot.md) | Команды, YandexGPT, подтверждение, чеки к расходам |
+| [AI intent](ai-intent.md) | Контракт JSON, YandexGPT, env, проверка |
 | [Пакеты](packages.md) | `@neportal/database`, `shared`, `permissions`, `ai-contracts` |
 
 Краткая шпаргалка по репозиторию — в корневом [README.md](../README.md).
@@ -40,4 +41,5 @@ Neportal — монорепозиторий для внутреннего пор
 - **Нет аутентификации** в API: все запросы обслуживаются в контексте одной организации (`NEPORTAL_ORG_SLUG` или `NEPORTAL_ORGANIZATION_ID`).
 - **Web** не реализует логин; страницы доверяют API и демо-данным сида.
 - **Отсутствия** — бот `/sick`, `/vacation`, API `GET/POST /absences`, вкладка проекта в Web — см. [api.md](api.md), [bot.md](bot.md).
-- **S3 / Yandex Cloud** в `.env.example` — заготовки под голос, GPT и хранение файлов; в MVP чеки из Telegram хранятся как `telegramFileId`, открытие — через redirect API.
+- **YandexGPT** — разбор обычного текста в боте (опционально, см. [ai-intent.md](ai-intent.md)); деплой в Yandex Cloud не нужен.
+- **S3 / SpeechKit** в `.env.example` — заготовки; в MVP чеки из Telegram — `telegramFileId`, preview через API.

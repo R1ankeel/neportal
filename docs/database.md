@@ -117,7 +117,7 @@ pnpm db:studio     # GUI
 Команда: `pnpm db:seed`  
 Скрипт: `packages/database/prisma/seed.ts`
 
-Перед созданием удаляется org с `slug = neportal-demo`, затем создаётся заново:
+Перед созданием удаляется org с `slug = neportal-demo` (сначала `BudgetExpenseAttachment`, иначе FK на `uploadedById`), затем org создаётся заново:
 
 | Сущность | Детали |
 |----------|--------|

@@ -32,18 +32,27 @@
 
 ## `@neportal/ai-contracts`
 
-Zod-схема **`AiIntent`** (intent-based контракт для YandexGPT):
+Zod-схемы для ответа **YandexGPT intent parser** (только разбор текста, без выполнения действий).
 
-```typescript
-{
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "unknown",
-  confidence: number,
-  requiresConfirmation: boolean,
-  payload: { ... } // зависит от intent
-}
-```
+Корневой тип **`AiIntent`** — discriminated union по полю `intent`:
 
-Функции: `parseAiIntent`, `safeParseAiIntent`, `preprocessAiIntentInput` (убирает legacy `version`/`action`/`entity`, если модель их вернула).
+| `intent` | Ключевые поля `payload` |
+|----------|-------------------------|
+| `create_task` | `title`, `assigneeHint?`, `projectHint?`, `deadlineDate?` (ISO) |
+| `create_note` | `text`, `projectHint?` |
+| `create_expense` | `amount`, `projectHint?`, `budgetHint?`, `description?` |
+| `create_absence` | `type`, `endDate`, `userHint?`, `startDate?`, … |
+| `set_task_deadline` | `taskTitle`, `deadlineDate` |
+| `unknown` | `reason?` |
+
+Общие поля ответа: `confidence` (0–1), `requiresConfirmation` (boolean).
+
+**Экспорт:** `AiIntentSchema`, `CreateTaskPayloadSchema`, …, `parseAiIntent`, `safeParseAiIntent`, `preprocessAiIntentInput`.
+
+Сборка: `pnpm --filter @neportal/ai-contracts build` → `dist/`.  
+Потребитель: `apps/bot` через `src/ai-contracts.ts` (прямой `require` на `dist`, см. [ai-intent.md](ai-intent.md)).
+
+Поля `version` / `action` / `entity` из старого черновика **удалены**.
 
 ## Зависимости между пакетами
 
@@ -52,6 +61,7 @@ apps/api  ──► @neportal/database
           ──► @neportal/shared
 
 apps/bot  ──► @neportal/shared
+          ──► @neportal/ai-contracts (workspace; runtime — dist монорепо)
 
 apps/web  ──► (прямого импорта database нет, только HTTP API)
 ```

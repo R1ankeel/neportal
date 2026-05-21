@@ -82,9 +82,18 @@ neportal/
 | Мульти-тенант | Только одна org в runtime |
 | Telegram file open | API запрашивает `getFile` у Bot API, редирект на URL файла; токен бота не отдаётся клиенту в JSON |
 
+## AI intent (реализовано в MVP)
+
+- **`@neportal/ai-contracts`** — Zod-контракт `intent` + `payload` для ответа YandexGPT.
+- **`apps/bot`** — текст без `/` → YandexGPT → подтверждение → REST API (те же обёртки, что slash-команды).
+- Yandex Cloud **не хостит** приложение в MVP; вызывается только HTTP API Foundation Models.
+- SpeechKit (голос → текст) — env в `.env.example`, код не подключён.
+
+Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md).
+
 ## Планируемые направления (по схеме и env)
 
 - Redis — очереди, кэш, напоминания (`Reminder` в БД).
-- S3 / Yandex Cloud — голосовые заметки, GPT, постоянное хранение вложений.
+- S3 — постоянное хранение вложений (сейчас чеки через `telegramFileId`).
+- SpeechKit — голосовые команды в боте.
 - Пакет `permissions` — отдельная модель ролей; в Prisma уже есть `UserRole` / `ProjectRole`.
-- `ai-contracts` — разбор намерений пользователя из текста/голоса.

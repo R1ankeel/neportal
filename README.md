@@ -60,7 +60,8 @@ pnpm dev
 ## MVP: что важно знать
 
 - API **без авторизации**; одна организация — `NEPORTAL_ORG_SLUG=neportal-demo` (после сида).
-- Бот: `/task`, `/note`, `/expense`, `/sick`, `/vacation`, `/deadline` + прикрепление чека → [docs/bot.md](docs/bot.md).
+- Бот: slash-команды (`/task`, `/note`, `/expense`, …) + **обычный текст** через YandexGPT (подтверждение «да»/«нет») → [docs/bot.md](docs/bot.md), [docs/ai-intent.md](docs/ai-intent.md).
+- Локально: Web `:3000`, API `:4000`, Postgres/Redis в Docker; Yandex Cloud только как внешний API (GPT), без деплоя приложения.
 - REST-справочник → [docs/api.md](docs/api.md).
 
 ## Troubleshooting
@@ -70,6 +71,8 @@ pnpm dev
 | `DATABASE_URL` не найден | `.env` в корне; команды из корня репозитория |
 | `TELEGRAM_BOT_TOKEN` | Задать в корневом `.env` |
 | Org не найдена | `pnpm db:seed` |
+| `db:seed` FK attachment | Пересоздание демо-org; нужна актуальная версия `seed.ts` |
+| YandexGPT 401 / Zod `version` | См. [docs/bot.md](docs/bot.md) Troubleshooting |
 | Ошибка Next `<Html>` при build | Не убирать `NODE_ENV=production` в скрипте `build` web-пакета |
 
 ## Лицензия и вклад

@@ -19,13 +19,41 @@ BOT_MODE=webhook
 TELEGRAM_WEBHOOK_URL=https://your-host/telegram/webhook
 ```
 
-Запуск:
+Запуск (перед `tsx` собирается `@neportal/ai-contracts`):
 
 ```bash
 pnpm --filter @neportal/bot dev
 ```
 
 При старте вызывается `loadRootEnv()` из `@neportal/shared` (как в API).
+
+### YandexGPT (опционально)
+
+Для разбора **обычного текста** без slash-команд в **корневом** `.env`:
+
+```env
+YANDEX_CLOUD_FOLDER_ID=<folder-id>
+# API key (приоритет): Authorization: Api-Key
+YANDEX_GPT_API_KEY=<ключ вида y0__...>
+# Или IAM token: Authorization: Bearer (если API key не задан)
+YANDEX_CLOUD_IAM_TOKEN=
+YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
+```
+
+| Переменная | Назначение |
+|------------|------------|
+| `YANDEX_CLOUD_FOLDER_ID` | Каталог Yandex Cloud, заголовок `x-folder-id` |
+| `YANDEX_GPT_API_KEY` | Статический ключ; **не** подставлять в `Bearer` |
+| `YANDEX_CLOUD_IAM_TOKEN` | IAM-токен; **не** подставлять в `Api-Key` |
+| `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` — `gpt://{folder}/yandexgpt/latest` |
+
+Значения `change_me` и пустые строки считаются «не задано».
+
+Если Yandex не настроен — slash-команды работают; на произвольный текст бот отвечает: *«AI-парсер пока не настроен. Используйте команды /demo.»*
+
+При успешном старте в консоли (без секретов): `[yandex-gpt] auth mode: api-key` или `iam-token`.
+
+Подробнее о контракте JSON → [ai-intent.md](ai-intent.md).
 
 ## Команды
 
@@ -39,6 +67,39 @@ pnpm --filter @neportal/bot dev
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
+
+### Обычный текст (YandexGPT)
+
+Сообщения **без** `/` в начале (не команда) обрабатываются AI-парсером, если заданы переменные Yandex.
+
+**Поток:**
+
+1. Текст → YandexGPT → JSON intent (см. `@neportal/ai-contracts`).
+2. Валидация Zod; `confidence < 0.7` или `intent: unknown` → «Не понял команду…».
+3. Сопоставление hints с проектами/пользователями/бюджетами/задачами из API (`intent-resolver.ts`).
+4. Preview и вопрос: *«Ответьте: да / нет»*.
+5. Ответ `да` / `+` / `yes` (регистр не важен) → выполнение через те же REST-обёртки, что и slash-команды.
+6. `нет` / `-` / `no` → отмена; pending сбрасывается.
+
+**Примеры фраз:**
+
+| Текст | Intent |
+|-------|--------|
+| Поставь Васе задачу подготовить отчет до 23 мая | `create_task` |
+| Запиши заметку: клиент попросил завтра проверить статистику VK | `create_note` |
+| Потратил 1500 рублей на рекламу VK | `create_expense` |
+| Вася заболел до 25 мая, больничный 123456 | `create_absence` |
+
+**Даты в тексте заметок:** в `payload.text` модель может вернуть ISO; бот перед сохранением заменяет `2026-05-22` → `22.05.2026` (`replaceIsoDatesInText`). Поля `deadlineDate` / `startDate` / `endDate` в JSON остаются ISO `YYYY-MM-DD`.
+
+**Сопоставление hints** (`hint-matchers.ts`):
+
+- `projectHint` → проект по подстроке имени (без учёта регистра), иначе проект по умолчанию.
+- `assigneeHint` / `userHint` → пользователь по подстроке `fullName`.
+- `budgetHint` → бюджет проекта по подстроке `title`, иначе первый бюджет.
+- `taskTitle` → точное совпадение `title`, иначе `includes`; несколько совпадений → просьба уточнить.
+
+Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход».
 
 ### Проект и бюджет по умолчанию
 
@@ -100,12 +161,33 @@ pnpm --filter @neportal/bot dev
 
 Файл `apps/bot/src/api.ts` — обёртки над REST:
 
-- `fetchUsers`, `fetchProjects`, `fetchBudgets`
-- `createTask`, `createNote`, `createBudgetExpense`, `createExpenseAttachment`, `createAbsence`, `fetchAbsences`
-- `fetchTasks`, `updateTaskDeadline`
+- `fetchUsers`, `fetchProjects`, `fetchBudgets`, `fetchTasks`
+- `createTask`, `createNote`, `createBudgetExpense` (alias `createExpense`), `createExpenseAttachment`, `createAbsence`
+- `updateTaskDeadline` (alias `setTaskDeadline`)
 - `pickCreatorId`, `pickAbsenceUserId`, `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`
 
 При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.
+
+## Структура кода (AI и команды)
+
+| Файл | Назначение |
+|------|------------|
+| `main.ts` | Регистрация команд, фото/документов, `message:text` → `ai-message.ts` |
+| `yandex-gpt.ts` | Запрос в YandexGPT, prompt, auth, `extractJsonText`, валидация |
+| `ai-contracts.ts` | Загрузка Zod-схемы из `packages/ai-contracts/dist` (обход stale `node_modules`) |
+| `ai-message.ts` | Текст без `/`, confirmation, порог confidence |
+| `intent-context.ts` | Контекст для prompt: дата, проекты, пользователи, бюджеты, задачи |
+| `intent-resolver.ts` | hints → ID сущностей |
+| `intent-preview.ts` | Текст «Создать задачу? … Ответьте: да / нет» |
+| `intent-executor.ts` | Вызов API после подтверждения |
+| `confirmation.ts` | Распознавание да/нет |
+| `pending-intent.ts` | In-memory pending по `telegramUserId` |
+| `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |
+
+**Dev-логи YandexGPT** (не логируют токены; отключить: `BOT_DEV_LOG=0`):
+
+- `raw AI JSON before validation`
+- `validation error` / `parsed intent`
 
 ## Troubleshooting
 
@@ -114,9 +196,16 @@ pnpm --filter @neportal/bot dev
 | `/sick` молчит или не создаёт запись | Раньше: `bot.hears` не ловит команды. Сейчас: `bot.command`. Перезапустите `pnpm --filter @neportal/bot dev`. |
 | `GET /absences` пустой после `/sick` | Проверьте логи `[bot] POST /absences`, `API_URL` в `.env`, что API запущен на `:4000`. |
 | Ошибка 400/404 от API | В логе будет body ответа; проверьте `pnpm db:seed` и `userId`. |
+| YandexGPT HTTP 401 `Unknown api key` | IAM-токен передан как `Api-Key`. Используйте `YANDEX_GPT_API_KEY` для `Api-Key`, `YANDEX_CLOUD_IAM_TOKEN` для `Bearer`. |
+| Zod: `version` / `action` / `entity` | Устаревший `@neportal/ai-contracts` в `node_modules`. Выполните `pnpm --filter @neportal/ai-contracts build` и перезапустите бота (см. `ai-contracts.ts`). |
+| «Не смог разобрать команду» | Невалидный JSON от модели или ошибка схемы; смотрите `[yandex-gpt] validation error`. |
+| В заметке дата `2026-05-22` | Перезапустите бота с актуальным кодом (`replaceIsoDatesInText` в `intent-resolver`). |
 
 ## Ограничения
 
-- Состояние «последний расход» **в памяти процесса** — сбрасывается при перезапуске бота.
+- Состояние «последний расход» и **pending AI intent** — **в памяти процесса**; сбрасывается при перезапуске бота.
+- YandexGPT **не выполняет** действия — только парсит текст; API вызывает бот после «да».
 - Нет привязки Telegram `from.id` к `User.telegramId` в БД — используются демо-пользователи из сида.
+- SpeechKit / голосовые сообщения — не реализованы (env в `.env.example` — заготовка).
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
+- Деплой в Yandex Cloud для MVP **не требуется** — только внешний API YandexGPT/SpeechKit из локального бота.

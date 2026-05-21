@@ -19,6 +19,7 @@ cp .env.example .env
 - `DATABASE_URL` — должен совпадать с `docker-compose.yml`
 - `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather), если запускаете бота
 - `API_URL` / `NEXT_PUBLIC_API_URL` — обычно `http://localhost:4000` для локальной разработки
+- **YandexGPT** (опционально): `YANDEX_CLOUD_FOLDER_ID`, `YANDEX_GPT_API_KEY` или `YANDEX_CLOUD_IAM_TOKEN`, `YANDEX_GPT_MODEL_URI` — см. [ai-intent.md](ai-intent.md)
 
 Подробнее о загрузке `.env` — в [architecture.md](architecture.md#переменные-окружения).
 
@@ -65,6 +66,9 @@ pnpm --filter @neportal/bot dev
 2. Swagger: http://localhost:4000/docs
 3. Web: http://localhost:3000 → редирект в приложение, раздел «Проекты»
 4. Бот: `/start` в Telegram после задания `TELEGRAM_BOT_TOKEN`
+5. AI (если настроен Yandex): фраза «Запиши заметку: …» → preview → ответ `да` → заметка в Web на вкладке проекта
+
+Локальные URL: Web `http://localhost:3000`, API `http://localhost:4000`, бот — polling (без публичного URL).
 
 ## Команды из корня
 
@@ -85,3 +89,5 @@ pnpm --filter @neportal/bot dev
 | Пути вроде `C:\Windows\System32` в ошибках | `cd` в каталог с корневым `package.json` |
 | `Organization slug "neportal-demo" not found` | Выполнить `pnpm db:seed` |
 | Ошибка Next `<Html>` при `next build` | В `@neportal/web` скрипт `build` выставляет `NODE_ENV=production` поверх `.env`; не отключайте при кастомных командах |
+| `pnpm db:seed` FK на `BudgetExpenseAttachment` | Сид удаляет вложения чеков перед пересозданием org; обновите `seed.ts` из репозитория |
+| Бот: Zod `version` / `action` / `entity` | `pnpm --filter @neportal/ai-contracts build`, перезапуск бота |
