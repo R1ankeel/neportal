@@ -8,10 +8,14 @@ import {
 const YANDEX_COMPLETION_URL =
   "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
 
+export type YandexGptAuthMode = "api-key" | "iam-token";
+
 export type YandexGptConfig = {
   folderId: string;
-  iamToken: string;
   modelUri: string;
+  authMode: YandexGptAuthMode;
+  /** API key (Api-Key) or IAM token (Bearer), never logged. */
+  credential: string;
 };
 
 export type YandexGptDisabledReason = "missing_env" | "placeholder_env";
@@ -26,27 +30,54 @@ function isPlaceholder(value: string | undefined): boolean {
   return v.length === 0 || v === "change_me";
 }
 
+function resolveAuth(): { authMode: YandexGptAuthMode; credential: string } | null {
+  const apiKey = process.env.YANDEX_GPT_API_KEY?.trim();
+  if (!isPlaceholder(apiKey)) {
+    return { authMode: "api-key", credential: apiKey! };
+  }
+
+  const iamToken = process.env.YANDEX_CLOUD_IAM_TOKEN?.trim();
+  if (!isPlaceholder(iamToken)) {
+    return { authMode: "iam-token", credential: iamToken! };
+  }
+
+  return null;
+}
+
+function buildAuthorizationHeader(config: YandexGptConfig): string {
+  if (config.authMode === "api-key") {
+    return `Api-Key ${config.credential}`;
+  }
+  return `Bearer ${config.credential}`;
+}
+
 export function getYandexGptState(): YandexGptState {
   const folderId = process.env.YANDEX_CLOUD_FOLDER_ID?.trim();
-  const iamToken = process.env.YANDEX_CLOUD_IAM_TOKEN?.trim();
   const modelUriRaw = process.env.YANDEX_GPT_MODEL_URI?.trim();
 
-  if (isPlaceholder(folderId) || isPlaceholder(iamToken)) {
+  if (isPlaceholder(folderId)) {
     return { enabled: false, reason: "missing_env" };
   }
 
-  const modelUri =
-    isPlaceholder(modelUriRaw) && folderId
-      ? `gpt://${folderId}/yandexgpt/latest`
-      : (modelUriRaw as string);
-
-  if (isPlaceholder(modelUri)) {
+  const auth = resolveAuth();
+  if (!auth) {
     return { enabled: false, reason: "missing_env" };
   }
+
+  const modelUri = isPlaceholder(modelUriRaw)
+    ? `gpt://${folderId}/yandexgpt/latest`
+    : modelUriRaw!;
+
+  console.log(`[yandex-gpt] auth mode: ${auth.authMode}`);
 
   return {
     enabled: true,
-    config: { folderId: folderId!, iamToken: iamToken!, modelUri },
+    config: {
+      folderId: folderId!,
+      modelUri,
+      authMode: auth.authMode,
+      credential: auth.credential,
+    },
   };
 }
 
@@ -178,7 +209,7 @@ async function callYandexGpt(config: YandexGptConfig, userPrompt: string): Promi
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      Authorization: `Bearer ${config.iamToken}`,
+      Authorization: buildAuthorizationHeader(config),
       "x-folder-id": config.folderId,
     },
     body: JSON.stringify({
