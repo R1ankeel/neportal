@@ -32,6 +32,12 @@ export function todayIsoDate(): string {
   return `${y}-${m}-${d}`;
 }
 
+const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isIsoDateString(value: string): boolean {
+  return ISO_DATE_ONLY_RE.test(value.trim());
+}
+
 /** Сдвиг ISO date YYYY-MM-DD на N календарных дней (UTC). */
 export function addDaysToIsoDate(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -42,6 +48,64 @@ export function addDaysToIsoDate(iso: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** Ближайший указанный день недели (0=вс … 6=сб), не раньше baseDate. */
+export function nextWeekdayFromIso(baseIso: string, targetDow: number): string {
+  const [y, m, d] = baseIso.split("-").map(Number);
+  const currentDow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  let days = targetDow - currentDow;
+  if (days < 0) days += 7;
+  return addDaysToIsoDate(baseIso, days);
+}
+
+/** Без \\b — в JS word boundary не работает с кириллицей. */
+const WEEKDAY_PATTERNS: ReadonlyArray<{ pattern: RegExp; dow: number }> = [
+  { pattern: /воскресенье/iu, dow: 0 },
+  { pattern: /понедельник/iu, dow: 1 },
+  { pattern: /вторник/iu, dow: 2 },
+  { pattern: /сред[аы]?/iu, dow: 3 },
+  { pattern: /четверг/iu, dow: 4 },
+  { pattern: /пятниц/iu, dow: 5 },
+  { pattern: /суббот/iu, dow: 6 },
+];
+
+function extractWeekdayFromText(text: string, baseDate: string): string | null {
+  const lower = text.toLowerCase();
+  for (const { pattern, dow } of WEEKDAY_PATTERNS) {
+    if (pattern.test(lower)) {
+      return nextWeekdayFromIso(baseDate, dow);
+    }
+  }
+  return null;
+}
+
+/**
+ * Приводит deadlineDate к YYYY-MM-DD: ISO, плейсхолдеры модели, дни недели, «завтра».
+ */
+export function coerceDeadlineDateLoose(
+  raw: string,
+  baseDate: string = todayIsoDate(),
+): string | undefined {
+  const trimmed = raw.trim().replace(/^<+|>+$/g, "").trim();
+  if (!trimmed) return undefined;
+  if (isIsoDateString(trimmed)) return trimmed;
+
+  const baseHint = trimmed.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? baseDate;
+
+  const weekday = extractWeekdayFromText(trimmed, baseHint);
+  if (weekday) return weekday;
+
+  const relative = extractDeadlineFromRussianText(trimmed, baseHint);
+  if (relative.deadlineDate) return relative.deadlineDate;
+
+  const ruMatch = trimmed.match(/(\d{1,2}\.\d{1,2}\.\d{4})/);
+  if (ruMatch) {
+    const iso = parseRuDate(ruMatch[1]);
+    if (iso) return iso;
+  }
+
+  return undefined;
+}
+
 /** Извлекает дедлайн из русского текста относительно baseDate (YYYY-MM-DD). */
 export function extractDeadlineFromRussianText(
   text: string,
@@ -49,15 +113,18 @@ export function extractDeadlineFromRussianText(
 ): { deadlineDate: string | null } {
   const lower = text.toLowerCase();
 
-  if (/\bпослезавтра\b/u.test(lower)) {
+  if (/послезавтра/u.test(lower)) {
     return { deadlineDate: addDaysToIsoDate(baseDate, 2) };
   }
-  if (/\bзавтра\b/u.test(lower)) {
+  if (/завтра/u.test(lower)) {
     return { deadlineDate: addDaysToIsoDate(baseDate, 1) };
   }
-  if (/\bсегодня\b/u.test(lower)) {
+  if (/сегодня/u.test(lower)) {
     return { deadlineDate: baseDate };
   }
+
+  const weekday = extractWeekdayFromText(text, baseDate);
+  if (weekday) return { deadlineDate: weekday };
 
   const absMatch = text.match(/(?:до|к|на|в)\s+(\d{1,2}\.\d{1,2}\.\d{4})/iu);
   if (absMatch) {
@@ -65,7 +132,7 @@ export function extractDeadlineFromRussianText(
     if (iso) return { deadlineDate: iso };
   }
 
-  const isoInText = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  const isoInText = text.match(/(\d{4}-\d{2}-\d{2})/);
   if (isoInText) return { deadlineDate: isoInText[1] };
 
   return { deadlineDate: null };
@@ -74,9 +141,12 @@ export function extractDeadlineFromRussianText(
 /** Убирает маркеры дедлайна из текста (описание/title после извлечения deadlineDate). */
 export function stripDeadlineMarkersFromText(text: string): string | undefined {
   let s = text;
-  s = s.replace(/\b(сегодня|завтра|послезавтра)\b/giu, "");
+  s = s.replace(/сегодня|завтра|послезавтра/giu, "");
+  for (const { pattern } of WEEKDAY_PATTERNS) {
+    s = s.replace(pattern, "");
+  }
   s = s.replace(/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/giu, "");
-  s = s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, "");
+  s = s.replace(/\d{4}-\d{2}-\d{2}/g, "");
   s = s.trim().replace(/\s{2,}/g, " ");
   return s.length > 0 ? s : undefined;
 }

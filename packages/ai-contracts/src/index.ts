@@ -53,7 +53,9 @@ export const CreateAbsencePayloadSchema = z.object({
 
 export const SetTaskDeadlinePayloadSchema = z.object({
   taskTitle: z.string().min(1),
-  deadlineDate: z.string(),
+  deadlineDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "deadlineDate must be YYYY-MM-DD"),
 });
 
 export const UnknownPayloadSchema = z.object({

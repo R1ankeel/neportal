@@ -2,6 +2,7 @@ import type { AiIntent } from "./ai-contracts";
 
 type CreateTaskPayload = Extract<AiIntent, { intent: "create_task" }>["payload"];
 import {
+  coerceDeadlineDateLoose,
   extractDeadlineFromRussianText,
   stripDeadlineMarkersFromText,
   todayIsoDate,
@@ -11,6 +12,10 @@ import {
 export function normalizeCreateTaskPayload(payload: CreateTaskPayload): CreateTaskPayload {
   const baseDate = todayIsoDate();
   let { title, description, deadlineDate, ...rest } = payload;
+
+  if (deadlineDate) {
+    deadlineDate = coerceDeadlineDateLoose(deadlineDate, baseDate);
+  }
 
   const combined = [title, description].filter(Boolean).join(" ");
   if (!deadlineDate) {

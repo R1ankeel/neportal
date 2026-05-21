@@ -1,4 +1,5 @@
 import { assertAiContractsSchemaLoaded, safeParseAiIntent, type AiIntent } from "./ai-contracts";
+import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
 import {
   formatPromptContextForModel,
   loadIntentPromptContext,
@@ -103,7 +104,7 @@ create_task.payload:
 
 create_task — дедлайн и формулировка:
 - Слова и фразы «сегодня», «завтра», «послезавтра», «до <дата>», «к <дата>», «на <дата>», «в <дата>», «завтра в 13:00» — это deadlineDate (и при необходимости время), НЕ description.
-- «Завтра» / «сегодня» / «послезавтра» считай от «Текущая дата» из контекста пользователя; deadlineDate только YYYY-MM-DD.
+- «Завтра» / «сегодня» / «послезавтра» / «в понедельник» считай от «Текущая дата» из контекста; deadlineDate — готовая дата YYYY-MM-DD (например 2026-05-25), НЕ плейсхолдер и НЕ текст вроде «<завтра…>».
 - title — короткое действие без даты: «Проверить склад», не «завтра проверить склад».
 - description опционален: только дополнительный контекст без дат и без дублирования дедлайна.
 - Не дублируй дедлайн в description.
@@ -118,7 +119,7 @@ Output:
   "payload": {
     "assigneeHint": "Вася",
     "title": "Проверить склад",
-    "deadlineDate": "<завтра от Текущая дата, YYYY-MM-DD>"
+    "deadlineDate": "2026-05-22"
   }
 }
 
@@ -160,7 +161,7 @@ unknown.payload:
 }
 
 Правила:
-- Поля deadlineDate, startDate, endDate — только YYYY-MM-DD; если год не указан — 2026.
+- Поля deadlineDate, startDate, endDate — только реальный YYYY-MM-DD (вычисли дату сам); если год не указан — 2026. Никогда не пиши <…>, YYYY-MM-DD как текст или пояснения вместо даты.
 - В payload.text заметок даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
 - В create_task поле description без дат; дедлайн только в deadlineDate.
 - «Завтра» в тексте заметки (create_note) — DD.MM.YYYY от текущей даты из контекста.
@@ -253,7 +254,15 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
 
   yandexGptDevLog("raw AI JSON before validation", { parsed });
 
-  const validated = safeParseAiIntent(parsed);
+  const fixed = fixAiIntentBeforeValidation(parsed, {
+    baseDate: context.currentDate,
+    userText: userText.trim(),
+  });
+  if (fixed !== parsed) {
+    yandexGptDevLog("deadlineDate coerced before validation", { fixed });
+  }
+
+  const validated = safeParseAiIntent(fixed);
   if (!validated.success) {
     yandexGptDevLog("validation error", {
       fieldErrors: validated.error.flatten().fieldErrors,
