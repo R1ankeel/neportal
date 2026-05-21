@@ -19,11 +19,17 @@ export function budgetRemainder(b: ApiBudget): number {
   return parseAmount(b.initialAmount) - parseAmount(b.spentAmount);
 }
 
+/** Календарная дата (дедлайны, отсутствия): API хранит конец дня UTC, показываем дату в UTC. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
