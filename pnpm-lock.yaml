@@ -72,6 +72,9 @@ importers:
 
   apps/bot:
     dependencies:
+      '@neportal/ai-contracts':
+        specifier: workspace:*
+        version: link:../../packages/ai-contracts
       '@neportal/shared':
         specifier: workspace:*
         version: link:../../packages/shared

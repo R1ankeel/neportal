@@ -29,6 +29,7 @@ import {
   todayIsoDate,
 } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
+import { handlePlainTextMessage } from "./ai-message";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -74,6 +75,12 @@ bot.command("demo", async (ctx) => {
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
+      "",
+      "Можно писать обычным текстом, например:",
+      "- Поставь Васе задачу подготовить отчет до 23 мая",
+      "- Запиши заметку: клиент попросил проверить статистику",
+      "- Потратил 1500 рублей на рекламу VK",
+      "- Вася заболел до 25 мая, больничный 123456",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -449,6 +456,12 @@ bot.on("message:document", async (ctx) => {
     originalFilename: doc.file_name,
     mimeType: doc.mime_type,
   });
+});
+
+bot.on("message:text", async (ctx) => {
+  const text = ctx.message.text;
+  if (!text || text.startsWith("/")) return;
+  await handlePlainTextMessage(ctx);
 });
 
 const mode = process.env.BOT_MODE ?? "polling";

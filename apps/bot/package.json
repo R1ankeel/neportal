@@ -9,6 +9,7 @@
     "lint": "echo \"No linter configured for @neportal/bot\""
   },
   "dependencies": {
+    "@neportal/ai-contracts": "workspace:*",
     "@neportal/shared": "workspace:*",
     "grammy": "^1.36.0"
   },

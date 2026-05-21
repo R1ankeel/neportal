@@ -96,6 +96,9 @@ export function formatMoney(amount: number, currency = "RUB"): string {
   }).format(amount);
 }
 
+/** Alias for AI intent execution. */
+export const createExpense = createBudgetExpense;
+
 export async function createBudgetExpense(
   budgetId: string,
   body: {
@@ -167,6 +170,9 @@ export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
   return res.json() as Promise<ApiTask[]>;
 }
 
+/** Alias for AI intent execution. */
+export const setTaskDeadline = updateTaskDeadline;
+
 export async function updateTaskDeadline(
   taskId: string,
   deadlineAt: string | null,
@@ -189,6 +195,7 @@ export async function updateTaskDeadline(
 
 export async function createTask(body: {
   title: string;
+  description?: string;
   creatorId: string;
   assigneeId?: string;
   projectId?: string;
