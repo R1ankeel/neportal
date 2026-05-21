@@ -32,19 +32,18 @@
 
 ## `@neportal/ai-contracts`
 
-Zod-схема **`AiIntent`** для разбора намерений (голос/текст → action + entity):
+Zod-схема **`AiIntent`** (intent-based контракт для YandexGPT):
 
 ```typescript
 {
-  version: 1,
-  action: "create" | "read" | "update" | "delete" | "unknown",
-  entity: string,
-  confidence?: number,
-  rawText?: string
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "unknown",
+  confidence: number,
+  requiresConfirmation: boolean,
+  payload: { ... } // зависит от intent
 }
 ```
 
-Функции: `parseAiIntent`, `safeParseAiIntent`. Интеграция с Yandex GPT/SpeechKit — через переменные в `.env.example`, код вызова в приложениях может отсутствовать.
+Функции: `parseAiIntent`, `safeParseAiIntent`, `preprocessAiIntentInput` (убирает legacy `version`/`action`/`entity`, если модель их вернула).
 
 ## Зависимости между пакетами
 

@@ -57,6 +57,7 @@ export const UnknownPayloadSchema = z.object({
   reason: z.string().optional(),
 });
 
+/** Intent-based AI contract (no version / action / entity). */
 export const AiIntentSchema = z.discriminatedUnion("intent", [
   z.object({
     intent: z.literal("create_task"),
@@ -98,10 +99,35 @@ export type CreateAbsencePayload = z.infer<typeof CreateAbsencePayloadSchema>;
 export type SetTaskDeadlinePayload = z.infer<typeof SetTaskDeadlinePayloadSchema>;
 export type UnknownPayload = z.infer<typeof UnknownPayloadSchema>;
 
+/** Removes legacy fields and coerces common model mistakes before Zod parse. */
+export function preprocessAiIntentInput(input: unknown): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return input;
+  }
+
+  const obj = { ...(input as Record<string, unknown>) };
+
+  delete obj.version;
+  delete obj.action;
+  delete obj.entity;
+  delete obj.rawText;
+
+  if (typeof obj.confidence === "string") {
+    const n = Number(obj.confidence);
+    if (!Number.isNaN(n)) obj.confidence = n;
+  }
+
+  if (obj.requiresConfirmation === undefined) {
+    obj.requiresConfirmation = true;
+  }
+
+  return obj;
+}
+
 export function parseAiIntent(input: unknown): AiIntent {
-  return AiIntentSchema.parse(input);
+  return AiIntentSchema.parse(preprocessAiIntentInput(input));
 }
 
 export function safeParseAiIntent(input: unknown) {
-  return AiIntentSchema.safeParse(input);
+  return AiIntentSchema.safeParse(preprocessAiIntentInput(input));
 }

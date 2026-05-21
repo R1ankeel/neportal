@@ -82,55 +82,70 @@ export function getYandexGptState(): YandexGptState {
 }
 
 const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
-Верни только один JSON-объект без markdown и без пояснений.
+Верни ТОЛЬКО один JSON-объект. Без markdown, без \`\`\`, без текста до или после JSON.
 Не выполняй действия — только разбор текста пользователя.
 
-Допустимые значения intent:
-- create_task
-- create_note
-- create_expense
-- create_absence
-- set_task_deadline
-- unknown
+ЗАПРЕЩЕНО использовать поля: version, action, entity, rawText.
+Используй ТОЛЬКО: intent, confidence, requiresConfirmation, payload.
 
-Структура ответа:
+JSON Schema ответа:
 {
-  "intent": "<один из intent выше>",
-  "confidence": <число от 0 до 1>,
-  "requiresConfirmation": true,
-  "payload": { ... }
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "unknown",
+  "confidence": number,
+  "requiresConfirmation": boolean,
+  "payload": object
 }
 
-payload для create_task:
+payload по intent:
+
+create_task.payload:
 { "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
-payload для create_note:
+create_note.payload:
 { "projectHint"?: string, "text": string }
 
-payload для create_expense:
+create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
 
-payload для create_absence:
+create_absence.payload:
 { "userHint"?: string, "type": "SICK_LEAVE" | "VACATION", "startDate"?: "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "documentNumber"?: string, "comment"?: string }
 
-payload для set_task_deadline:
+set_task_deadline.payload:
 { "taskTitle": string, "deadlineDate": "YYYY-MM-DD" }
 
-payload для unknown:
+unknown.payload:
 { "reason"?: string }
 
-Правила:
-- Даты только в формате YYYY-MM-DD.
-- Если год не указан — используй 2026.
-- «Завтра» и относительные даты считай от текущей даты из контекста.
-- Сопоставляй имена, проекты и бюджеты со списками из контекста (hints — подстроки имён из списка).
-- Для больничного type = SICK_LEAVE, для отпуска type = VACATION.
-- Если команда непонятна — intent unknown, confidence низкая.
-- requiresConfirmation всегда true для известных intent.`;
+Пример create_note:
+{
+  "intent": "create_note",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "text": "клиент попросил завтра проверить статистику VK" }
+}
 
-function extractJsonText(raw: string): string {
+Правила:
+- Даты только YYYY-MM-DD; если год не указан — 2026.
+- «Завтра» считай от текущей даты из контекста.
+- hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
+- Больничный: type SICK_LEAVE; отпуск: VACATION.
+- Если команда непонятна: intent unknown, низкая confidence.
+- requiresConfirmation: true для всех известных intent.`;
+
+/** Dev-only logs (отключить: BOT_DEV_LOG=0). */
+function yandexGptDevLog(message: string, data?: Record<string, unknown>): void {
+  if (process.env.BOT_DEV_LOG === "0") return;
+  if (data && Object.keys(data).length > 0) {
+    console.log(`[yandex-gpt] ${message}`, data);
+  } else {
+    console.log(`[yandex-gpt] ${message}`);
+  }
+}
+
+/** Извлекает JSON из ответа модели, в т.ч. из блока \`\`\`json ... \`\`\`. */
+export function extractJsonText(raw: string): string {
   const trimmed = raw.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) return fenced[1].trim();
 
   const start = trimmed.indexOf("{");
@@ -186,21 +201,37 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
     return { ok: false, kind: "api_error" };
   }
 
+  const jsonText = extractJsonText(responseText);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(extractJsonText(responseText));
+    parsed = JSON.parse(jsonText);
   } catch {
-    console.error("[yandex-gpt] model returned non-JSON text");
+    yandexGptDevLog("model returned non-JSON text", {
+      preview: jsonText.slice(0, 500),
+    });
     return { ok: false, kind: "invalid_json" };
   }
 
+  yandexGptDevLog("raw AI JSON before validation", { parsed });
+
   const validated = safeParseAiIntent(parsed);
   if (!validated.success) {
-    console.error("[yandex-gpt] schema validation failed", validated.error.flatten());
+    yandexGptDevLog("validation error", {
+      fieldErrors: validated.error.flatten().fieldErrors,
+      formErrors: validated.error.flatten().formErrors,
+    });
     return { ok: false, kind: "invalid_schema" };
   }
 
-  return { ok: true, intent: validated.data };
+  const intent = validated.data;
+  yandexGptDevLog("parsed intent", {
+    intent: intent.intent,
+    confidence: intent.confidence,
+    requiresConfirmation: intent.requiresConfirmation,
+    payload: intent.payload,
+  });
+
+  return { ok: true, intent };
 }
 
 async function callYandexGpt(config: YandexGptConfig, userPrompt: string): Promise<string> {
