@@ -16,9 +16,13 @@ export type ApiUser = {
   telegramUsername?: string | null;
 };
 
-/** Нормализация @username (без @, lower case). */
-export function normalizeTelegramUsername(raw: string): string {
-  return raw.trim().replace(/^@+/, "").toLowerCase();
+/** Нормализация @username (без @, lower case); пусто → null. */
+export function normalizeTelegramUsername(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withoutAt = trimmed.replace(/^@+/, "");
+  const lower = withoutAt.toLowerCase();
+  return lower.length > 0 ? lower : null;
 }
 
 export type UserNameMatchResult =
@@ -72,6 +76,7 @@ export async function fetchUserByTelegramUsername(
   username: string,
 ): Promise<ApiUser | null> {
   const normalized = normalizeTelegramUsername(username);
+  if (!normalized) return null;
   const res = await fetch(
     `${getApiBaseUrl()}/users/by-telegram-username/${encodeURIComponent(normalized)}`,
     { headers: { Accept: "application/json" } },

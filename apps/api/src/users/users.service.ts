@@ -54,6 +54,11 @@ export class UsersService {
 
   async findByTelegramUsername(username: string) {
     const normalized = normalizeTelegramUsername(username);
+    if (!normalized) {
+      throw new NotFoundException(
+        `User with telegramUsername "${username}" not found`,
+      );
+    }
     const user = await this.prisma.user.findFirst({
       where: {
         telegramUsername: normalized,
@@ -102,10 +107,12 @@ export class UsersService {
       phone: dto.phone,
     };
 
-    if (dto.telegramUsername?.trim()) {
+    if (dto.telegramUsername !== undefined) {
       const telegramUsername = normalizeTelegramUsername(dto.telegramUsername);
-      await this.assertTelegramUsernameAvailable(telegramUsername);
-      data.telegramUsername = telegramUsername;
+      if (telegramUsername) {
+        await this.assertTelegramUsernameAvailable(telegramUsername);
+        data.telegramUsername = telegramUsername;
+      }
     }
 
     return this.prisma.user.create({ data });
@@ -130,13 +137,13 @@ export class UsersService {
     if (dto.status !== undefined) data.status = dto.status;
 
     if (dto.telegramUsername !== undefined) {
-      if (dto.telegramUsername === null || dto.telegramUsername === "") {
+      if (dto.telegramUsername === null) {
         data.telegramUsername = null;
       } else {
-        const telegramUsername = normalizeTelegramUsername(
-          dto.telegramUsername,
-        );
-        await this.assertTelegramUsernameAvailable(telegramUsername, id);
+        const telegramUsername = normalizeTelegramUsername(dto.telegramUsername);
+        if (telegramUsername) {
+          await this.assertTelegramUsernameAvailable(telegramUsername, id);
+        }
         data.telegramUsername = telegramUsername;
       }
     }
@@ -162,6 +169,14 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: { telegramId },
+    });
+  }
+
+  async unlinkTelegram(id: string) {
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { telegramId: null },
     });
   }
 }

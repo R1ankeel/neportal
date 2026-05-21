@@ -61,6 +61,11 @@ pnpm --filter @neportal/web dev
   - username не указан → **Username не указан**
 - **Добавить сотрудника:** Server Action `POST /users` — ФИО, роль, опционально Telegram username (без `@`).
 - **Редактирование username:** inline-форма в строке (пока `telegramId` не привязан) → `PATCH /users/:id`.
+- **Отвязка:** кнопка «Отвязать Telegram» (если `telegramId` задан) → `DELETE /users/:id/telegram`; `telegramUsername` остаётся → статус **Ожидает /start**.
+
+**Нормализация username** (на API, дублируется в формах Web): trim, убрать `@`, lowercase; пустая строка → `null`. Примеры: `@TestUser` → `testuser`, `" vasya "` → `vasya`.
+
+`telegramUsername` — для первой привязки; `telegramId` — для всех действий после привязки. Смена username в Telegram не ломает связь.
 
 Подробнее о потоке в боте → [bot.md](bot.md) (раздел «Привязка Telegram»).
 

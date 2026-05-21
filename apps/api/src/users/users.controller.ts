@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -60,5 +60,12 @@ export class UsersController {
     @Body() dto: UpdateUserTelegramDto,
   ) {
     return this.usersService.updateTelegram(id, dto.telegramId);
+  }
+
+  @Delete(":id/telegram")
+  @ApiOperation({ summary: "Unlink Telegram account from user" })
+  @ApiParam({ name: "id" })
+  unlinkTelegram(@Param("id") id: string) {
+    return this.usersService.unlinkTelegram(id);
   }
 }

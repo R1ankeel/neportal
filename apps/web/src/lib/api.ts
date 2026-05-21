@@ -60,6 +60,20 @@ export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function apiDeleteJson<T>(path: string): Promise<T> {
+  const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`DELETE ${path} → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function apiPatchJson<T>(path: string, body: unknown): Promise<T> {
   const url = `${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
   const res = await fetch(url, {

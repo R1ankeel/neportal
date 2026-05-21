@@ -72,7 +72,18 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 ### Привязка Telegram (username flow)
 
-Руководитель в Web (`/employees`) создаёт сотрудника и указывает **Telegram username** (без `@`, сохраняется в нижнем регистре). Сотрудник в Telegram отправляет **`/start`**.
+Руководитель в Web (`/employees`) создаёт сотрудника и указывает **Telegram username** (`@Vasya` → `vasya` на API). Сотрудник в Telegram отправляет **`/start`**.
+
+**Идентификация:**
+
+| Поле | Когда используется |
+|------|-------------------|
+| `telegramUsername` | Только **первичная привязка** через `/start` (пока `telegramId` пустой) |
+| `telegramId` | **Постоянная** идентификация для slash-команд, AI и расходов после подтверждения |
+
+Смена `@username` в Telegram **не отвязывает** сотрудника — связь держится на `telegramId`.
+
+**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает `telegramId`, **не** трогает `telegramUsername`; сотрудник снова может пройти `/start`.
 
 **Поток `/start`:**
 

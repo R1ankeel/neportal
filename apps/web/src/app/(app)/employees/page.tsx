@@ -2,6 +2,7 @@ import { apiGet } from "@/lib/api";
 import type { ApiUser } from "@/lib/types";
 import { AddEmployeeForm } from "./AddEmployeeForm";
 import { EditUsernameForm } from "./EditUsernameForm";
+import { UnlinkTelegramButton } from "./UnlinkTelegramButton";
 import { getTelegramBindingStatus } from "./telegram-status";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,9 @@ export default async function EmployeesPage() {
                       <span className="mt-0.5 block text-xs text-zinc-400 dark:text-zinc-500">
                         {binding.detail}
                       </span>
+                    ) : null}
+                    {u.telegramId ? (
+                      <UnlinkTelegramButton userId={u.id} fullName={u.fullName} />
                     ) : null}
                   </td>
                 </tr>

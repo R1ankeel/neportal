@@ -1,13 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { apiPatchJson, apiPostJson } from "@/lib/api";
+import { apiDeleteJson, apiPatchJson, apiPostJson } from "@/lib/api";
+import { normalizeTelegramUsername } from "@/lib/telegram-username";
 
 export type EmployeeFormState = { ok: boolean; message?: string };
-
-function normalizeTelegramUsername(raw: string): string {
-  return raw.trim().replace(/^@+/, "").toLowerCase();
-}
 
 export async function createEmployee(
   _prev: EmployeeFormState | undefined,
@@ -15,14 +12,15 @@ export async function createEmployee(
 ): Promise<EmployeeFormState> {
   const fullName = String(formData.get("fullName") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim();
-  const telegramUsernameRaw = String(formData.get("telegramUsername") ?? "").trim();
+  const telegramUsernameRaw = String(formData.get("telegramUsername") ?? "");
 
   if (!fullName) return { ok: false, message: "Укажите ФИО" };
   if (!role) return { ok: false, message: "Выберите роль" };
 
   const body: Record<string, string> = { fullName, role };
-  if (telegramUsernameRaw) {
-    body.telegramUsername = normalizeTelegramUsername(telegramUsernameRaw);
+  const telegramUsername = normalizeTelegramUsername(telegramUsernameRaw);
+  if (telegramUsername) {
+    body.telegramUsername = telegramUsername;
   }
 
   try {
@@ -42,14 +40,12 @@ export async function updateEmployeeUsername(
   formData: FormData,
 ): Promise<EmployeeFormState> {
   const userId = String(formData.get("userId") ?? "");
-  const telegramUsernameRaw = String(formData.get("telegramUsername") ?? "").trim();
+  const telegramUsernameRaw = String(formData.get("telegramUsername") ?? "");
 
   if (!userId) return { ok: false, message: "Не указан сотрудник" };
 
   const body: { telegramUsername: string | null } = {
-    telegramUsername: telegramUsernameRaw
-      ? normalizeTelegramUsername(telegramUsernameRaw)
-      : null,
+    telegramUsername: normalizeTelegramUsername(telegramUsernameRaw),
   };
 
   try {
@@ -60,6 +56,23 @@ export async function updateEmployeeUsername(
     return {
       ok: false,
       message: e instanceof Error ? e.message : "Ошибка сохранения",
+    };
+  }
+}
+
+export async function unlinkEmployeeTelegram(
+  userId: string,
+): Promise<EmployeeFormState> {
+  if (!userId) return { ok: false, message: "Не указан сотрудник" };
+
+  try {
+    await apiDeleteJson(`/users/${userId}/telegram`);
+    revalidatePath("/employees");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Ошибка отвязки",
     };
   }
 }

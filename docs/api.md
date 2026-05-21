@@ -28,6 +28,7 @@
 | GET | `/users/:id` | Пользователь по id |
 | PATCH | `/users/:id` | Обновить (`telegramUsername` можно сбросить `null`) |
 | PATCH | `/users/:id/telegram` | Привязать `telegramId` (unique глобально) |
+| DELETE | `/users/:id/telegram` | Отвязать Telegram (`telegramId = null`, `telegramUsername` сохраняется) |
 
 ## Projects
 
