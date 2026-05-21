@@ -1,4 +1,4 @@
-import type { AiIntent } from "@neportal/ai-contracts";
+import type { AiIntent } from "./ai-contracts";
 import {
   fetchBudgets,
   fetchProjects,

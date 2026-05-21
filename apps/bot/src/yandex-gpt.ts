@@ -1,4 +1,4 @@
-import { safeParseAiIntent, type AiIntent } from "@neportal/ai-contracts";
+import { assertAiContractsSchemaLoaded, safeParseAiIntent, type AiIntent } from "./ai-contracts";
 import {
   formatPromptContextForModel,
   loadIntentPromptContext,
@@ -171,6 +171,8 @@ export type ParseTextIntentResult =
   | { ok: false; kind: "disabled" | "api_error" | "invalid_json" | "invalid_schema" };
 
 export async function parseTextIntent(userText: string): Promise<ParseTextIntentResult> {
+  assertAiContractsSchemaLoaded();
+
   const state = getYandexGptState();
   if (!state.enabled) {
     return { ok: false, kind: "disabled" };

@@ -58,35 +58,40 @@ export const UnknownPayloadSchema = z.object({
 });
 
 /** Intent-based AI contract (no version / action / entity). */
+const intentFields = {
+  confidence: intentBase.confidence,
+  requiresConfirmation: intentBase.requiresConfirmation,
+};
+
 export const AiIntentSchema = z.discriminatedUnion("intent", [
   z.object({
     intent: z.literal("create_task"),
-    ...intentBase,
+    ...intentFields,
     payload: CreateTaskPayloadSchema,
   }),
   z.object({
     intent: z.literal("create_note"),
-    ...intentBase,
+    ...intentFields,
     payload: CreateNotePayloadSchema,
   }),
   z.object({
     intent: z.literal("create_expense"),
-    ...intentBase,
+    ...intentFields,
     payload: CreateExpensePayloadSchema,
   }),
   z.object({
     intent: z.literal("create_absence"),
-    ...intentBase,
+    ...intentFields,
     payload: CreateAbsencePayloadSchema,
   }),
   z.object({
     intent: z.literal("set_task_deadline"),
-    ...intentBase,
+    ...intentFields,
     payload: SetTaskDeadlinePayloadSchema,
   }),
   z.object({
     intent: z.literal("unknown"),
-    ...intentBase,
+    ...intentFields,
     payload: UnknownPayloadSchema,
   }),
 ]);

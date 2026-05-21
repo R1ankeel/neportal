@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "pnpm --filter @neportal/ai-contracts build && tsx watch src/main.ts",
     "start": "node dist/main.js",
     "lint": "echo \"No linter configured for @neportal/bot\""
   },
