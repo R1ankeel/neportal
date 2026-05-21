@@ -61,7 +61,9 @@ pnpm --filter @neportal/web dev
   - username не указан → **Username не указан**
 - **Добавить сотрудника:** Server Action `POST /users` — ФИО, роль, опционально Telegram username (без `@`).
 - **Редактирование username:** inline-форма в строке (пока `telegramId` не привязан) → `PATCH /users/:id`.
-- **Отвязка:** кнопка «Отвязать Telegram» (если `telegramId` задан) → `DELETE /users/:id/telegram`; `telegramUsername` остаётся → статус **Ожидает /start**.
+- **Отвязка:** «Отвязать Telegram» (если задан `telegramId` или `telegramUsername`) → `DELETE /users/:id/telegram` — сброс обоих полей → **Username не указан**.
+- **Удаление:** «Удалить» → `DELETE /users/:id` (soft: `ARCHIVED`, Telegram очищается); последний OWNER удалить нельзя.
+- Ошибка 409 при username: «Этот username уже указан у сотрудника {fullName}».
 
 **Нормализация username** (на API, дублируется в формах Web): trim, убрать `@`, lowercase; пустая строка → `null`. Примеры: `@TestUser` → `testuser`, `" vasya "` → `vasya`.
 

@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { unlinkEmployeeTelegram } from "./actions";
+import { deleteEmployee } from "./actions";
 
-export function UnlinkTelegramButton({
+export function DeleteEmployeeButton({
   userId,
   fullName,
 }: {
@@ -18,16 +18,16 @@ export function UnlinkTelegramButton({
   function handleClick() {
     if (
       !window.confirm(
-        `Отвязать Telegram от сотрудника ${fullName}? Username будет освобождён для другого сотрудника.`,
+        `Удалить сотрудника ${fullName}? История задач, расходов и заметок сохранится.`,
       )
     ) {
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await unlinkEmployeeTelegram(userId);
+      const result = await deleteEmployee(userId);
       if (!result.ok) {
-        setError(result.message ?? "Ошибка отвязки");
+        setError(result.message ?? "Ошибка удаления");
         return;
       }
       router.refresh();
@@ -40,9 +40,9 @@ export function UnlinkTelegramButton({
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="rounded-lg border border-red-300 px-2 py-1 text-sm font-medium text-red-700 disabled:opacity-60 dark:border-red-800 dark:text-red-400"
+        className="rounded-lg border border-zinc-300 px-2 py-1 text-sm font-medium text-zinc-700 disabled:opacity-60 dark:border-zinc-600 dark:text-zinc-300"
       >
-        {pending ? "Отвязка…" : "Отвязать Telegram"}
+        {pending ? "Удаление…" : "Удалить"}
       </button>
       {error ? (
         <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>

@@ -2,9 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { apiDeleteJson, apiPatchJson, apiPostJson } from "@/lib/api";
+import { formatApiErrorMessage } from "@/lib/format-api-error";
 import { normalizeTelegramUsername } from "@/lib/telegram-username";
 
 export type EmployeeFormState = { ok: boolean; message?: string };
+
+function mapError(e: unknown, fallback: string): string {
+  if (e instanceof Error) return formatApiErrorMessage(e.message) || fallback;
+  return fallback;
+}
 
 export async function createEmployee(
   _prev: EmployeeFormState | undefined,
@@ -28,10 +34,7 @@ export async function createEmployee(
     revalidatePath("/employees");
     return { ok: true };
   } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Ошибка создания",
-    };
+    return { ok: false, message: mapError(e, "Ошибка создания") };
   }
 }
 
@@ -53,10 +56,7 @@ export async function updateEmployeeUsername(
     revalidatePath("/employees");
     return { ok: true };
   } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Ошибка сохранения",
-    };
+    return { ok: false, message: mapError(e, "Ошибка сохранения") };
   }
 }
 
@@ -70,9 +70,18 @@ export async function unlinkEmployeeTelegram(
     revalidatePath("/employees");
     return { ok: true };
   } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Ошибка отвязки",
-    };
+    return { ok: false, message: mapError(e, "Ошибка отвязки") };
+  }
+}
+
+export async function deleteEmployee(userId: string): Promise<EmployeeFormState> {
+  if (!userId) return { ok: false, message: "Не указан сотрудник" };
+
+  try {
+    await apiDeleteJson(`/users/${userId}`);
+    revalidatePath("/employees");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: mapError(e, "Ошибка удаления") };
   }
 }

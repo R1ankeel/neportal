@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createEmployee } from "./actions";
 
 const ROLES = [
@@ -11,7 +11,14 @@ const ROLES = [
 ] as const;
 
 export function AddEmployeeForm() {
+  const [formKey, setFormKey] = useState(0);
   const [state, formAction, pending] = useActionState(createEmployee, undefined);
+
+  useEffect(() => {
+    if (state?.ok) {
+      setFormKey((k) => k + 1);
+    }
+  }, [state?.ok]);
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
@@ -34,7 +41,7 @@ export function AddEmployeeForm() {
         </p>
       ) : null}
 
-      <form action={formAction} className="mt-6 grid gap-4 sm:grid-cols-2">
+      <form key={formKey} action={formAction} className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
           <span className="mb-2 block text-base font-medium text-zinc-700 dark:text-zinc-300">
             ФИО

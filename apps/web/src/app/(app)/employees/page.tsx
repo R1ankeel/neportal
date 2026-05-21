@@ -2,8 +2,13 @@ import { apiGet } from "@/lib/api";
 import type { ApiUser } from "@/lib/types";
 import { AddEmployeeForm } from "./AddEmployeeForm";
 import { EditUsernameForm } from "./EditUsernameForm";
+import { DeleteEmployeeButton } from "./DeleteEmployeeButton";
 import { UnlinkTelegramButton } from "./UnlinkTelegramButton";
 import { getTelegramBindingStatus } from "./telegram-status";
+
+function hasTelegramBinding(user: ApiUser): boolean {
+  return Boolean(user.telegramId || user.telegramUsername);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +46,7 @@ export default async function EmployeesPage() {
               <th className="px-4 py-3 font-semibold">Роль</th>
               <th className="px-4 py-3 font-semibold">@username</th>
               <th className="px-4 py-3 font-semibold">Привязка</th>
+              <th className="px-4 py-3 font-semibold">Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -76,9 +82,12 @@ export default async function EmployeesPage() {
                         {binding.detail}
                       </span>
                     ) : null}
-                    {u.telegramId ? (
+                    {hasTelegramBinding(u) ? (
                       <UnlinkTelegramButton userId={u.id} fullName={u.fullName} />
                     ) : null}
+                  </td>
+                  <td className="px-4 py-3">
+                    <DeleteEmployeeButton userId={u.id} fullName={u.fullName} />
                   </td>
                 </tr>
               );

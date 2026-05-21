@@ -83,7 +83,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 Смена `@username` в Telegram **не отвязывает** сотрудника — связь держится на `telegramId`.
 
-**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает `telegramId`, **не** трогает `telegramUsername`; сотрудник снова может пройти `/start`.
+**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает **и** `telegramId`, **и** `telegramUsername` (username освобождается для другого сотрудника). Руководитель может указать username заново → сотрудник снова проходит `/start`.
 
 **Поток `/start`:**
 

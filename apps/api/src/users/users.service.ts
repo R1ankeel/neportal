@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PrismaService } from "@neportal/database";
+import { EntityStatus, PrismaService, UserRole } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -20,9 +20,12 @@ export class UsersService {
     return this.organization.getOrganizationId();
   }
 
-  findAll() {
+  findAll(includeArchived = false) {
     return this.prisma.user.findMany({
-      where: { organizationId: this.orgId() },
+      where: {
+        organizationId: this.orgId(),
+        ...(includeArchived ? {} : { status: EntityStatus.ACTIVE }),
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -42,6 +45,7 @@ export class UsersService {
       where: {
         telegramId,
         organizationId: this.orgId(),
+        status: EntityStatus.ACTIVE,
       },
     });
     if (!user) {
@@ -63,6 +67,7 @@ export class UsersService {
       where: {
         telegramUsername: normalized,
         organizationId: this.orgId(),
+        status: EntityStatus.ACTIVE,
       },
     });
     if (!user) {
@@ -73,6 +78,10 @@ export class UsersService {
     return user;
   }
 
+  private usernameTakenMessage(fullName: string): string {
+    return `Этот username уже указан у сотрудника ${fullName}`;
+  }
+
   private async assertTelegramUsernameAvailable(
     telegramUsername: string,
     excludeUserId?: string,
@@ -81,13 +90,12 @@ export class UsersService {
       where: {
         organizationId: this.orgId(),
         telegramUsername,
+        status: EntityStatus.ACTIVE,
         ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
       },
     });
     if (taken) {
-      throw new ConflictException(
-        `telegramUsername already used by user "${taken.fullName}"`,
-      );
+      throw new ConflictException(this.usernameTakenMessage(taken.fullName));
     }
   }
 
@@ -96,6 +104,7 @@ export class UsersService {
       organizationId: string;
       fullName: string;
       role: CreateUserDto["role"];
+      status: EntityStatus;
       email?: string;
       phone?: string;
       telegramUsername?: string;
@@ -103,6 +112,7 @@ export class UsersService {
       organizationId: this.orgId(),
       fullName: dto.fullName.trim(),
       role: dto.role,
+      status: EntityStatus.ACTIVE,
       email: dto.email,
       phone: dto.phone,
     };
@@ -119,7 +129,10 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+    if (existing.status !== EntityStatus.ACTIVE) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
 
     const data: {
       fullName?: string;
@@ -155,7 +168,10 @@ export class UsersService {
   }
 
   async updateTelegram(id: string, telegramId: string) {
-    await this.findOne(id);
+    const user = await this.findOne(id);
+    if (user.status !== EntityStatus.ACTIVE) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
 
     const taken = await this.prisma.user.findFirst({
       where: { telegramId, NOT: { id } },
@@ -172,11 +188,47 @@ export class UsersService {
     });
   }
 
+  /** Полный сброс Telegram: id и username. */
   async unlinkTelegram(id: string) {
-    await this.findOne(id);
+    const user = await this.findOne(id);
+    if (user.status !== EntityStatus.ACTIVE) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
+
     return this.prisma.user.update({
       where: { id },
-      data: { telegramId: null },
+      data: { telegramId: null, telegramUsername: null },
+    });
+  }
+
+  async archive(id: string) {
+    const user = await this.findOne(id);
+    if (user.status !== EntityStatus.ACTIVE) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
+
+    if (user.role === UserRole.OWNER) {
+      const ownerCount = await this.prisma.user.count({
+        where: {
+          organizationId: this.orgId(),
+          role: UserRole.OWNER,
+          status: EntityStatus.ACTIVE,
+        },
+      });
+      if (ownerCount <= 1) {
+        throw new ConflictException(
+          "Нельзя удалить последнего владельца организации",
+        );
+      }
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        status: EntityStatus.ARCHIVED,
+        telegramId: null,
+        telegramUsername: null,
+      },
     });
   }
 }

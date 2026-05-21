@@ -39,7 +39,8 @@ erDiagram
 - Роли org: `OWNER`, `MANAGER`, `EMPLOYEE`, `ACCOUNTANT` (`UserRole`).
 - Опционально `telegramId` (unique) — связь с Telegram после подтверждения в боте.
 - Опционально `telegramUsername` — для **первичной** привязки в боте (unique в рамках `organizationId`; несколько `NULL` допустимы). Нормализация: trim, без `@`, lowercase.
-- `telegramId` — постоянная связь после подтверждения в `/start`; отвязка в Web (`DELETE /users/:id/telegram`) обнуляет только `telegramId`.
+- `telegramId` — постоянная связь после `/start`; отвязка (`DELETE /users/:id/telegram`) или архивация сотрудника обнуляет `telegramId` и `telegramUsername`.
+- `status` — `ARCHIVED` при soft delete (`DELETE /users/:id`).
 - Связи: проекты, задачи, бюджеты, расходы, отсутствия, напоминания.
 
 ### Project

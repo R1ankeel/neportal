@@ -21,14 +21,15 @@
 
 | Метод | Путь | Описание |
 |-------|------|----------|
-| GET | `/users` | Список пользователей организации |
+| GET | `/users` | Список ACTIVE; `?includeArchived=true` — все |
 | POST | `/users` | Создать сотрудника (`fullName`, `role`, `telegramUsername?`, …) |
 | GET | `/users/by-telegram/:telegramId` | По Telegram id (в org) |
 | GET | `/users/by-telegram-username/:username` | По @username без `@`, case-insensitive |
 | GET | `/users/:id` | Пользователь по id |
 | PATCH | `/users/:id` | Обновить (`telegramUsername` можно сбросить `null`) |
 | PATCH | `/users/:id/telegram` | Привязать `telegramId` (unique глобально) |
-| DELETE | `/users/:id/telegram` | Отвязать Telegram (`telegramId = null`, `telegramUsername` сохраняется) |
+| DELETE | `/users/:id/telegram` | Полный сброс Telegram (`telegramId` и `telegramUsername` → null) |
+| DELETE | `/users/:id` | Архивировать (`status=ARCHIVED`, Telegram очищается; последний OWNER запрещён) |
 
 ## Projects
 
