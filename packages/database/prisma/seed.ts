@@ -50,8 +50,28 @@ async function ensureDemoContractTask(
   });
 }
 
+/** Удаляет демо-организацию; вложения чеков снимаем до cascade, иначе FK uploadedById. */
+async function deleteDemoOrganization() {
+  const existing = await prisma.organization.findUnique({
+    where: { slug: "neportal-demo" },
+    select: { id: true },
+  });
+  if (!existing) return;
+
+  await prisma.budgetExpenseAttachment.deleteMany({
+    where: {
+      OR: [
+        { expense: { organizationId: existing.id } },
+        { uploadedBy: { organizationId: existing.id } },
+      ],
+    },
+  });
+
+  await prisma.organization.delete({ where: { id: existing.id } });
+}
+
 async function main() {
-  await prisma.organization.deleteMany({ where: { slug: "neportal-demo" } });
+  await deleteDemoOrganization();
 
   const org = await prisma.organization.create({
     data: {
