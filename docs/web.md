@@ -1,5 +1,7 @@
 # Веб-приложение (`apps/web`)
 
+Общий контекст и карта репозитория: [developer-guide.md](developer-guide.md).
+
 Next.js 15 с **App Router**, серверные компоненты и Server Actions для мутаций. Стили: **Tailwind CSS**.
 
 ## Запуск

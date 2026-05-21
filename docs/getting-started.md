@@ -1,5 +1,7 @@
 # Быстрый старт
 
+Перед установкой полезно прочитать [Руководство разработчика](developer-guide.md) — там описаны архитектура и сквозные сценарии проверки.
+
 ## Требования
 
 - **Node.js** 20+
@@ -21,7 +23,7 @@ cp .env.example .env
 - `API_URL` / `NEXT_PUBLIC_API_URL` — обычно `http://localhost:4000` для локальной разработки
 - **YandexGPT** (опционально): `YANDEX_CLOUD_FOLDER_ID`, `YANDEX_GPT_API_KEY` или `YANDEX_CLOUD_IAM_TOKEN`, `YANDEX_GPT_MODEL_URI` — см. [ai-intent.md](ai-intent.md)
 
-Подробнее о загрузке `.env` — в [architecture.md](architecture.md#переменные-окружения).
+Подробнее о загрузке `.env` — [env.md](env.md), [architecture.md](architecture.md#переменные-окружения).
 
 ## 2. Инфраструктура
 

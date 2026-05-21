@@ -193,14 +193,20 @@
 
 ```
 app.module
-├── OrganizationModule   # контекст org
-├── UsersModule
+├── PrismaModule         # @neportal/database
+├── OrganizationModule   # контекст org (OnModuleInit)
+├── UsersModule          # импортирует TelegramModule для уведомлений
 ├── ProjectsModule
 ├── TasksModule
 ├── BudgetsModule
-├── BudgetExpensesModule # attachments + open
+├── BudgetExpensesModule # расходы + attachments (preview/download)
 ├── NotesModule
 └── AbsencesModule
+
+telegram/
+└── TelegramModule       # TelegramNotifyService — sendMessage при отвязке
 ```
+
+`UsersService` при `DELETE /users/:id/telegram` вызывает `TelegramNotifyService` (тот же `TELEGRAM_BOT_TOKEN`, что у бота).
 
 Prisma подключается через `PrismaModule` из `@neportal/database`.

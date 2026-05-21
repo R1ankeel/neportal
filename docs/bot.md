@@ -1,5 +1,7 @@
 # Telegram-бот (`apps/bot`)
 
+Общий контекст и карта репозитория: [developer-guide.md](developer-guide.md).
+
 Стек: **grammY**, TypeScript, long polling по умолчанию.
 
 ## Настройка

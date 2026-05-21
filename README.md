@@ -2,7 +2,7 @@
 
 Внутренний портал организации: **проекты**, **задачи**, **заметки**, **бюджеты и расходы**, **сотрудники**. Монорепозиторий на [pnpm](https://pnpm.io/) и [Turborepo](https://turbo.build/) с веб-клиентом, REST API и Telegram-ботом.
 
-**Полная документация:** [docs/README.md](docs/README.md)
+**Документация:** [docs/README.md](docs/README.md) · **Онбординг разработчика:** [docs/developer-guide.md](docs/developer-guide.md)
 
 ## Быстрый старт
 
@@ -35,7 +35,7 @@ pnpm dev
 | `packages/shared` | `loadRootEnv()`, общие типы |
 | `packages/permissions` | RBAC (заготовка) |
 | `packages/ai-contracts` | Zod-схемы для AI intent |
-| `docs/` | Документация проекта |
+| `docs/` | Документация; старт — `docs/developer-guide.md` |
 
 ## Переменные окружения
 
