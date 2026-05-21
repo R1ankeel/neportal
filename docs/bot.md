@@ -59,7 +59,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 | Команда | Действие |
 |---------|----------|
-| `/start` | Приветствие и краткая справка |
+| `/start` | Привязка Telegram по username из Web + краткая справка |
+| `/me` | Статус привязки (ФИО, роль, @username) |
+| `/link <ФИО>` | Привязка по имени (**dev**, без username в Web) |
 | `/demo` | Полный список команд |
 | `/task <текст>` | `POST /tasks` в проекте по умолчанию |
 | `/note <текст>` | `POST /notes`, source `TELEGRAM_TEXT` |
@@ -67,6 +69,29 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
+
+### Привязка Telegram (username flow)
+
+Руководитель в Web (`/employees`) создаёт сотрудника и указывает **Telegram username** (без `@`, сохраняется в нижнем регистре). Сотрудник в Telegram отправляет **`/start`**.
+
+**Поток `/start`:**
+
+1. `GET /users/by-telegram/:telegramId` — если пользователь уже привязан → *«Здравствуйте, {fullName}. Вы уже привязаны.»*
+2. Иначе, если у отправителя есть `ctx.from.username`:
+   - `GET /users/by-telegram-username/:username` (без `@`, case-insensitive)
+   - Найден, `telegramId` пустой → pending `confirm_link_by_username`, вопрос *да / нет*
+   - Найден, `telegramId` уже задан → *«…уже привязан. Обратитесь к руководителю.»*
+3. Username не указан в Telegram или сотрудник не найден → *«Попросите руководителя добавить ваш username…»*
+
+**Подтверждение:** ответ `да` → `PATCH /users/:id/telegram` с `telegramId = String(ctx.from.id)` → *«Готово. Telegram привязан…»*; `нет` → *«Привязка отменена.»*
+
+Pending привязки и AI intent хранятся **в памяти** (`pending-intent.ts`), типы различаются полем `type`.
+
+После привязки все действия (задачи, заметки, расходы, отсутствия, AI) используют **linked user** по `telegramId` (`getCurrentUserOrFallback`).
+
+### Dev fallback: `/link <ФИО>`
+
+Для локальной отладки без username в Web: поиск сотрудника по подстроке `fullName` (case-insensitive), затем `PATCH /users/:id/telegram`. Не использовать в проде — позже заменится на invite-code.
 
 ### Обычный текст (YandexGPT)
 
@@ -107,9 +132,8 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…` предпочитается заголовок, содержащий «Реклама VK», иначе первый.
-3. **Автор расхода / создатель задачи:** **Иван** (`OWNER`), иначе первый OWNER, иначе первый пользователь (`pickCreatorId`).
-4. **Сотрудник отсутствия** (`/sick`, `/vacation`): **Иван Иванов** `OWNER`, иначе первый пользователь в `GET /users` (`pickAbsenceUserId`).
-5. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE`.
+3. **Автор / расход / отсутствие без явного сотрудника:** пользователь, привязанный по `telegramId` (`getCurrentUserOrFallback`); иначе **Иван** `OWNER`, иначе первый в списке.
+4. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE` (если не указан `assigneeHint` в AI).
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
 
@@ -161,10 +185,11 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 Файл `apps/bot/src/api.ts` — обёртки над REST:
 
-- `fetchUsers`, `fetchProjects`, `fetchBudgets`, `fetchTasks`
+- `fetchUsers`, `fetchUserByTelegramId`, `fetchUserByTelegramUsername`, `linkTelegramUser`
+- `fetchProjects`, `fetchBudgets`, `fetchTasks`
 - `createTask`, `createNote`, `createBudgetExpense` (alias `createExpense`), `createExpenseAttachment`, `createAbsence`
 - `updateTaskDeadline` (alias `setTaskDeadline`)
-- `pickCreatorId`, `pickAbsenceUserId`, `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`
+- `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`, `findUserByNameHint`
 
 При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.
 
@@ -181,7 +206,9 @@ Pending confirmation хранится **в памяти** процесса (`pen
 | `intent-preview.ts` | Текст «Создать задачу? … Ответьте: да / нет» |
 | `intent-executor.ts` | Вызов API после подтверждения |
 | `confirmation.ts` | Распознавание да/нет |
-| `pending-intent.ts` | In-memory pending по `telegramUserId` |
+| `pending-intent.ts` | In-memory pending: AI intent или привязка по username |
+| `start-binding.ts` | Логика `/start` и подтверждение привязки |
+| `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |
 
 **Dev-логи YandexGPT** (не логируют токены; отключить: `BOT_DEV_LOG=0`):
@@ -205,7 +232,8 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 - Состояние «последний расход» и **pending AI intent** — **в памяти процесса**; сбрасывается при перезапуске бота.
 - YandexGPT **не выполняет** действия — только парсит текст; API вызывает бот после «да».
-- Нет привязки Telegram `from.id` к `User.telegramId` в БД — используются демо-пользователи из сида.
+- Без привязки `telegramId` slash/AI используют fallback (Иван OWNER) — см. `getCurrentUserOrFallback`.
+- `/link` — только для dev; в продукте — username в Web + `/start`.
 - SpeechKit / голосовые сообщения — не реализованы (env в `.env.example` — заготовка).
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
 - Деплой в Yandex Cloud для MVP **не требуется** — только внешний API YandexGPT/SpeechKit из локального бота.

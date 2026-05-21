@@ -37,7 +37,8 @@ erDiagram
 ### User
 
 - Роли org: `OWNER`, `MANAGER`, `EMPLOYEE`, `ACCOUNTANT` (`UserRole`).
-- Опционально `telegramId` (unique) — связь с Telegram.
+- Опционально `telegramId` (unique) — связь с Telegram после подтверждения в боте.
+- Опционально `telegramUsername` — `@username` из Web (unique в рамках `organizationId`; несколько `NULL` допустимы).
 - Связи: проекты, задачи, бюджеты, расходы, отсутствия, напоминания.
 
 ### Project
@@ -123,7 +124,8 @@ pnpm db:studio     # GUI
 |----------|--------|
 | Организация | Neportal Demo, `neportal-demo` |
 | Пользователи | Иван (OWNER), Вася, Петр (EMPLOYEE), Мария (ACCOUNTANT) |
-| `telegramId` | `seed-demo-ivan`, `seed-demo-vasya`, … — не пересекаются с реальными Telegram ID |
+| `telegramUsername` | `demo_ivan`, `demo_vasya` — не реальные username |
+| `telegramId` | `seed-demo-ivan` у Ивана; у Васи пусто до `/start` |
 | Проект | «Реклама VK», участники с ролями |
 | Бюджет | 50 000 RUB, название «Реклама VK» |
 | Задачи | «Подготовить отчет» (Вася); «Подписать договор с подрядчиком» (Иван, deadline конец 22.05.2026 UTC — `ensureDemoContractTask`, без дублей) |

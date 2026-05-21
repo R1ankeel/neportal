@@ -106,8 +106,9 @@ model User {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  telegramId String? @unique
-  email      String?
+  telegramId       String? @unique
+  telegramUsername String?
+  email            String?
   phone      String?
   fullName   String
   role       UserRole
@@ -128,6 +129,7 @@ model User {
   absences         Absence[]
   reminders        Reminder[]
 
+  @@unique([organizationId, telegramUsername])
   @@index([organizationId])
   @@index([telegramId])
 }

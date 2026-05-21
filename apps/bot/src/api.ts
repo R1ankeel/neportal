@@ -13,7 +13,13 @@ export type ApiUser = {
   fullName: string;
   role: string;
   telegramId?: string | null;
+  telegramUsername?: string | null;
 };
+
+/** Нормализация @username (без @, lower case). */
+export function normalizeTelegramUsername(raw: string): string {
+  return raw.trim().replace(/^@+/, "").toLowerCase();
+}
 
 export type UserNameMatchResult =
   | { kind: "none" }
@@ -57,6 +63,24 @@ export async function fetchUserByTelegramId(
     const text = await res.text().catch(() => "");
     throw new Error(
       `GET /users/by-telegram/${telegramId} → ${res.status} ${text}`.trim(),
+    );
+  }
+  return res.json() as Promise<ApiUser>;
+}
+
+export async function fetchUserByTelegramUsername(
+  username: string,
+): Promise<ApiUser | null> {
+  const normalized = normalizeTelegramUsername(username);
+  const res = await fetch(
+    `${getApiBaseUrl()}/users/by-telegram-username/${encodeURIComponent(normalized)}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `GET /users/by-telegram-username/${normalized} → ${res.status} ${text}`.trim(),
     );
   }
   return res.json() as Promise<ApiUser>;

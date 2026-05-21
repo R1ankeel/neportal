@@ -8,6 +8,7 @@ import {
   getPendingConfirmation,
   setPendingConfirmation,
 } from "./pending-intent";
+import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
 
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -19,10 +20,18 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   const pending = getPendingConfirmation(telegramUserId);
   if (pending) {
+    if (pending.type === "confirm_link_by_username") {
+      await handleLinkByUsernameConfirmation(ctx, pending, text, telegramUserId);
+      return;
+    }
+
     if (isConfirmationYes(text)) {
       clearPendingConfirmation(telegramUserId);
       try {
-        const reply = await executeResolvedIntent(pending.resolved, telegramUserId);
+        const reply = await executeResolvedIntent(
+          pending.resolved,
+          telegramUserId,
+        );
         await ctx.reply(reply);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -74,6 +83,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  setPendingConfirmation(telegramUserId, { intent, resolved: resolvedResult.resolved });
+  setPendingConfirmation(telegramUserId, {
+    type: "ai_intent",
+    intent,
+    resolved: resolvedResult.resolved,
+  });
   await ctx.reply(buildIntentPreview(resolvedResult.resolved));
 }

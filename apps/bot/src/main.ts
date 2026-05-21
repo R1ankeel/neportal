@@ -32,6 +32,7 @@ import {
 } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
+import { handleStartBinding } from "./start-binding";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -49,38 +50,21 @@ if (!token || token === "change_me") {
 const bot = new Bot(token);
 
 bot.command("start", async (ctx) => {
-  const lines = ["Привет! Я бот Neportal.", ""];
+  await handleStartBinding(ctx);
 
-  try {
-    const telegramId = ctx.from?.id;
-    if (telegramId) {
-      const linked = await fetchUserByTelegramId(String(telegramId));
-      if (linked) {
-        lines.push(`Вы привязаны как ${linked.fullName}.`, "");
-      } else {
-        lines.push(
-          "Чтобы действия создавались от вашего имени, привяжите аккаунт: /link Вася Пупкин",
-          "",
-        );
-      }
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[bot] start link check: ${msg}`);
-  }
-
-  lines.push(
-    "Создавай задачи: /task <название>",
-    "Создавай заметки: /note <текст>",
-    "Добавляй расходы: /expense <сумма> <описание>",
-    "Больничный: /sick до 25.05.2026 номер 123456",
-    "Отпуск: /vacation с 01.06.2026 по 10.06.2026",
-    "Дедлайн: /deadline Подготовить отчет 22.05.2026",
-    "Привязка Telegram: /link <ФИО> · /me",
-    "Список команд: /demo",
+  await ctx.reply(
+    [
+      "",
+      "Команды Neportal:",
+      "/task <название> — задача",
+      "/note <текст> — заметка",
+      "/expense <сумма> <описание> — расход",
+      "/sick до 25.05.2026 номер 123456 — больничный",
+      "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/me — статус привязки",
+      "/demo — справка",
+    ].join("\n"),
   );
-
-  await ctx.reply(lines.join("\n"));
 });
 
 bot.command("demo", async (ctx) => {
@@ -96,8 +80,8 @@ bot.command("demo", async (ctx) => {
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
-      "/link Вася Пупкин — привязать Telegram к сотруднику",
-      "/me — проверить привязку",
+      "/link Вася Пупкин — привязка по ФИО (dev)",
+      "/me — статус привязки",
       "",
       "Можно писать обычным текстом, например:",
       "- Поставь Васе задачу подготовить отчет до 23 мая",
@@ -159,11 +143,21 @@ bot.command("me", async (ctx) => {
   try {
     const linked = await fetchUserByTelegramId(String(telegramId));
     if (linked) {
-      await ctx.reply(`Вы привязаны как: ${linked.fullName} · ${linked.role}`);
+      const lines = [
+        `Вы привязаны как: ${linked.fullName} · ${linked.role}`,
+      ];
+      if (linked.telegramUsername) {
+        lines.push(`Username в Neportal: @${linked.telegramUsername}`);
+      }
+      await ctx.reply(lines.join("\n"));
       return;
     }
     await ctx.reply(
-      "Telegram не привязан. Используйте /link <ФИО>, например /link Вася Пупкин.",
+      [
+        "Telegram не привязан.",
+        "Попросите руководителя указать ваш @username в карточке сотрудника и отправьте /start.",
+        "Dev: /link <ФИО>",
+      ].join("\n"),
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

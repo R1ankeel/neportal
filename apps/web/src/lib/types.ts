@@ -6,6 +6,7 @@ export type ApiUser = {
   email: string | null;
   role: string;
   telegramId: string | null;
+  telegramUsername: string | null;
 };
 
 export type ApiProject = {

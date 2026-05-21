@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, Patch } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateUserTelegramDto } from "./dto/update-user-telegram.dto";
 import { UsersService } from "./users.service";
 
@@ -21,6 +23,21 @@ export class UsersController {
     return this.usersService.findByTelegramId(telegramId);
   }
 
+  @Get("by-telegram-username/:username")
+  @ApiOperation({
+    summary: "Пользователь по Telegram username (без @, case-insensitive)",
+  })
+  @ApiParam({ name: "username", example: "vasya_pupkin" })
+  findByTelegramUsername(@Param("username") username: string) {
+    return this.usersService.findByTelegramUsername(username);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Создать сотрудника" })
+  create(@Body() dto: CreateUserDto) {
+    return this.usersService.create(dto);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Пользователь по id" })
   @ApiParam({ name: "id" })
@@ -28,8 +45,15 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  @Patch(":id")
+  @ApiOperation({ summary: "Обновить сотрудника" })
+  @ApiParam({ name: "id" })
+  update(@Param("id") id: string, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(id, dto);
+  }
+
   @Patch(":id/telegram")
-  @ApiOperation({ summary: "Привязать Telegram id к пользователю (MVP/dev)" })
+  @ApiOperation({ summary: "Привязать Telegram id к пользователю" })
   @ApiParam({ name: "id" })
   updateTelegram(
     @Param("id") id: string,

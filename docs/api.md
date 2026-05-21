@@ -22,7 +22,12 @@
 | Метод | Путь | Описание |
 |-------|------|----------|
 | GET | `/users` | Список пользователей организации |
+| POST | `/users` | Создать сотрудника (`fullName`, `role`, `telegramUsername?`, …) |
+| GET | `/users/by-telegram/:telegramId` | По Telegram id (в org) |
+| GET | `/users/by-telegram-username/:username` | По @username без `@`, case-insensitive |
 | GET | `/users/:id` | Пользователь по id |
+| PATCH | `/users/:id` | Обновить (`telegramUsername` можно сбросить `null`) |
+| PATCH | `/users/:id/telegram` | Привязать `telegramId` (unique глобально) |
 
 ## Projects
 

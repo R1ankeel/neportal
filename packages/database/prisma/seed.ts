@@ -87,6 +87,7 @@ async function main() {
       fullName: "Иван Иванов",
       role: UserRole.OWNER,
       status: EntityStatus.ACTIVE,
+      telegramUsername: "demo_ivan",
       telegramId: "seed-demo-ivan",
     },
   });
@@ -97,7 +98,7 @@ async function main() {
       fullName: "Вася Пупкин",
       role: UserRole.EMPLOYEE,
       status: EntityStatus.ACTIVE,
-      telegramId: "seed-demo-vasya",
+      telegramUsername: "demo_vasya",
     },
   });
 
