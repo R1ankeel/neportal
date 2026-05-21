@@ -32,6 +32,55 @@ export function todayIsoDate(): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Сдвиг ISO date YYYY-MM-DD на N календарных дней (UTC). */
+export function addDaysToIsoDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Извлекает дедлайн из русского текста относительно baseDate (YYYY-MM-DD). */
+export function extractDeadlineFromRussianText(
+  text: string,
+  baseDate: string = todayIsoDate(),
+): { deadlineDate: string | null } {
+  const lower = text.toLowerCase();
+
+  if (/\bпослезавтра\b/u.test(lower)) {
+    return { deadlineDate: addDaysToIsoDate(baseDate, 2) };
+  }
+  if (/\bзавтра\b/u.test(lower)) {
+    return { deadlineDate: addDaysToIsoDate(baseDate, 1) };
+  }
+  if (/\bсегодня\b/u.test(lower)) {
+    return { deadlineDate: baseDate };
+  }
+
+  const absMatch = text.match(/(?:до|к|на|в)\s+(\d{1,2}\.\d{1,2}\.\d{4})/iu);
+  if (absMatch) {
+    const iso = parseRuDate(absMatch[1]);
+    if (iso) return { deadlineDate: iso };
+  }
+
+  const isoInText = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoInText) return { deadlineDate: isoInText[1] };
+
+  return { deadlineDate: null };
+}
+
+/** Убирает маркеры дедлайна из текста (описание/title после извлечения deadlineDate). */
+export function stripDeadlineMarkersFromText(text: string): string | undefined {
+  let s = text;
+  s = s.replace(/\b(сегодня|завтра|послезавтра)\b/giu, "");
+  s = s.replace(/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/giu, "");
+  s = s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, "");
+  s = s.trim().replace(/\s{2,}/g, " ");
+  return s.length > 0 ? s : undefined;
+}
+
 /** ISO date → DD.MM.YYYY для ответов бота. */
 export function formatIsoDateRu(iso: string): string {
   const [y, m, d] = iso.split("-");

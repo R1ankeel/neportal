@@ -15,6 +15,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
+import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
 export type ResolvedCreateTask = {
@@ -93,15 +94,16 @@ export async function resolveIntent(
   switch (intent.intent) {
     case "create_task": {
       const creatorId = currentUser.id;
+      const payload = normalizeCreateTaskPayload(intent.payload);
 
-      const project = findProjectByHint(projects, intent.payload.projectHint);
+      const project = findProjectByHint(projects, payload.projectHint);
       if (!project) {
         return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
       }
 
       const assigneeIdDefault = pickAssigneeId(users);
-      const assignee = intent.payload.assigneeHint
-        ? findUserByHint(users, intent.payload.assigneeHint)
+      const assignee = payload.assigneeHint
+        ? findUserByHint(users, payload.assigneeHint)
         : assigneeIdDefault
           ? users.find((u) => u.id === assigneeIdDefault)
           : undefined;
@@ -113,9 +115,9 @@ export async function resolveIntent(
           project,
           assignee,
           creatorId,
-          title: intent.payload.title,
-          description: intent.payload.description,
-          deadlineDate: intent.payload.deadlineDate,
+          title: payload.title,
+          description: payload.description,
+          deadlineDate: payload.deadlineDate,
         },
       };
     }

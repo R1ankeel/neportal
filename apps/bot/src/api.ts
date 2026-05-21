@@ -285,7 +285,10 @@ export async function createTask(body: {
   creatorId: string;
   assigneeId?: string;
   projectId?: string;
+  deadlineAt?: string;
 }): Promise<{ id: string; title: string; project?: { id: string; name: string } | null }> {
+  devLog("POST /tasks payload", body as Record<string, unknown>);
+
   const res = await fetch(`${getApiBaseUrl()}/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },

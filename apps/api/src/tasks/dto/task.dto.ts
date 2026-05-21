@@ -45,6 +45,14 @@ export class CreateTaskDto {
   @IsOptional()
   @IsEnum(TaskStatus)
   status?: TaskStatus;
+
+  @ApiPropertyOptional({
+    description: "ISO date или datetime; для date-only — конец дня UTC",
+    example: "2026-05-22",
+  })
+  @IsOptional()
+  @IsDateString()
+  deadlineAt?: string;
 }
 
 export class UpdateTaskStatusDto {

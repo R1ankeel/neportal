@@ -23,11 +23,8 @@ export async function executeResolvedIntent(
         creatorId: resolved.creatorId,
         assigneeId: resolved.assignee?.id,
         projectId: resolved.project.id,
+        ...(resolved.deadlineDate ? { deadlineAt: resolved.deadlineDate } : {}),
       });
-
-      if (resolved.deadlineDate) {
-        await setTaskDeadline(task.id, resolved.deadlineDate);
-      }
 
       const parts = [`Задача создана в проекте «${resolved.project.name}»: ${task.title}`];
       if (resolved.assignee) {

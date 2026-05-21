@@ -101,6 +101,41 @@ payload по intent:
 create_task.payload:
 { "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
+create_task — дедлайн и формулировка:
+- Слова и фразы «сегодня», «завтра», «послезавтра», «до <дата>», «к <дата>», «на <дата>», «в <дата>», «завтра в 13:00» — это deadlineDate (и при необходимости время), НЕ description.
+- «Завтра» / «сегодня» / «послезавтра» считай от «Текущая дата» из контекста пользователя; deadlineDate только YYYY-MM-DD.
+- title — короткое действие без даты: «Проверить склад», не «завтра проверить склад».
+- description опционален: только дополнительный контекст без дат и без дублирования дедлайна.
+- Не дублируй дедлайн в description.
+
+Пример create_task:
+Input: «Создай задачу Васе, чтоб он завтра проверил склад»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Проверить склад",
+    "deadlineDate": "<завтра от Текущая дата, YYYY-MM-DD>"
+  }
+}
+
+Пример create_task с датой:
+Input: «Поставь Васе задачу до 25.05.2026 подготовить отчет»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Подготовить отчет",
+    "deadlineDate": "2026-05-25"
+  }
+}
+
 create_note.payload:
 { "projectHint"?: string, "text": string } — в text даты пиши DD.MM.YYYY, не YYYY-MM-DD
 
@@ -126,8 +161,9 @@ unknown.payload:
 
 Правила:
 - Поля deadlineDate, startDate, endDate — только YYYY-MM-DD; если год не указан — 2026.
-- В payload.text и description даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
-- «Завтра» в тексте заметки — DD.MM.YYYY от текущей даты из контекста.
+- В payload.text заметок даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
+- В create_task поле description без дат; дедлайн только в deadlineDate.
+- «Завтра» в тексте заметки (create_note) — DD.MM.YYYY от текущей даты из контекста.
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
 - Если команда непонятна: intent unknown, низкая confidence.

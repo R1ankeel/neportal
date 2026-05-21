@@ -81,6 +81,11 @@ export class TasksService {
       }
     }
 
+    let deadlineAt: Date | undefined;
+    if (dto.deadlineAt != null) {
+      deadlineAt = this.endOfDay(this.parseDateInput(dto.deadlineAt));
+    }
+
     return this.prisma.task.create({
       data: {
         organizationId: org,
@@ -90,6 +95,7 @@ export class TasksService {
         creatorId: dto.creatorId,
         assigneeId: dto.assigneeId,
         status: dto.status ?? TaskStatus.NEW,
+        ...(deadlineAt != null ? { deadlineAt } : {}),
       },
       include: {
         creator: { select: { id: true, fullName: true } },
