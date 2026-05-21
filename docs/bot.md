@@ -83,7 +83,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 Смена `@username` в Telegram **не отвязывает** сотрудника — связь держится на `telegramId`.
 
-**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает **и** `telegramId`, **и** `telegramUsername` (username освобождается для другого сотрудника). Руководитель может указать username заново → сотрудник снова проходит `/start`.
+**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает `telegramId` и `telegramUsername`; в Telegram уходит *«Вас открепили от проекта «…»»*. После этого рабочие команды бота недоступны до повторной привязки.
 
 **Поток `/start`:**
 
@@ -98,7 +98,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 Pending привязки и AI intent хранятся **в памяти** (`pending-intent.ts`), типы различаются полем `type`.
 
-После привязки все действия (задачи, заметки, расходы, отсутствия, AI) используют **linked user** по `telegramId` (`getCurrentUserOrFallback`).
+После привязки рабочие действия требуют **linked user** по `telegramId` (`requireLinkedUser`). Без привязки: *«Вы не привязаны ни к какому проекту.»* — fallback на демо-пользователя **отключён**.
 
 ### Dev fallback: `/link <ФИО>`
 
@@ -143,7 +143,7 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…` предпочитается заголовок, содержащий «Реклама VK», иначе первый.
-3. **Автор / расход / отсутствие без явного сотрудника:** пользователь, привязанный по `telegramId` (`getCurrentUserOrFallback`); иначе **Иван** `OWNER`, иначе первый в списке.
+3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
 4. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE` (если не указан `assigneeHint` в AI).
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
@@ -243,7 +243,7 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 - Состояние «последний расход» и **pending AI intent** — **в памяти процесса**; сбрасывается при перезапуске бота.
 - YandexGPT **не выполняет** действия — только парсит текст; API вызывает бот после «да».
-- Без привязки `telegramId` slash/AI используют fallback (Иван OWNER) — см. `getCurrentUserOrFallback`.
+- Без привязки `telegramId` рабочие команды и AI **не выполняются** (`NOT_LINKED_MESSAGE`). Доступны: `/start`, `/demo`, `/me`, `/link` (dev).
 - `/link` — только для dev; в продукте — username в Web + `/start`.
 - SpeechKit / голосовые сообщения — не реализованы (env в `.env.example` — заготовка).
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).

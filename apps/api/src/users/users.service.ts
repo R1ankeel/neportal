@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { EntityStatus, PrismaService, UserRole } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { TelegramNotifyService } from "../telegram/telegram-notify.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { normalizeTelegramUsername } from "./telegram-username.util";
@@ -14,6 +15,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly telegramNotify: TelegramNotifyService,
   ) {}
 
   private orgId() {
@@ -188,6 +190,24 @@ export class UsersService {
     });
   }
 
+  private async resolveNotifyProjectName(): Promise<string> {
+    const orgId = this.orgId();
+    const preferred = await this.prisma.project.findFirst({
+      where: {
+        organizationId: orgId,
+        name: "Реклама VK",
+        status: EntityStatus.ACTIVE,
+      },
+    });
+    if (preferred) return preferred.name;
+
+    const first = await this.prisma.project.findFirst({
+      where: { organizationId: orgId, status: EntityStatus.ACTIVE },
+      orderBy: { createdAt: "asc" },
+    });
+    return first?.name ?? "Neportal";
+  }
+
   /** Полный сброс Telegram: id и username. */
   async unlinkTelegram(id: string) {
     const user = await this.findOne(id);
@@ -195,10 +215,22 @@ export class UsersService {
       throw new NotFoundException(`User with id "${id}" not found`);
     }
 
-    return this.prisma.user.update({
+    const oldTelegramId = user.telegramId;
+    const projectName = await this.resolveNotifyProjectName();
+
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { telegramId: null, telegramUsername: null },
     });
+
+    if (oldTelegramId) {
+      await this.telegramNotify.sendMessage(
+        oldTelegramId,
+        `Вас открепили от проекта «${projectName}».`,
+      );
+    }
+
+    return updated;
   }
 
   async archive(id: string) {

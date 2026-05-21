@@ -28,7 +28,7 @@
 | GET | `/users/:id` | Пользователь по id |
 | PATCH | `/users/:id` | Обновить (`telegramUsername` можно сбросить `null`) |
 | PATCH | `/users/:id/telegram` | Привязать `telegramId` (unique глобально) |
-| DELETE | `/users/:id/telegram` | Полный сброс Telegram (`telegramId` и `telegramUsername` → null) |
+| DELETE | `/users/:id/telegram` | Полный сброс Telegram; уведомление в Telegram (*«Вас открепили от проекта …»*) |
 | DELETE | `/users/:id` | Архивировать (`status=ARCHIVED`, Telegram очищается; последний OWNER запрещён) |
 
 ## Projects

@@ -1,5 +1,9 @@
 import type { Context } from "grammy";
 import { isConfirmationNo, isConfirmationYes } from "./confirmation";
+import {
+  getLinkedUserByTelegramId,
+  NOT_LINKED_MESSAGE,
+} from "./current-user";
 import { executeResolvedIntent } from "./intent-executor";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
@@ -26,6 +30,13 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     if (isConfirmationYes(text)) {
+      const linked = await getLinkedUserByTelegramId(telegramUserId);
+      if (!linked) {
+        clearPendingConfirmation(telegramUserId);
+        await ctx.reply(NOT_LINKED_MESSAGE);
+        return;
+      }
+
       clearPendingConfirmation(telegramUserId);
       try {
         const reply = await executeResolvedIntent(
@@ -48,6 +59,12 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     await ctx.reply("Ожидаю подтверждение. Ответьте: да / нет");
+    return;
+  }
+
+  const linked = await getLinkedUserByTelegramId(telegramUserId);
+  if (!linked) {
+    await ctx.reply(NOT_LINKED_MESSAGE);
     return;
   }
 

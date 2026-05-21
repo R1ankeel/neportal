@@ -1,38 +1,29 @@
-import {
-  fetchUserByTelegramId,
-  fetchUsers,
-  type ApiUser,
-} from "./api";
+import { fetchUserByTelegramId, type ApiUser } from "./api";
 
-/** Linked Telegram user, else Иван Иванов OWNER, else first user. */
-export async function getCurrentUserOrFallback(ctx: {
+export const NOT_LINKED_MESSAGE = "Вы не привязаны ни к какому проекту.";
+
+export async function getLinkedUser(ctx: {
   from?: { id: number };
-}): Promise<ApiUser | undefined> {
-  if (ctx.from?.id != null) {
-    const linked = await fetchUserByTelegramId(String(ctx.from.id));
-    if (linked) return linked;
-  }
-
-  const users = await fetchUsers();
-  const ivan = users.find(
-    (u) => u.fullName.includes("Иван") && u.role === "OWNER",
-  );
-  if (ivan) return ivan;
-  return users[0];
+}): Promise<ApiUser | null> {
+  if (ctx.from?.id == null) return null;
+  return fetchUserByTelegramId(String(ctx.from.id));
 }
 
-export async function getCurrentUserOrFallbackByTelegramId(
-  telegramUserId?: number,
-): Promise<ApiUser | undefined> {
-  if (telegramUserId != null) {
-    const linked = await fetchUserByTelegramId(String(telegramUserId));
-    if (linked) return linked;
-  }
+export async function getLinkedUserByTelegramId(
+  telegramUserId: number,
+): Promise<ApiUser | null> {
+  return fetchUserByTelegramId(String(telegramUserId));
+}
 
-  const users = await fetchUsers();
-  const ivan = users.find(
-    (u) => u.fullName.includes("Иван") && u.role === "OWNER",
-  );
-  if (ivan) return ivan;
-  return users[0];
+/** Для рабочих команд: только привязанный user, иначе ответ и null. */
+export async function requireLinkedUser(ctx: {
+  from?: { id: number };
+  reply: (text: string) => Promise<unknown>;
+}): Promise<ApiUser | null> {
+  const user = await getLinkedUser(ctx);
+  if (!user) {
+    await ctx.reply(NOT_LINKED_MESSAGE);
+    return null;
+  }
+  return user;
 }

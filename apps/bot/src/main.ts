@@ -22,7 +22,7 @@ import {
   pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
-import { getCurrentUserOrFallback } from "./current-user";
+import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
 import {
   formatIsoDateRu,
@@ -174,17 +174,12 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   }
 
   try {
-    const [users, projects, currentUser] = await Promise.all([
-      fetchUsers(),
-      fetchProjects(),
-      getCurrentUserOrFallback(ctx),
-    ]);
-    const creatorId = currentUser?.id;
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser) return;
+
+    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+    const creatorId = currentUser.id;
     const assigneeId = pickAssigneeId(users);
-    if (!creatorId) {
-      await ctx.reply("Не удалось определить автора задачи. Проверьте сид и GET /users.");
-      return;
-    }
 
     const projectId = pickDefaultProjectId(projects);
     if (!projectId) {
@@ -220,15 +215,11 @@ bot.hears(/^\/note(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
   }
 
   try {
-    const [projects, currentUser] = await Promise.all([
-      fetchProjects(),
-      getCurrentUserOrFallback(ctx),
-    ]);
-    const creatorId = currentUser?.id;
-    if (!creatorId) {
-      await ctx.reply("Не удалось определить автора заметки. Проверьте сид и GET /users.");
-      return;
-    }
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser) return;
+
+    const projects = await fetchProjects();
+    const creatorId = currentUser.id;
 
     const projectId = pickDefaultProjectId(projects);
     if (!projectId) {
@@ -267,15 +258,11 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
   }
 
   try {
-    const [projects, currentUser] = await Promise.all([
-      fetchProjects(),
-      getCurrentUserOrFallback(ctx),
-    ]);
-    const userId = currentUser?.id;
-    if (!userId) {
-      await ctx.reply("Не удалось определить пользователя. Проверьте сид и GET /users.");
-      return;
-    }
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser) return;
+
+    const projects = await fetchProjects();
+    const userId = currentUser.id;
 
     const project = pickDefaultProject(projects);
     if (!project) {
@@ -370,11 +357,8 @@ bot.command("sick", async (ctx) => {
   const startIso = todayIsoDate();
 
   try {
-    const employee = await getCurrentUserOrFallback(ctx);
-    if (!employee) {
-      await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
-      return;
-    }
+    const employee = await requireLinkedUser(ctx);
+    if (!employee) return;
 
     devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
 
@@ -413,6 +397,8 @@ bot.command("deadline", async (ctx) => {
   const { title, dateIso } = parsed;
 
   try {
+    if (!(await requireLinkedUser(ctx))) return;
+
     const projects = await fetchProjects();
     const projectId = pickDefaultProjectId(projects);
     if (!projectId) {
@@ -459,11 +445,8 @@ bot.command("vacation", async (ctx) => {
   }
 
   try {
-    const employee = await getCurrentUserOrFallback(ctx);
-    if (!employee) {
-      await ctx.reply("Не удалось определить сотрудника. Проверьте сид и GET /users.");
-      return;
-    }
+    const employee = await requireLinkedUser(ctx);
+    if (!employee) return;
 
     devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
 
@@ -491,11 +474,11 @@ async function handleReceiptAttachment(
   ctx: { from?: { id: number }; reply: (text: string) => Promise<unknown> },
   file: { telegramFileId: string; originalFilename?: string; mimeType?: string },
 ): Promise<void> {
+  const linked = await requireLinkedUser(ctx);
+  if (!linked) return;
+
   const telegramUserId = ctx.from?.id;
-  if (!telegramUserId) {
-    await ctx.reply("Не удалось определить пользователя Telegram.");
-    return;
-  }
+  if (!telegramUserId) return;
 
   const lastExpense = getLastExpense(telegramUserId);
   if (!lastExpense) {

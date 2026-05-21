@@ -10,7 +10,10 @@ import {
   type ApiProject,
   type ApiUser,
 } from "./api";
-import { getCurrentUserOrFallbackByTelegramId } from "./current-user";
+import {
+  getLinkedUserByTelegramId,
+  NOT_LINKED_MESSAGE,
+} from "./current-user";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
@@ -76,18 +79,20 @@ export async function resolveIntent(
     return { ok: false, message: "Не понял команду. Попробуйте переформулировать или используйте /demo." };
   }
 
-  const [users, projects, currentUser] = await Promise.all([
-    fetchUsers(),
-    fetchProjects(),
-    getCurrentUserOrFallbackByTelegramId(telegramUserId),
-  ]);
+  const linkedUser =
+    telegramUserId != null
+      ? await getLinkedUserByTelegramId(telegramUserId)
+      : null;
+  if (!linkedUser) {
+    return { ok: false, message: NOT_LINKED_MESSAGE };
+  }
+
+  const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+  const currentUser = linkedUser;
 
   switch (intent.intent) {
     case "create_task": {
-      const creatorId = currentUser?.id;
-      if (!creatorId) {
-        return { ok: false, message: "Не удалось определить автора задачи." };
-      }
+      const creatorId = currentUser.id;
 
       const project = findProjectByHint(projects, intent.payload.projectHint);
       if (!project) {
@@ -116,10 +121,7 @@ export async function resolveIntent(
     }
 
     case "create_note": {
-      const creatorId = currentUser?.id;
-      if (!creatorId) {
-        return { ok: false, message: "Не удалось определить автора заметки." };
-      }
+      const creatorId = currentUser.id;
 
       const project = findProjectByHint(projects, intent.payload.projectHint);
       if (!project) {
@@ -138,10 +140,7 @@ export async function resolveIntent(
     }
 
     case "create_expense": {
-      const userId = currentUser?.id;
-      if (!userId) {
-        return { ok: false, message: "Не удалось определить пользователя для расхода." };
-      }
+      const userId = currentUser.id;
 
       const project = findProjectByHint(projects, intent.payload.projectHint);
       if (!project) {
@@ -192,7 +191,7 @@ export async function resolveIntent(
       }
 
       if (!user) {
-        return { ok: false, message: "Не удалось определить сотрудника." };
+        return { ok: false, message: NOT_LINKED_MESSAGE };
       }
 
       const startDate = intent.payload.startDate ?? todayIsoDate();
