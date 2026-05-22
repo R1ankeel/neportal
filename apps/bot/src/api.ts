@@ -269,6 +269,8 @@ export type ApiTaskCreated = {
   id: string;
   title: string;
   deadlineAt: string | null;
+  completionResult?: string | null;
+  cancellationReason?: string | null;
   creatorId: string;
   assigneeId: string | null;
   creator: ApiTaskUserNotify;
@@ -307,13 +309,21 @@ export const setTaskDeadline = updateTaskDeadline;
 export async function updateTaskStatus(
   taskId: string,
   status: "DONE" | "CANCELLED",
+  options?: { completionResult?: string; cancellationReason?: string },
 ): Promise<ApiTaskStatusUpdated> {
-  devLog("PATCH /tasks/:id/status payload", { taskId, status });
+  const body: Record<string, string> = { status };
+  if (options?.completionResult?.trim()) {
+    body.completionResult = options.completionResult.trim();
+  }
+  if (options?.cancellationReason?.trim()) {
+    body.cancellationReason = options.cancellationReason.trim();
+  }
+  devLog("PATCH /tasks/:id/status payload", { taskId, ...body });
 
   const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

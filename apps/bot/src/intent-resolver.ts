@@ -15,7 +15,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
-import { canModifyTask } from "./task-status-flow";
+import { lookupTaskForStatusChange } from "./task-status-flow";
 import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
@@ -66,12 +66,14 @@ export type ResolvedCompleteTask = {
   intent: "complete_task";
   taskId: string;
   taskTitle: string;
+  completionResult?: string;
 };
 
 export type ResolvedCancelTask = {
   intent: "cancel_task";
   taskId: string;
   taskTitle: string;
+  cancellationReason?: string;
 };
 
 export type ResolvedIntent =
@@ -257,48 +259,46 @@ export async function resolveIntent(
       };
     }
 
-    case "complete_task":
+    case "complete_task": {
+      const lookup = await lookupTaskForStatusChange(
+        currentUser,
+        intent.payload.taskTitle,
+        "DONE",
+      );
+      if (!lookup.ok) {
+        return { ok: false, message: lookup.message };
+      }
+
+      const completionResult = intent.payload.completionResult?.trim();
+      return {
+        ok: true,
+        resolved: {
+          intent: "complete_task",
+          taskId: lookup.task.id,
+          taskTitle: lookup.task.title,
+          ...(completionResult ? { completionResult } : {}),
+        },
+      };
+    }
+
     case "cancel_task": {
-      const allTasks = await fetchTasks();
-      const match = findTaskByTitle(allTasks, intent.payload.taskTitle);
-
-      if (match.kind === "not_found") {
-        return { ok: false, message: "Задача не найдена." };
-      }
-      if (match.kind === "ambiguous") {
-        const names = match.tasks.map((t) => `«${t.title}»`).join(", ");
-        return { ok: false, message: `Найдено несколько задач: ${names}. Уточните название.` };
+      const lookup = await lookupTaskForStatusChange(
+        currentUser,
+        intent.payload.taskTitle,
+        "CANCELLED",
+      );
+      if (!lookup.ok) {
+        return { ok: false, message: lookup.message };
       }
 
-      if (!canModifyTask(currentUser, match.task)) {
-        return { ok: false, message: "Вы не можете изменить эту задачу." };
-      }
-
-      const target = intent.intent === "complete_task" ? "DONE" : "CANCELLED";
-      if (target === "DONE" && match.task.status === "DONE") {
-        return { ok: false, message: `Задача уже закрыта: ${match.task.title}` };
-      }
-      if (target === "CANCELLED" && match.task.status === "CANCELLED") {
-        return { ok: false, message: `Задача уже отменена: ${match.task.title}` };
-      }
-
-      if (intent.intent === "complete_task") {
-        return {
-          ok: true,
-          resolved: {
-            intent: "complete_task",
-            taskId: match.task.id,
-            taskTitle: match.task.title,
-          },
-        };
-      }
-
+      const cancellationReason = intent.payload.cancellationReason?.trim();
       return {
         ok: true,
         resolved: {
           intent: "cancel_task",
-          taskId: match.task.id,
-          taskTitle: match.task.title,
+          taskId: lookup.task.id,
+          taskTitle: lookup.task.title,
+          ...(cancellationReason ? { cancellationReason } : {}),
         },
       };
     }

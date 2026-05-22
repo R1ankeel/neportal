@@ -12,7 +12,14 @@ import {
   getPendingConfirmation,
   setPendingConfirmation,
 } from "./pending-intent";
+import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
+import {
+  aiIntentNeedsStatusDetails,
+  lookupTaskForStatusChange,
+  pendingDetailsTypeForAiIntent,
+  startPendingTaskStatusDetails,
+} from "./task-status-flow";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
 
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -63,6 +70,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingTaskStatusDetailsMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   const linked = await getLinkedUserByTelegramId(telegramUserId);
   if (!linked) {
     await ctx.reply(NOT_LINKED_MESSAGE);
@@ -95,9 +106,42 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (aiIntentNeedsStatusDetails(intent)) {
+    const target = intent.intent === "complete_task" ? "DONE" : "CANCELLED";
+    const taskTitle =
+      intent.intent === "complete_task" || intent.intent === "cancel_task"
+        ? intent.payload.taskTitle
+        : "";
+    const lookup = await lookupTaskForStatusChange(linked, taskTitle, target);
+    if (!lookup.ok) {
+      await ctx.reply(lookup.message);
+      return;
+    }
+
+    const detailsType = pendingDetailsTypeForAiIntent(intent);
+    if (!detailsType) {
+      await ctx.reply("Не понял команду. Попробуйте переформулировать или используйте /demo.");
+      return;
+    }
+
+    const question = startPendingTaskStatusDetails(telegramUserId, lookup.task, detailsType);
+    await ctx.reply(question);
+    return;
+  }
+
   const resolvedResult = await resolveIntent(intent, telegramUserId, text);
   if (!resolvedResult.ok) {
     await ctx.reply(resolvedResult.message);
+    return;
+  }
+
+  if (
+    (resolvedResult.resolved.intent === "complete_task" &&
+      !resolvedResult.resolved.completionResult?.trim()) ||
+    (resolvedResult.resolved.intent === "cancel_task" &&
+      !resolvedResult.resolved.cancellationReason?.trim())
+  ) {
+    await ctx.reply("Укажите результат или причину.");
     return;
   }
 

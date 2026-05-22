@@ -6,14 +6,14 @@ import {
   formatMoney,
   parseAmount,
   setTaskDeadline,
-  updateTaskStatus,
 } from "./api";
 import { getLinkedUserByTelegramId } from "./current-user";
+import { executeTaskStatusChange } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
 import { setLastExpense } from "./last-expense";
 import type { Api } from "grammy";
-import { notifyTaskAssigned, notifyTaskStatusChanged } from "./task-notifications";
+import { notifyTaskAssigned } from "./task-notifications";
 
 export async function executeResolvedIntent(
   resolved: ResolvedIntent,
@@ -116,22 +116,18 @@ export async function executeResolvedIntent(
       if (!linked) {
         return "Вы не привязаны ни к какому проекту.";
       }
-
-      const target = resolved.intent === "complete_task" ? "DONE" : "CANCELLED";
-      const updated = await updateTaskStatus(resolved.taskId, target);
-
-      if (botApi) {
-        try {
-          await notifyTaskStatusChanged(botApi, updated, linked, target);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.error(`[task-notifications] status notify error: ${msg}`);
-        }
+      if (!botApi) {
+        return "Не удалось отправить уведомление.";
       }
 
-      return target === "DONE"
-        ? `Задача закрыта: ${updated.title}`
-        : `Задача отменена: ${updated.title}`;
+      if (resolved.intent === "complete_task" && !resolved.completionResult?.trim()) {
+        return "Укажите результат выполнения задачи.";
+      }
+      if (resolved.intent === "cancel_task" && !resolved.cancellationReason?.trim()) {
+        return "Укажите причину отмены задачи.";
+      }
+
+      return executeTaskStatusChange(botApi, linked, resolved);
     }
 
     default:

@@ -59,6 +59,16 @@ export class UpdateTaskStatusDto {
   @ApiProperty({ enum: TaskStatus })
   @IsEnum(TaskStatus)
   status!: TaskStatus;
+
+  @ApiPropertyOptional({ description: "Результат выполнения (при status DONE)" })
+  @IsOptional()
+  @IsString()
+  completionResult?: string;
+
+  @ApiPropertyOptional({ description: "Причина отмены (при status CANCELLED)" })
+  @IsOptional()
+  @IsString()
+  cancellationReason?: string;
 }
 
 export class UpdateTaskDeadlineDto {

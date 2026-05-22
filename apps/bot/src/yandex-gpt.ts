@@ -150,19 +150,37 @@ set_task_deadline.payload:
 { "taskTitle": string, "deadlineDate": "YYYY-MM-DD" }
 
 complete_task.payload:
-{ "taskTitle": string }
+{ "taskTitle": string, "completionResult"?: string }
 
 cancel_task.payload:
-{ "taskTitle": string }
+{ "taskTitle": string, "cancellationReason"?: string }
 
-Пример complete_task:
-Input: «Закрой задачу Проверить склад»
+complete_task — результат:
+- «Закрой задачу X» без результата → только taskTitle, без completionResult.
+- «Закрой задачу X, сделал Y» / «Задача X выполнена, Y» → taskTitle + completionResult.
+
+cancel_task — причина:
+- «Отмени задачу X» без причины → только taskTitle.
+- «Отмени задачу X, потому что Y» / «Отмени задачу X, Y» → taskTitle + cancellationReason.
+
+Пример complete_task без результата:
+Input: «Закрой задачу поехать к поставщику»
 Output:
 {
   "intent": "complete_task",
   "confidence": 0.9,
   "requiresConfirmation": true,
-  "payload": { "taskTitle": "Проверить склад" }
+  "payload": { "taskTitle": "Поехать к поставщику" }
+}
+
+Пример complete_task с результатом:
+Input: «Закрой задачу Проверить склад, всё проверил»
+Output:
+{
+  "intent": "complete_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад", "completionResult": "всё проверил" }
 }
 
 Пример complete_task (выполнена):
@@ -175,14 +193,24 @@ Output:
   "payload": { "taskTitle": "Проверить склад" }
 }
 
-Пример cancel_task:
-Input: «Отмени задачу Проверить склад»
+Пример cancel_task без причины:
+Input: «Отмени задачу проверить склад»
 Output:
 {
   "intent": "cancel_task",
   "confidence": 0.9,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример cancel_task с причиной:
+Input: «Отмени задачу Проверить склад, склад закрыт»
+Output:
+{
+  "intent": "cancel_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад", "cancellationReason": "склад закрыт" }
 }
 
 unknown.payload:

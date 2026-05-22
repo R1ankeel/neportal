@@ -271,17 +271,29 @@ export class TasksService {
       status: TaskStatus;
       completedAt?: Date | null;
       cancelledAt?: Date | null;
+      completionResult?: string | null;
+      cancellationReason?: string | null;
     } = { status: dto.status };
 
     if (dto.status === TaskStatus.DONE) {
       data.completedAt = now;
       data.cancelledAt = null;
+      data.cancellationReason = null;
+      if (dto.completionResult != null && dto.completionResult.trim() !== "") {
+        data.completionResult = dto.completionResult.trim();
+      }
     } else if (dto.status === TaskStatus.CANCELLED) {
       data.cancelledAt = now;
       data.completedAt = null;
+      data.completionResult = null;
+      if (dto.cancellationReason != null && dto.cancellationReason.trim() !== "") {
+        data.cancellationReason = dto.cancellationReason.trim();
+      }
     } else {
       data.completedAt = null;
       data.cancelledAt = null;
+      data.completionResult = null;
+      data.cancellationReason = null;
     }
 
     return this.prisma.task.update({

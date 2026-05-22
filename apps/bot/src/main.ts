@@ -35,7 +35,9 @@ import { handlePlainTextMessage } from "./ai-message";
 import { handleStartBinding } from "./start-binding";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
-import { changeTaskStatusByTitle } from "./task-status-flow";
+import { handleTaskStatusSlashCommand } from "./task-status-flow";
+import { buildIntentPreview } from "./intent-preview";
+import { setPendingConfirmation } from "./pending-intent";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -95,6 +97,10 @@ bot.command("demo", async (ctx) => {
       "- Запиши заметку: клиент попросил проверить статистику",
       "- Потратил 1500 рублей на рекламу VK",
       "- Вася заболел до 25 мая, больничный 123456",
+      "- Закрой задачу Проверить склад",
+      "- Закрой задачу Проверить склад, всё проверил",
+      "- Отмени задачу Проверить склад",
+      "- Отмени задачу Проверить склад, склад закрыт",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -400,11 +406,39 @@ bot.command("sick", async (ctx) => {
 
 bot.command("done", async (ctx) => {
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
   try {
     const currentUser = await requireLinkedUser(ctx);
-    if (!currentUser) return;
-    const reply = await changeTaskStatusByTitle(bot.api, currentUser, payload, "DONE");
-    await ctx.reply(reply);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleTaskStatusSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+      "DONE",
+    );
+    if (result.kind === "reply") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    if (resolved.intent !== "complete_task") return;
+
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "complete_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          completionResult: resolved.completionResult ?? "",
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] done command error: ${msg}`);
@@ -414,11 +448,39 @@ bot.command("done", async (ctx) => {
 
 bot.command("cancel", async (ctx) => {
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
   try {
     const currentUser = await requireLinkedUser(ctx);
-    if (!currentUser) return;
-    const reply = await changeTaskStatusByTitle(bot.api, currentUser, payload, "CANCELLED");
-    await ctx.reply(reply);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleTaskStatusSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+      "CANCELLED",
+    );
+    if (result.kind === "reply") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    if (resolved.intent !== "cancel_task") return;
+
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "cancel_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          cancellationReason: resolved.cancellationReason ?? "",
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] cancel command error: ${msg}`);

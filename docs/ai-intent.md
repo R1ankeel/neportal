@@ -48,26 +48,44 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
-| `complete_task` | `taskTitle` |
-| `cancel_task` | `taskTitle` |
+| `complete_task` | `taskTitle`, `completionResult?` |
+| `cancel_task` | `taskTitle`, `cancellationReason?` |
 | `unknown` | `reason?` |
 
-### Пример: закрыть задачу
+### Пример: закрыть задачу (без результата в фразе)
 
-> Закрой задачу Проверить склад
+> Закрой задачу поехать к поставщику
 
 ```json
 {
   "intent": "complete_task",
   "confidence": 0.9,
   "requiresConfirmation": true,
-  "payload": { "taskTitle": "Проверить склад" }
+  "payload": { "taskTitle": "Поехать к поставщику" }
 }
 ```
 
-### Пример: отменить задачу
+Бот спросит: *«Что сделано по задаче «…»?»*, затем confirmation.
 
-> Отмени задачу Проверить склад
+### Пример: закрыть задачу с результатом
+
+> Закрой задачу Проверить склад, всё проверил
+
+```json
+{
+  "intent": "complete_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "completionResult": "всё проверил"
+  }
+}
+```
+
+### Пример: отменить задачу (без причины)
+
+> Отмени задачу проверить склад
 
 ```json
 {
@@ -75,6 +93,22 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
   "confidence": 0.9,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Проверить склад" }
+}
+```
+
+### Пример: отменить задачу с причиной
+
+> Отмени задачу Проверить склад, склад закрыт
+
+```json
+{
+  "intent": "cancel_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "cancellationReason": "склад закрыт"
+  }
 }
 ```
 

@@ -62,10 +62,12 @@ export const SetTaskDeadlinePayloadSchema = z.object({
 
 export const CompleteTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
+  completionResult: z.string().min(1).optional(),
 });
 
 export const CancelTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
+  cancellationReason: z.string().min(1).optional(),
 });
 
 export const UnknownPayloadSchema = z.object({

@@ -61,11 +61,21 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         .filter((line): line is string => line != null)
         .join("\n") + CONFIRM_FOOTER;
 
-    case "complete_task":
-      return `Закрыть задачу «${resolved.taskTitle}»?${CONFIRM_FOOTER}`;
+    case "complete_task": {
+      const lines = [`Закрыть задачу «${resolved.taskTitle}»?`];
+      if (resolved.completionResult) {
+        lines.push("", `Результат: ${resolved.completionResult}`);
+      }
+      return lines.join("\n") + CONFIRM_FOOTER;
+    }
 
-    case "cancel_task":
-      return `Отменить задачу «${resolved.taskTitle}»?${CONFIRM_FOOTER}`;
+    case "cancel_task": {
+      const lines = [`Отменить задачу «${resolved.taskTitle}»?`];
+      if (resolved.cancellationReason) {
+        lines.push("", `Причина отмены: ${resolved.cancellationReason}`);
+      }
+      return lines.join("\n") + CONFIRM_FOOTER;
+    }
 
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;

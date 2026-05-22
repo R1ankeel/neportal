@@ -76,31 +76,44 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 ### Закрытие и отмена задач
 
+**Двухшаговый сценарий:** если результат (`completionResult`) или причина (`cancellationReason`) не указаны, бот сначала спрашивает уточнение, затем показывает confirmation (да/нет). Права проверяются **до** уточняющего вопроса.
+
 **Slash:**
 
 | Команда | Пример |
 |---------|--------|
-| `/done` | `/done Проверить склад` |
-| `/cancel` | `/cancel Проверить склад` |
+| `/done` | `/done Проверить склад` → *«Что сделано по задаче…?»* |
+| `/done` с результатом | `/done Проверить склад — всё проверил` (разделитель `—`, `-` или `:`) → confirmation |
+| `/cancel` | `/cancel Проверить склад` → *«Почему отменяем…?»* |
+| `/cancel` с причиной | `/cancel Проверить склад — склад закрыт` → confirmation |
 
-**AI (после подтвержения «да»):**
+**AI:**
 
-| Текст | Intent |
-|-------|--------|
-| Закрой задачу Проверить склад | `complete_task` |
-| Задача Проверить склад выполнена | `complete_task` |
-| Отмени задачу Проверить склад | `cancel_task` |
+| Текст | Поведение |
+|-------|-----------|
+| Закрой задачу Проверить склад | вопрос о результате → confirmation → `DONE` |
+| Закрой задачу Проверить склад, всё проверил | сразу confirmation с `completionResult` |
+| Отмени задачу Проверить склад | вопрос о причине → confirmation → `CANCELLED` |
+| Отмени задачу Проверить склад, склад закрыт | сразу confirmation с `cancellationReason` |
 
-**Поиск задачи по названию:** сначала точное совпадение `title` (без учёта регистра), затем `includes`; несколько совпадений — просьба уточнить.
+**Pending details** (в памяти, TTL 30 мин): `pending-task-status-details.ts`. Отмена уточнения: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
-**Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` — любая задача. Иначе: *«Вы не можете изменить эту задачу.»*
+**Порядок обработки обычного текста** (`ai-message.ts`):
 
-**После успешного закрытия/отмены:** постановщику с `telegramId` (если он не тот, кто выполнил действие) уходит:
+1. Pending confirmation (да/нет)
+2. Pending details (результат/причина) — **не** отправляется в YandexGPT
+3. Иначе AI parser
 
-- DONE: *«{ФИО} закрыл задачу «{title}».»*
-- CANCELLED: *«{ФИО} отменил задачу «{title}».»*
+**Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
 
-Запись в `TaskNotificationLog`: `TASK_COMPLETED_CREATOR` / `TASK_CANCELLED_CREATOR`. Повторный `/done` на уже закрытой задаче — *«Задача уже закрыта…»*, без повторного уведомления.
+**Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` — любая задача.
+
+**Уведомление постановщику** (если есть `telegramId` и он не исполнитель действия):
+
+- DONE: *«{ФИО} закрыл задачу «{title}».»* + строка *Результат: …* при наличии
+- CANCELLED: *«{ФИО} отменил задачу «{title}».»* + *Причина отмены: …*
+
+`PATCH /tasks/:id/status` принимает `completionResult` / `cancellationReason`. Повторный `/done` на закрытой задаче — без дубля уведомления.
 
 ### Привязка Telegram (username flow)
 
@@ -293,7 +306,9 @@ REST для scheduler (вызывает бот):
 | `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
 | `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
-| `task-status-flow.ts` | `/done`, `/cancel`: поиск задачи, права, PATCH status |
+| `task-status-flow.ts` | `/done`, `/cancel`: поиск, права, confirmation, PATCH status |
+| `pending-task-status-details.ts` | Ожидание результата/причины (TTL 30 мин) |
+| `handle-pending-task-status-details.ts` | Ответ на уточняющий вопрос → confirmation |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |

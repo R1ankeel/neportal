@@ -103,9 +103,15 @@ export async function notifyTaskStatusChanged(
     target === "DONE" ? "TASK_COMPLETED_CREATOR" : "TASK_CANCELLED_CREATOR";
 
   const verb = target === "DONE" ? "закрыл" : "отменил";
-  const text = `${actor.fullName} ${verb} задачу «${task.title}».`;
+  const lines = [`${actor.fullName} ${verb} задачу «${task.title}».`];
+  if (target === "DONE" && task.completionResult?.trim()) {
+    lines.push("", `Результат: ${task.completionResult.trim()}`);
+  }
+  if (target === "CANCELLED" && task.cancellationReason?.trim()) {
+    lines.push("", `Причина отмены: ${task.cancellationReason.trim()}`);
+  }
 
-  await sendTelegramMessage(api, creator.telegramId, text);
+  await sendTelegramMessage(api, creator.telegramId, lines.join("\n"));
   await recordTaskNotification(task.id, creator.id, logType);
 }
 
