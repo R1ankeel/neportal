@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
-import { TaskNotificationType, TaskStatus } from "@neportal/database";
+import { TaskCommentSource, TaskNotificationType, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { CreateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 
@@ -45,9 +46,95 @@ export class TasksService {
     telegramId: true,
   } as const;
 
+  private readonly taskUserDetailSelect = {
+    id: true,
+    fullName: true,
+    role: true,
+    telegramId: true,
+  } as const;
+
+  private readonly commentAuthorSelect = {
+    id: true,
+    fullName: true,
+    role: true,
+  } as const;
+
+  private readonly commentInclude = {
+    author: { select: this.commentAuthorSelect },
+  } as const;
+
+  private readonly taskDetailInclude = {
+    project: { select: { id: true, name: true } },
+    creator: { select: this.taskUserDetailSelect },
+    assignee: { select: this.taskUserDetailSelect },
+    comments: {
+      orderBy: { createdAt: "asc" as const },
+      include: this.commentInclude,
+    },
+  } as const;
+
   private readonly activeTaskStatuses = {
     notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] as TaskStatus[],
   };
+
+  private async assertTaskInOrg(taskId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: this.orgId() },
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${taskId}" not found`);
+    }
+    return task;
+  }
+
+  async findOne(id: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id, organizationId: this.orgId() },
+      include: this.taskDetailInclude,
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${id}" not found`);
+    }
+    return task;
+  }
+
+  async findComments(taskId: string) {
+    await this.assertTaskInOrg(taskId);
+
+    return this.prisma.taskComment.findMany({
+      where: { taskId, organizationId: this.orgId() },
+      orderBy: { createdAt: "asc" },
+      include: this.commentInclude,
+    });
+  }
+
+  async createComment(taskId: string, dto: CreateTaskCommentDto) {
+    const org = this.orgId();
+    await this.assertTaskInOrg(taskId);
+
+    const author = await this.prisma.user.findFirst({
+      where: { id: dto.authorId, organizationId: org },
+    });
+    if (!author) {
+      throw new NotFoundException(`User with id "${dto.authorId}" not found in this organization`);
+    }
+
+    const text = dto.text.trim();
+    if (!text) {
+      throw new BadRequestException("text must not be empty");
+    }
+
+    return this.prisma.taskComment.create({
+      data: {
+        organizationId: org,
+        taskId,
+        authorId: dto.authorId,
+        text,
+        source: dto.source ?? TaskCommentSource.WEB,
+      },
+      include: this.commentInclude,
+    });
+  }
 
   async findAll(projectId?: string) {
     if (projectId) {

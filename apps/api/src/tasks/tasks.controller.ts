@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { CreateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
@@ -53,5 +54,26 @@ export class TasksController {
   @ApiParam({ name: "id" })
   updateStatus(@Param("id") id: string, @Body() dto: UpdateTaskStatusDto) {
     return this.tasksService.updateStatus(id, dto);
+  }
+
+  @Get(":id")
+  @ApiOperation({ summary: "Задача по id с комментариями" })
+  @ApiParam({ name: "id" })
+  findOne(@Param("id") id: string) {
+    return this.tasksService.findOne(id);
+  }
+
+  @Get(":id/comments")
+  @ApiOperation({ summary: "Комментарии задачи" })
+  @ApiParam({ name: "id" })
+  findComments(@Param("id") id: string) {
+    return this.tasksService.findComments(id);
+  }
+
+  @Post(":id/comments")
+  @ApiOperation({ summary: "Добавить комментарий к задаче" })
+  @ApiParam({ name: "id" })
+  createComment(@Param("id") id: string, @Body() dto: CreateTaskCommentDto) {
+    return this.tasksService.createComment(id, dto);
   }
 }

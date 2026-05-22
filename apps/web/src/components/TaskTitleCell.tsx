@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ApiTask } from "@/lib/types";
 
 function outcomeSubtext(task: ApiTask): { label: string; text: string } | null {
@@ -18,7 +19,9 @@ export function TaskTitleCell({ task }: { task: ApiTask }) {
 
   return (
     <div>
-      <div className="font-medium">{task.title}</div>
+      <Link href={`/tasks/${task.id}`} className="font-medium hover:underline">
+        {task.title}
+      </Link>
       {outcome ? (
         <p className="mt-1 text-sm leading-snug text-zinc-500 dark:text-zinc-400">
           <span className="text-zinc-400 dark:text-zinc-500">{outcome.label}</span> {outcome.text}

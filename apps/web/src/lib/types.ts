@@ -19,19 +19,37 @@ export type ApiProject = {
   createdBy?: { id: string; fullName: string; email: string | null };
 };
 
+export type ApiTaskUser = {
+  id: string;
+  fullName: string;
+  role?: string;
+  telegramId?: string | null;
+};
+
+export type ApiTaskComment = {
+  id: string;
+  text: string;
+  source: string;
+  createdAt: string;
+  author: { id: string; fullName: string; role: string };
+};
+
 export type ApiTask = {
   id: string;
   title: string;
   description: string | null;
   status: string;
   deadlineAt: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
   completionResult?: string | null;
   cancellationReason?: string | null;
   createdAt: string;
   updatedAt: string;
-  creator?: { id: string; fullName: string };
-  assignee?: { id: string; fullName: string } | null;
+  creator?: ApiTaskUser;
+  assignee?: ApiTaskUser | null;
   project?: { id: string; name: string } | null;
+  comments?: ApiTaskComment[];
 };
 
 export type ApiBudget = {

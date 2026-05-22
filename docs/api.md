@@ -47,7 +47,10 @@
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/tasks` | `projectId?` | Список задач |
+| GET | `/tasks/:id` | — | Карточка задачи с комментариями |
 | POST | `/tasks` | — | Создать задачу |
+| GET | `/tasks/:id/comments` | — | Комментарии задачи (по `createdAt` asc) |
+| POST | `/tasks/:id/comments` | — | Добавить комментарий |
 | PATCH | `/tasks/:id/deadline` | — | Установить или сбросить дедлайн |
 | PATCH | `/tasks/:id/status` | — | Сменить статус |
 
@@ -81,6 +84,20 @@
 ```
 
 Статусы: `NEW`, `IN_PROGRESS`, `DONE`, `CANCELLED`.
+
+**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author`).
+
+**POST /tasks/:id/comments** (`CreateTaskCommentDto`):
+
+```json
+{
+  "authorId": "cuid пользователя org",
+  "text": "Текст комментария",
+  "source": "WEB"
+}
+```
+
+`source` опционален (`WEB` | `TELEGRAM_TEXT` | `TELEGRAM_VOICE`, по умолчанию `WEB`). `text` обязателен, trim, минимум 1 символ. Задача и автор должны принадлежать текущей организации.
 
 ## Notes
 

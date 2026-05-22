@@ -43,6 +43,12 @@ enum NoteSource {
   TELEGRAM_VOICE
 }
 
+enum TaskCommentSource {
+  WEB
+  TELEGRAM_TEXT
+  TELEGRAM_VOICE
+}
+
 enum BudgetStatus {
   ACTIVE
   EXHAUSTED
@@ -109,6 +115,7 @@ model Organization {
   absences              Absence[]
   reminders             Reminder[]
   taskNotificationLogs  TaskNotificationLog[]
+  taskComments          TaskComment[]
 }
 
 model User {
@@ -139,6 +146,7 @@ model User {
   absences               Absence[]
   reminders              Reminder[]
   taskNotificationLogs   TaskNotificationLog[]
+  taskComments           TaskComment[]
 
   @@unique([organizationId, telegramUsername])
   @@index([organizationId])
@@ -214,12 +222,32 @@ model Task {
 
   reminders            Reminder[]
   notificationLogs     TaskNotificationLog[]
+  comments             TaskComment[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([creatorId])
   @@index([assigneeId])
   @@index([deadlineAt])
+}
+
+model TaskComment {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId         String
+  task           Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  text           String
+  source         TaskCommentSource @default(WEB)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organizationId])
+  @@index([taskId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model TaskNotificationLog {
