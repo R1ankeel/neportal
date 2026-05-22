@@ -12,8 +12,8 @@
     }
   },
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.json",
-    "dev": "prisma generate && tsc -p tsconfig.json --watch",
+    "build": "node scripts/prisma-generate.mjs && tsc -p tsconfig.json",
+    "dev": "node scripts/prisma-generate.mjs && tsc -p tsconfig.json --watch",
     "lint": "echo \"No linter configured for @neportal/database\"",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
