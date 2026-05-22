@@ -10,10 +10,13 @@ import {
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
 import { setLastExpense } from "./last-expense";
+import type { Api } from "grammy";
+import { notifyTaskAssigned } from "./task-notifications";
 
 export async function executeResolvedIntent(
   resolved: ResolvedIntent,
   telegramUserId?: number,
+  botApi?: Api,
 ): Promise<string> {
   switch (resolved.intent) {
     case "create_task": {
@@ -25,6 +28,15 @@ export async function executeResolvedIntent(
         projectId: resolved.project.id,
         ...(resolved.deadlineDate ? { deadlineAt: resolved.deadlineDate } : {}),
       });
+
+      if (botApi) {
+        try {
+          await notifyTaskAssigned(botApi, task);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`[task-notifications] assign notify error: ${msg}`);
+        }
+      }
 
       const parts = [`Задача создана в проекте «${resolved.project.name}»: ${task.title}`];
       if (resolved.assignee) {

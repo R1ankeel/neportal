@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
-import { TaskStatus } from "@neportal/database";
+import { TaskNotificationType, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 
 @Injectable()
@@ -28,6 +29,25 @@ export class TasksService {
       Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999),
     );
   }
+
+  /** Локальное время сервера: границы календарного «завтра». */
+  private tomorrowLocalRange(): { start: Date; end: Date } {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const start = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 0, 0, 0, 0);
+    const end = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 23, 59, 59, 999);
+    return { start, end };
+  }
+
+  private readonly taskUserNotifySelect = {
+    id: true,
+    fullName: true,
+    telegramId: true,
+  } as const;
+
+  private readonly activeTaskStatuses = {
+    notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] as TaskStatus[],
+  };
 
   async findAll(projectId?: string) {
     if (projectId) {
@@ -98,10 +118,143 @@ export class TasksService {
         ...(deadlineAt != null ? { deadlineAt } : {}),
       },
       include: {
-        creator: { select: { id: true, fullName: true } },
-        assignee: { select: { id: true, fullName: true } },
+        creator: { select: this.taskUserNotifySelect },
+        assignee: { select: this.taskUserNotifySelect },
         project: { select: { id: true, name: true } },
       },
+    });
+  }
+
+  async findDeadlineTomorrowNotifications() {
+    const { start, end } = this.tomorrowLocalRange();
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        organizationId: this.orgId(),
+        status: this.activeTaskStatuses,
+        deadlineAt: { gte: start, lte: end },
+        assigneeId: { not: null },
+        assignee: { telegramId: { not: null } },
+      },
+      include: {
+        project: { select: { id: true, name: true } },
+        assignee: { select: this.taskUserNotifySelect },
+        creator: { select: this.taskUserNotifySelect },
+        notificationLogs: {
+          where: { type: TaskNotificationType.TASK_DEADLINE_TOMORROW },
+          select: { userId: true },
+        },
+      },
+    });
+
+    return tasks
+      .filter(
+        (t) =>
+          t.assigneeId != null &&
+          !t.notificationLogs.some((l) => l.userId === t.assigneeId),
+      )
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        deadlineAt: t.deadlineAt,
+        project: t.project ? { id: t.project.id, name: t.project.name } : null,
+        assignee: t.assignee,
+        creator: t.creator,
+      }));
+  }
+
+  async findOverdueNotifications() {
+    const now = new Date();
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        organizationId: this.orgId(),
+        status: this.activeTaskStatuses,
+        deadlineAt: { lt: now },
+        assigneeId: { not: null },
+      },
+      include: {
+        project: { select: { id: true, name: true } },
+        assignee: { select: this.taskUserNotifySelect },
+        creator: { select: this.taskUserNotifySelect },
+        notificationLogs: {
+          where: {
+            type: {
+              in: [
+                TaskNotificationType.TASK_OVERDUE_ASSIGNEE,
+                TaskNotificationType.TASK_OVERDUE_CREATOR,
+              ],
+            },
+          },
+          select: { userId: true, type: true },
+        },
+      },
+    });
+
+    return tasks.map((t) => {
+      const hasAssigneeLog = t.notificationLogs.some(
+        (l) =>
+          l.type === TaskNotificationType.TASK_OVERDUE_ASSIGNEE &&
+          l.userId === t.assigneeId,
+      );
+      const hasCreatorLog = t.notificationLogs.some(
+        (l) =>
+          l.type === TaskNotificationType.TASK_OVERDUE_CREATOR &&
+          l.userId === t.creatorId,
+      );
+
+      const notifyAssignee =
+        t.assigneeId != null &&
+        t.assignee?.telegramId != null &&
+        !hasAssigneeLog;
+      const notifyCreator =
+        t.creator.telegramId != null && !hasCreatorLog;
+
+      return {
+        id: t.id,
+        title: t.title,
+        deadlineAt: t.deadlineAt,
+        project: t.project ? { id: t.project.id, name: t.project.name } : null,
+        assignee: t.assignee,
+        creator: t.creator,
+        notifyAssignee,
+        notifyCreator,
+      };
+    }).filter((t) => t.notifyAssignee || t.notifyCreator);
+  }
+
+  async recordNotification(taskId: string, dto: CreateTaskNotificationDto) {
+    const org = this.orgId();
+
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: org },
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${taskId}" not found`);
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: dto.userId, organizationId: org },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with id "${dto.userId}" not found in this organization`);
+    }
+
+    return this.prisma.taskNotificationLog.upsert({
+      where: {
+        taskId_userId_type: {
+          taskId,
+          userId: dto.userId,
+          type: dto.type,
+        },
+      },
+      create: {
+        organizationId: org,
+        taskId,
+        userId: dto.userId,
+        type: dto.type,
+      },
+      update: {},
     });
   }
 

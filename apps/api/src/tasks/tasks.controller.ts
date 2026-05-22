@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
 
@@ -19,6 +20,25 @@ export class TasksController {
   @ApiOperation({ summary: "Создать задачу" })
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);
+  }
+
+  @Get("notifications/deadline-tomorrow")
+  @ApiOperation({ summary: "Задачи с дедлайном завтра для уведомления исполнителю (бот)" })
+  findDeadlineTomorrowNotifications() {
+    return this.tasksService.findDeadlineTomorrowNotifications();
+  }
+
+  @Get("notifications/overdue")
+  @ApiOperation({ summary: "Просроченные задачи для уведомлений (бот)" })
+  findOverdueNotifications() {
+    return this.tasksService.findOverdueNotifications();
+  }
+
+  @Post(":id/notifications")
+  @ApiOperation({ summary: "Записать отправленное уведомление по задаче (идемпотентно)" })
+  @ApiParam({ name: "id" })
+  recordNotification(@Param("id") id: string, @Body() dto: CreateTaskNotificationDto) {
+    return this.tasksService.recordNotification(id, dto);
   }
 
   @Patch(":id/deadline")

@@ -245,6 +245,43 @@ export type ApiTask = {
   project?: { id: string; name: string } | null;
 };
 
+export type TaskNotificationType =
+  | "TASK_ASSIGNED"
+  | "TASK_DEADLINE_TOMORROW"
+  | "TASK_OVERDUE_ASSIGNEE"
+  | "TASK_OVERDUE_CREATOR";
+
+export type ApiTaskUserNotify = {
+  id: string;
+  fullName: string;
+  telegramId: string | null;
+};
+
+export type ApiTaskCreated = {
+  id: string;
+  title: string;
+  deadlineAt: string | null;
+  creatorId: string;
+  assigneeId: string | null;
+  creator: ApiTaskUserNotify;
+  assignee: ApiTaskUserNotify | null;
+  project?: { id: string; name: string } | null;
+};
+
+export type DeadlineTomorrowNotificationItem = {
+  id: string;
+  title: string;
+  deadlineAt: string | null;
+  project: { id: string; name: string } | null;
+  assignee: ApiTaskUserNotify | null;
+  creator: ApiTaskUserNotify;
+};
+
+export type OverdueNotificationItem = DeadlineTomorrowNotificationItem & {
+  notifyAssignee: boolean;
+  notifyCreator: boolean;
+};
+
 export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
   const url = new URL(`${getApiBaseUrl()}/tasks`);
   if (projectId) url.searchParams.set("projectId", projectId);
@@ -286,7 +323,7 @@ export async function createTask(body: {
   assigneeId?: string;
   projectId?: string;
   deadlineAt?: string;
-}): Promise<{ id: string; title: string; project?: { id: string; name: string } | null }> {
+}): Promise<ApiTaskCreated> {
   devLog("POST /tasks payload", body as Record<string, unknown>);
 
   const res = await fetch(`${getApiBaseUrl()}/tasks`, {
@@ -298,7 +335,50 @@ export async function createTask(body: {
     const text = await res.text().catch(() => "");
     throw new Error(`POST /tasks → ${res.status} ${text}`.trim());
   }
-  return res.json() as Promise<{ id: string; title: string; project?: { id: string; name: string } | null }>;
+  return res.json() as Promise<ApiTaskCreated>;
+}
+
+export async function fetchDeadlineTomorrowNotifications(): Promise<
+  DeadlineTomorrowNotificationItem[]
+> {
+  const res = await fetch(`${getApiBaseUrl()}/tasks/notifications/deadline-tomorrow`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `GET /tasks/notifications/deadline-tomorrow → ${res.status} ${text}`.trim(),
+    );
+  }
+  return res.json() as Promise<DeadlineTomorrowNotificationItem[]>;
+}
+
+export async function fetchOverdueNotifications(): Promise<OverdueNotificationItem[]> {
+  const res = await fetch(`${getApiBaseUrl()}/tasks/notifications/overdue`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks/notifications/overdue → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<OverdueNotificationItem[]>;
+}
+
+export async function recordTaskNotification(
+  taskId: string,
+  userId: string,
+  type: TaskNotificationType,
+): Promise<{ id: string }> {
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/notifications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ userId, type }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /tasks/${taskId}/notifications → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<{ id: string }>;
 }
 
 export async function createNote(body: {

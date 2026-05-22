@@ -194,6 +194,41 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 Для проверки **affectedTasks**: в сиде есть задача «Подписать договор с подрядчиком» (исполнитель Иван, deadline 22.05.2026) + `/sick до 25.05.2026` для Ивана.
 
+### Уведомления по задачам (Telegram)
+
+Три типа уведомлений; дубликаты не отправляются благодаря `TaskNotificationLog` в БД.
+
+| Тип | Когда | Кому |
+|-----|--------|------|
+| Новая задача | Сразу после `POST /tasks` (`/task`, AI `create_task` после «да») | Исполнитель, если есть `telegramId` и `assigneeId ≠ creatorId` |
+| Дедлайн завтра | Scheduler в процессе бота | Исполнитель с привязанным Telegram |
+| Просрочка | Scheduler: `deadlineAt` в прошлом, статус не DONE/CANCELLED | Исполнитель и постановщик (если у каждого есть `telegramId`) |
+
+**Scheduler** (без отдельного worker): `startTaskNotificationScheduler` в `main.ts` — `setInterval` по умолчанию 60 с.
+
+В **корневом** `.env`:
+
+```env
+TASK_NOTIFICATION_SCHEDULER_ENABLED=true
+TASK_NOTIFICATION_INTERVAL_MS=60000
+```
+
+Для теста дедлайна/просрочки можно уменьшить интервал (например `10000`).
+
+Граница «завтра» считается в **локальном времени сервера** (API: `GET /tasks/notifications/deadline-tomorrow`).
+
+**Проверка новой задачи:** от Ивана (привязан Telegram) — фраза *«Создай задачу Васе проверить склад завтра»* → «да» → Васе приходит *«Вам назначена новая задача…»*.
+
+**Проверка дедлайна завтра:** задача с `deadlineAt` на завтра, у исполнителя есть `telegramId` → одно сообщение *«Завтра дедлайн по задаче…»*; повторно scheduler не шлёт.
+
+**Проверка просрочки:** `deadlineAt` вчера (или через Prisma) → исполнителю и постановщику по одному сообщению; повторно не шлёт.
+
+REST для scheduler (вызывает бот):
+
+- `GET /tasks/notifications/deadline-tomorrow`
+- `GET /tasks/notifications/overdue`
+- `POST /tasks/:id/notifications` — body `{ userId, type }`, идемпотентный upsert по `(taskId, userId, type)`
+
 ## HTTP-клиент бота
 
 Файл `apps/bot/src/api.ts` — обёртки над REST:
@@ -202,6 +237,7 @@ Pending confirmation хранится **в памяти** процесса (`pen
 - `fetchProjects`, `fetchBudgets`, `fetchTasks`
 - `createTask`, `createNote`, `createBudgetExpense` (alias `createExpense`), `createExpenseAttachment`, `createAbsence`
 - `updateTaskDeadline` (alias `setTaskDeadline`)
+- `fetchDeadlineTomorrowNotifications`, `fetchOverdueNotifications`, `recordTaskNotification`
 - `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`, `findUserByNameHint`
 
 При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.
@@ -220,6 +256,9 @@ Pending confirmation хранится **в памяти** процесса (`pen
 | `intent-executor.ts` | Вызов API после подтверждения |
 | `confirmation.ts` | Распознавание да/нет |
 | `pending-intent.ts` | In-memory pending: AI intent или привязка по username |
+| `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
+| `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
+| `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |
@@ -248,5 +287,6 @@ Pending confirmation хранится **в памяти** процесса (`pen
 - Без привязки `telegramId` рабочие команды и AI **не выполняются** (`NOT_LINKED_MESSAGE`). Доступны: `/start`, `/demo`, `/me`, `/link` (dev).
 - `/link` — только для dev; в продукте — username в Web + `/start`.
 - SpeechKit / голосовые сообщения — не реализованы (env в `.env.example` — заготовка).
+- Уведомления по задачам — in-process scheduler в боте; позже worker/BullMQ.
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
 - Деплой в Yandex Cloud для MVP **не требуется** — только внешний API YandexGPT/SpeechKit из локального бота.

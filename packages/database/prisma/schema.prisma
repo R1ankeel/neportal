@@ -79,6 +79,13 @@ enum ReminderStatus {
   CANCELLED
 }
 
+enum TaskNotificationType {
+  TASK_ASSIGNED
+  TASK_DEADLINE_TOMORROW
+  TASK_OVERDUE_ASSIGNEE
+  TASK_OVERDUE_CREATOR
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
@@ -97,8 +104,9 @@ model Organization {
   notes          Note[]
   budgets        Budget[]
   budgetExpenses BudgetExpense[]
-  absences       Absence[]
-  reminders      Reminder[]
+  absences              Absence[]
+  reminders             Reminder[]
+  taskNotificationLogs  TaskNotificationLog[]
 }
 
 model User {
@@ -126,8 +134,9 @@ model User {
   budgetExpenses   BudgetExpense[] @relation("ExpenseUser")
   approvedExpenses BudgetExpense[] @relation("ExpenseApprover")
   attachments      BudgetExpenseAttachment[]
-  absences         Absence[]
-  reminders        Reminder[]
+  absences               Absence[]
+  reminders              Reminder[]
+  taskNotificationLogs   TaskNotificationLog[]
 
   @@unique([organizationId, telegramUsername])
   @@index([organizationId])
@@ -198,13 +207,34 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reminders Reminder[]
+  reminders            Reminder[]
+  notificationLogs     TaskNotificationLog[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([creatorId])
   @@index([assigneeId])
   @@index([deadlineAt])
+}
+
+model TaskNotificationLog {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId         String
+  task           Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           TaskNotificationType
+  sentAt         DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+
+  @@unique([taskId, userId, type])
+  @@index([organizationId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([type])
+  @@index([sentAt])
 }
 
 model Note {

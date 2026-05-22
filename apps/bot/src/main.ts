@@ -33,6 +33,8 @@ import {
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import { handleStartBinding } from "./start-binding";
+import { startTaskNotificationScheduler } from "./task-notification-scheduler";
+import { notifyTaskAssigned } from "./task-notifications";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -193,6 +195,13 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
       assigneeId,
       projectId,
     });
+
+    try {
+      await notifyTaskAssigned(bot.api, task);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[task-notifications] assign notify error: ${msg}`);
+    }
 
     const projectName = task.project?.name ?? projects.find((p) => p.id === projectId)?.name ?? "проект";
     await ctx.reply(`Задача создана в проекте «${projectName}»: ${task.title}`);
@@ -533,6 +542,8 @@ bot.on("message:text", async (ctx) => {
 const mode = process.env.BOT_MODE ?? "polling";
 
 async function main() {
+  startTaskNotificationScheduler(bot);
+
   if (mode === "webhook") {
     const url = process.env.TELEGRAM_WEBHOOK_URL;
     if (!url) {
