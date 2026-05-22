@@ -61,7 +61,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -81,6 +81,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
 | `complete_task` | `taskTitle`, `completionResult?` |
 | `cancel_task` | `taskTitle`, `cancellationReason?` |
+| `start_task` | `taskTitle` |
 | `add_task_comment` | `taskTitle`, `text?` |
 | `mention_in_task` | `userHint`, `taskTitle`, `text?` |
 | `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
@@ -102,6 +103,21 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 ```
 
 Бот спросит: *«Что сделано по задаче «…»?»*, затем confirmation.
+
+### Пример: взять задачу в работу
+
+> Взял задачу Проверить склад в работу
+
+```json
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+```
+
+Confirmation: *«Взять задачу «Проверить склад» в работу?»* → `PATCH` `IN_PROGRESS`.
 
 ### Пример: закрыть задачу с результатом
 

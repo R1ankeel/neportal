@@ -153,6 +153,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   if (
     intent.intent === "complete_task" ||
     intent.intent === "cancel_task" ||
+    intent.intent === "start_task" ||
     intent.intent === "set_task_deadline"
   ) {
     await handleTaskActionIntent(ctx, linked, telegramUserId, intent);

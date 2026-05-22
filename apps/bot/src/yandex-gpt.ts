@@ -95,7 +95,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -285,6 +285,12 @@ complete_task.payload:
 
 cancel_task.payload:
 { "taskTitle": string, "cancellationReason"?: string }
+
+start_task.payload:
+{ "taskTitle": string }
+
+start_task — взять задачу в работу:
+- «Взял задачу X в работу», «Беру в работу задачу X», «Начал делать задачу X», «Поставь задачу X в работу», «Переведи задачу X в работу» → start_task, taskTitle = название без префиксов.
 
 add_task_comment.payload:
 { "taskTitle": string, "text"?: string }
@@ -489,6 +495,56 @@ Output:
   "confidence": 0.9,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Проверить склад", "cancellationReason": "склад закрыт" }
+}
+
+Пример start_task:
+Input: «Взял задачу Проверить склад в работу»
+Output:
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример start_task:
+Input: «Беру в работу задачу Заключить договор»
+Output:
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Заключить договор" }
+}
+
+Пример start_task:
+Input: «Начал делать задачу Проверить склад»
+Output:
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример start_task:
+Input: «Поставь задачу Проверить склад в работу»
+Output:
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример start_task:
+Input: «Переведи задачу Проверить склад в работу»
+Output:
+{
+  "intent": "start_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
 }
 
 list_my_tasks.payload:

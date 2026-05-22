@@ -10,13 +10,14 @@ import {
   type TaskResolvePurpose,
 } from "./resolve-task-by-title";
 import type { TaskSelectionPayload } from "./pending-task-selection";
+import { buildResolvedStartTask } from "./task-start-flow";
 import {
   buildResolvedCancelTask,
   buildResolvedCompleteTask,
   startPendingTaskStatusDetails,
 } from "./task-status-flow";
 
-/** AI intents complete_task / cancel_task / set_task_deadline с выбором задачи. */
+/** AI intents complete_task / cancel_task / start_task / set_task_deadline с выбором задачи. */
 export async function handleTaskActionIntent(
   ctx: Context,
   linked: ApiUser,
@@ -26,6 +27,7 @@ export async function handleTaskActionIntent(
   if (
     intent.intent !== "complete_task" &&
     intent.intent !== "cancel_task" &&
+    intent.intent !== "start_task" &&
     intent.intent !== "set_task_deadline"
   ) {
     return;
@@ -36,7 +38,9 @@ export async function handleTaskActionIntent(
       ? "complete"
       : intent.intent === "cancel_task"
         ? "cancel"
-        : "deadline";
+        : intent.intent === "start_task"
+          ? "start"
+          : "deadline";
 
   const selectionPayload: TaskSelectionPayload = {};
   if (intent.intent === "complete_task" && intent.payload.completionResult?.trim()) {
@@ -60,6 +64,13 @@ export async function handleTaskActionIntent(
   }
 
   const task = resolution.task;
+
+  if (intent.intent === "start_task") {
+    const resolved = buildResolvedStartTask(task);
+    setPendingConfirmation(telegramUserId, { type: "ai_intent", intent, resolved });
+    await ctx.reply(buildIntentPreview(resolved));
+    return;
+  }
 
   if (intent.intent === "set_task_deadline") {
     const resolved: ResolvedSetTaskDeadline = {

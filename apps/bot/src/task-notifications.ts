@@ -117,6 +117,21 @@ export async function notifyTaskStatusChanged(
   await recordTaskNotification(task.id, creator.id, logType);
 }
 
+/** Уведомление постановщику о взятии задачи в работу (не дублируется через TaskNotificationLog). */
+export async function notifyTaskStarted(
+  api: Api,
+  task: ApiTaskStatusUpdated,
+  actor: ApiUser,
+): Promise<void> {
+  const creator = task.creator;
+  if (!creator?.telegramId || !creator.id) return;
+  if (task.creatorId === actor.id) return;
+
+  const text = `${actor.fullName} взял задачу «${task.title}» в работу.`;
+  await sendTelegramMessage(api, creator.telegramId, text);
+  await recordTaskNotification(task.id, creator.id, "TASK_STARTED_CREATOR");
+}
+
 /** Уведомление creator/assignee о новом комментарии (без TaskNotificationLog). */
 export async function notifyTaskCommentAdded(
   api: Api,

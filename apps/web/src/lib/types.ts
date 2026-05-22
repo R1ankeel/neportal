@@ -62,6 +62,7 @@ export type ApiTask = {
   description: string | null;
   status: string;
   deadlineAt: string | null;
+  startedAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
   completionResult?: string | null;

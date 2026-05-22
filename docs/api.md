@@ -97,6 +97,19 @@
 
 Статусы: `NEW`, `IN_PROGRESS`, `DONE`, `CANCELLED`.
 
+При смене статуса:
+
+| status | Поля |
+|--------|------|
+| `IN_PROGRESS` | `startedAt` = существующий или `now`; `completedAt`, `cancelledAt`, `completionResult`, `cancellationReason` → `null` |
+| `NEW` | `startedAt` → `null`; сброс полей завершения/отмены |
+| `DONE` | `completedAt` = `now`; … |
+| `CANCELLED` | `cancelledAt` = `now`; … |
+
+Ответ включает `startedAt`, `creator` и `assignee` (с `telegramId`), `project`.
+
+**POST /tasks/:id/notifications** — типы включают `TASK_STARTED_CREATOR` (идемпотентный upsert по `(taskId, userId, type)`).
+
 **GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`), `transfers[]` (с `fromUser`, `toUser`, `requestedBy`, `status`, `comment`, `rejectionReason`).
 
 **POST /tasks/:id/comments** (`CreateTaskCommentDto`):

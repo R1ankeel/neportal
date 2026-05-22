@@ -71,6 +71,8 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
+| `/start-task <название>` | `PATCH /tasks/:id/status` → `IN_PROGRESS` |
+| `/work <название>` | то же, что `/start-task` |
 | `/done <название>` | `PATCH /tasks/:id/status` → `DONE` |
 | `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
@@ -197,6 +199,22 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 **Selection:** `select_task_for_transfer`, payload `toUserId`, `toUserName`, `transferComment?`.
 
 **Порядок текста:** после mention details — transfer comment → transfer rejection reason → transfer decision → selection.
+
+### Взятие задачи в работу (start_task)
+
+**Slash:** `/start-task <название>` или `/work <название>` → confirmation *«Взять задачу «…» в работу?»* → `да` → `PATCH` `IN_PROGRESS`, ответ *«Задача взята в работу: …»*.
+
+**AI:** «Взял задачу Проверить склад в работу», «Беру в работу задачу …», «Начал делать задачу …», «Поставь задачу … в работу», «Переведи задачу … в работу» → intent `start_task` → тот же confirmation.
+
+**Статусы:** уже `IN_PROGRESS` → *«Задача уже в работе: …»*; `DONE` / `CANCELLED` — соответствующие сообщения; повтор без дубля уведомления постановщику (лог `TASK_STARTED_CREATOR`).
+
+**Права:** исполнитель, постановщик, `OWNER`, `MANAGER`. Иначе: *«Вы не можете изменить эту задачу.»*
+
+**Уведомление постановщику** (если `telegramId` и не он сам): *«{ФИО} взял задачу «{title}» в работу.»*
+
+**Task Selection:** `select_task_for_start` при нескольких задачах с одним названием.
+
+Модуль: `task-start-flow.ts`.
 
 ### Закрытие и отмена задач
 
@@ -347,6 +365,8 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 | Запиши заметку: клиент попросил завтра проверить статистику VK | `create_note` |
 | Потратил 1500 рублей на рекламу VK | `create_expense` |
 | Вася заболел до 25 мая, больничный 123456 | `create_absence` |
+| Взял задачу Проверить склад в работу | `start_task` |
+| Беру в работу задачу Заключить договор | `start_task` |
 | Закрой задачу Проверить склад | `complete_task` |
 | Задача Проверить склад выполнена | `complete_task` |
 | Отмени задачу Проверить склад | `cancel_task` |
@@ -483,6 +503,7 @@ REST для scheduler (вызывает бот):
 | `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
 | `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
+| `task-start-flow.ts` | `/start-task`, `/work`, AI `start_task`: поиск, права, confirmation, PATCH `IN_PROGRESS` |
 | `task-status-flow.ts` | `/done`, `/cancel`: поиск, права, confirmation, PATCH status |
 | `resolve-task-by-title.ts` | Общий поиск задачи + запуск selection flow |
 | `pending-task-selection.ts` | Ожидание номера задачи (TTL 30 мин) |

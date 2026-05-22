@@ -12,6 +12,7 @@ import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 export type PendingTaskSelectionType =
   | "select_task_for_complete"
   | "select_task_for_cancel"
+  | "select_task_for_start"
   | "select_task_for_deadline"
   | "select_task_for_comment"
   | "select_task_for_mention"

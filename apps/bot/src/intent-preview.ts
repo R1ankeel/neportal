@@ -78,6 +78,9 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
       return lines.join("\n") + CONFIRM_FOOTER;
     }
 
+    case "start_task":
+      return `Взять задачу «${resolved.taskTitle}» в работу?` + CONFIRM_FOOTER;
+
     case "add_task_comment":
       return [
         `Добавить комментарий к задаче «${resolved.taskTitle}»?`,

@@ -23,6 +23,7 @@ import {
 } from "./task-transfer-flow";
 import { fetchUsers } from "./api";
 import { getLinkedUserByTelegramId } from "./current-user";
+import { buildResolvedStartTask } from "./task-start-flow";
 import {
   buildResolvedCancelTask,
   buildResolvedCompleteTask,
@@ -77,6 +78,22 @@ export async function continueAfterTaskSelection(
       "awaiting_completion_result",
     );
     await ctx.reply(question);
+    return;
+  }
+
+  if (selectionType === "select_task_for_start") {
+    const resolved = buildResolvedStartTask(task);
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "start_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: { taskTitle: resolved.taskTitle },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
     return;
   }
 

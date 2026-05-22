@@ -24,5 +24,6 @@ export async function updateTaskStatus(_prev: unknown, formData: FormData) {
 
   revalidatePath(`/projects/${projectId}/tasks`);
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/tasks/${taskId}`);
   return { ok: true as const };
 }

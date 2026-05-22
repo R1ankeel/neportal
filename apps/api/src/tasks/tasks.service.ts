@@ -526,13 +526,20 @@ export class TasksService {
     const now = new Date();
     const data: {
       status: TaskStatus;
+      startedAt?: Date | null;
       completedAt?: Date | null;
       cancelledAt?: Date | null;
       completionResult?: string | null;
       cancellationReason?: string | null;
     } = { status: dto.status };
 
-    if (dto.status === TaskStatus.DONE) {
+    if (dto.status === TaskStatus.IN_PROGRESS) {
+      data.startedAt = existing.startedAt ?? now;
+      data.completedAt = null;
+      data.cancelledAt = null;
+      data.completionResult = null;
+      data.cancellationReason = null;
+    } else if (dto.status === TaskStatus.DONE) {
       data.completedAt = now;
       data.cancelledAt = null;
       data.cancellationReason = null;
@@ -546,6 +553,12 @@ export class TasksService {
       if (dto.cancellationReason != null && dto.cancellationReason.trim() !== "") {
         data.cancellationReason = dto.cancellationReason.trim();
       }
+    } else if (dto.status === TaskStatus.NEW) {
+      data.startedAt = null;
+      data.completedAt = null;
+      data.cancelledAt = null;
+      data.completionResult = null;
+      data.cancellationReason = null;
     } else {
       data.completedAt = null;
       data.cancelledAt = null;

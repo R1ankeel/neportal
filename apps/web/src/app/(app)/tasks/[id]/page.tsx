@@ -69,6 +69,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <dt className="text-sm font-medium text-zinc-500">Дедлайн</dt>
             <dd className="mt-1 text-lg">{formatDate(task.deadlineAt)}</dd>
           </div>
+          {task.status === "IN_PROGRESS" && task.startedAt ? (
+            <div>
+              <dt className="text-sm font-medium text-zinc-500">В работе с</dt>
+              <dd className="mt-1 text-lg">{formatDateTime(task.startedAt)}</dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-sm font-medium text-zinc-500">Автор</dt>
             <dd className="mt-1 text-lg">{task.creator?.fullName ?? "—"}</dd>

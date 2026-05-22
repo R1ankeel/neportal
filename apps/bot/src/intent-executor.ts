@@ -11,6 +11,7 @@ import { getLinkedUserByTelegramId } from "./current-user";
 import { executeTaskComment } from "./task-comment-flow";
 import { executeMentionInTask } from "./task-mention-flow";
 import { executeTransferTask } from "./task-transfer-flow";
+import { executeStartTask } from "./task-start-flow";
 import { executeTaskStatusChange } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
@@ -110,6 +111,18 @@ export async function executeResolvedIntent(
     case "set_task_deadline": {
       await setTaskDeadline(resolved.taskId, resolved.deadlineDate);
       return `Дедлайн задачи «${resolved.taskTitle}» установлен на ${formatIsoDateRu(resolved.deadlineDate)}.`;
+    }
+
+    case "start_task": {
+      const linked =
+        telegramUserId != null ? await getLinkedUserByTelegramId(telegramUserId) : null;
+      if (!linked) {
+        return "Вы не привязаны ни к какому проекту.";
+      }
+      if (!botApi) {
+        return "Не удалось отправить уведомление.";
+      }
+      return executeStartTask(botApi, linked, resolved);
     }
 
     case "complete_task":

@@ -73,6 +73,12 @@ export type ResolvedCancelTask = {
   cancellationReason?: string;
 };
 
+export type ResolvedStartTask = {
+  intent: "start_task";
+  taskId: string;
+  taskTitle: string;
+};
+
 export type ResolvedAddTaskComment = {
   intent: "add_task_comment";
   taskId: string;
@@ -116,6 +122,7 @@ export type ResolvedIntent =
   | ResolvedSetTaskDeadline
   | ResolvedCompleteTask
   | ResolvedCancelTask
+  | ResolvedStartTask
   | ResolvedAddTaskComment
   | ResolvedMentionInTask
   | ResolvedTransferTask;

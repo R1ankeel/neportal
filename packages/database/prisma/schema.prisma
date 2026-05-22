@@ -92,6 +92,7 @@ enum TaskNotificationType {
   TASK_OVERDUE_CREATOR
   TASK_COMPLETED_CREATOR
   TASK_CANCELLED_CREATOR
+  TASK_STARTED_CREATOR
 }
 
 enum TaskTransferStatus {
@@ -225,6 +226,7 @@ model Task {
   status TaskStatus @default(NEW)
 
   deadlineAt   DateTime?
+  startedAt    DateTime?
   completedAt  DateTime?
   cancelledAt  DateTime?
 

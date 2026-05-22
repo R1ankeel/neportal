@@ -253,7 +253,8 @@ export type TaskNotificationType =
   | "TASK_OVERDUE_ASSIGNEE"
   | "TASK_OVERDUE_CREATOR"
   | "TASK_COMPLETED_CREATOR"
-  | "TASK_CANCELLED_CREATOR";
+  | "TASK_CANCELLED_CREATOR"
+  | "TASK_STARTED_CREATOR";
 
 export type ApiTaskUserNotify = {
   id: string;
@@ -265,6 +266,7 @@ export type ApiTaskCreated = {
   id: string;
   title: string;
   deadlineAt: string | null;
+  startedAt?: string | null;
   completionResult?: string | null;
   cancellationReason?: string | null;
   creatorId: string;
@@ -316,7 +318,7 @@ export const setTaskDeadline = updateTaskDeadline;
 
 export async function updateTaskStatus(
   taskId: string,
-  status: "DONE" | "CANCELLED",
+  status: "DONE" | "CANCELLED" | "IN_PROGRESS",
   options?: { completionResult?: string; cancellationReason?: string },
 ): Promise<ApiTaskStatusUpdated> {
   const body: Record<string, string> = { status };

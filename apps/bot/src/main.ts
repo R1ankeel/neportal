@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, type Context } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import {
   createAbsence,
@@ -43,6 +43,7 @@ import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
 import { handleTransferSlashCommand } from "./task-transfer-flow";
+import { handleStartTaskSlashCommand } from "./task-start-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { replyWithTasksForHint } from "./my-tasks-flow";
 import { buildIntentPreview } from "./intent-preview";
@@ -75,6 +76,8 @@ bot.command("start", async (ctx) => {
       "/expense <сумма> <описание> — расход",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/start-task <название> — взять задачу в работу",
+      "/work <название> — взять задачу в работу",
       "/done <название> — закрыть задачу",
       "/cancel <название> — отменить задачу",
       "/comment <задача> — <комментарий> — комментарий к задаче",
@@ -101,6 +104,8 @@ bot.command("demo", async (ctx) => {
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
+      "/start-task Проверить склад — взять задачу в работу",
+      "/work Проверить склад — взять задачу в работу",
       "/done Проверить склад — закрыть задачу",
       "/cancel Проверить склад — отменить задачу",
       "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
@@ -116,6 +121,8 @@ bot.command("demo", async (ctx) => {
       "- Запиши заметку: клиент попросил проверить статистику",
       "- Потратил 1500 рублей на рекламу VK",
       "- Вася заболел до 25 мая, больничный 123456",
+      "- Взял задачу Проверить склад в работу",
+      "- Беру в работу задачу Заключить договор",
       "- Закрой задачу Проверить склад",
       "- Закрой задачу Проверить склад, всё проверил",
       "- Отмени задачу Проверить склад",
@@ -493,6 +500,51 @@ bot.command("done", async (ctx) => {
     console.error(`[bot] done command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
+});
+
+async function runStartTaskSlash(ctx: Context, payload: string): Promise<void> {
+  const telegramUserId = ctx.from?.id;
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleStartTaskSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+    );
+    if (result.kind === "reply") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "start_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: { taskTitle: resolved.taskTitle },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] start-task command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+}
+
+bot.command("start-task", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  await runStartTaskSlash(ctx, payload);
+});
+
+bot.command("work", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  await runStartTaskSlash(ctx, payload);
 });
 
 bot.command("cancel", async (ctx) => {

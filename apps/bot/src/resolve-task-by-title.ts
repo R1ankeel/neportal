@@ -14,6 +14,7 @@ import { canModifyTask, type TaskStatusChangeTarget } from "./task-status-flow";
 export type TaskResolvePurpose =
   | "complete"
   | "cancel"
+  | "start"
   | "deadline"
   | "comment"
   | "mention"
@@ -26,6 +27,8 @@ export type ResolveTaskByTitleResult =
   | { kind: "cannot_modify"; message: string }
   | { kind: "already_closed"; message: string }
   | { kind: "already_cancelled"; message: string }
+  | { kind: "already_in_progress"; message: string }
+  | { kind: "already_done"; message: string }
   | { kind: "selection_started"; message: string }
   | { kind: "empty"; message: string };
 
@@ -35,6 +38,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_complete";
     case "cancel":
       return "select_task_for_cancel";
+    case "start":
+      return "select_task_for_start";
     case "deadline":
       return "select_task_for_deadline";
     case "comment":
@@ -61,6 +66,9 @@ function filterTasksForPurpose(
     if (purpose === "transfer") {
       return task.status === "NEW" || task.status === "IN_PROGRESS";
     }
+    if (purpose === "start") {
+      return task.status === "NEW";
+    }
     if (purpose === "complete" || purpose === "cancel") {
       return task.status !== "DONE" && task.status !== "CANCELLED";
     }
@@ -71,6 +79,7 @@ function filterTasksForPurpose(
 function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   if (purpose === "complete") return "Укажите название: /done Проверить склад";
   if (purpose === "cancel") return "Укажите название: /cancel Проверить склад";
+  if (purpose === "start") return "Укажите название: /start-task Проверить склад";
   if (purpose === "comment") {
     return "Использование: /comment <задача> — <комментарий>";
   }
@@ -87,6 +96,26 @@ function noModifiableMessage(
   matchedTasks: ApiTask[],
   purpose: TaskResolvePurpose,
 ): ResolveTaskByTitleResult {
+  if (purpose === "start") {
+    if (matchedTasks.some((t) => t.status === "IN_PROGRESS")) {
+      return {
+        kind: "already_in_progress",
+        message: `Задача уже в работе: ${matchedTasks[0].title}`,
+      };
+    }
+    if (matchedTasks.some((t) => t.status === "DONE")) {
+      return {
+        kind: "already_done",
+        message: `Задача уже выполнена: ${matchedTasks[0].title}`,
+      };
+    }
+    if (matchedTasks.some((t) => t.status === "CANCELLED")) {
+      return {
+        kind: "already_cancelled",
+        message: `Задача отменена: ${matchedTasks[0].title}`,
+      };
+    }
+  }
   if (purpose === "complete" && matchedTasks.some((t) => t.status === "DONE")) {
     return {
       kind: "already_closed",
@@ -188,6 +217,8 @@ export function resolveResultToMessage(result: ResolveTaskByTitleResult): string
     case "cannot_modify":
     case "already_closed":
     case "already_cancelled":
+    case "already_in_progress":
+    case "already_done":
     case "selection_started":
       return result.message;
   }
