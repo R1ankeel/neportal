@@ -439,16 +439,19 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 ### Absence Impact Flow v1
 
-После `/sick`, `/vacation` или AI `create_absence` (после «да»):
+После `/sick`, `/vacation` или AI `create_absence` (после «да»), если есть affected tasks:
 
-1. Если есть затронутые задачи (`NEW` / `IN_PROGRESS`, дедлайн в периоде отсутствия) — сотруднику: список задач и «Хотите передать? да / нет».
-2. Постановщикам с `telegramId` (и `creatorId ≠` отсутствующий) — предупреждение по каждой задаче.
-3. «да» → «Кому передать?» → имя → подтверждение → `POST /tasks/:id/transfers` с `absenceId` и комментарием `Передача из-за отсутствия: …`.
-4. Новый исполнитель принимает через обычный Task Transfer Flow; после accept постановщик получает уведомление о новом исполнителе.
+1. Отсутствующему — нумерованный список (title, дедлайн, статус, проект при нескольких проектах): «Какие задачи передать? 1, 3 / все / нет».
+2. Постановщикам с `telegramId` — предупреждение по каждой задаче.
+3. Выбор номеров → «Кому передать выбранные задачи?» → User Resolution (`Вася`, `Ваня`, @username) → при нескольких — `select_user_for_absence_delegation`.
+4. Confirmation (`confirm_absence_delegation` в `pending-intent`) → для каждой **выбранной** задачи `POST /tasks/:id/transfers` с `requestedById` = **absence.userId** (не текущий OWNER в Telegram), `absenceId` в теле.
+5. EMPLOYEE → transfer `PENDING`, уведомление «хочет передать… да/нет»; OWNER/MANAGER → `ACCEPTED` сразу, уведомление «Вам передали задачу».
+6. Итоговое сообщение по фактическим статусам: «запросы отправлены» / «переданы» / смешанный вариант.
+7. После accept — постановщик получает уведомление о новом исполнителе.
 
-Pending: `pending_absence_delegation` → `awaiting_absence_delegation_assignee` → `confirm_absence_delegation` (обрабатываются до выбора задачи/сотрудника в plain text).
+Pending (plain text, до AI): `awaiting_absence_delegation_task_selection` → `awaiting_absence_delegation_assignee`.
 
-**Проверка (сид):** задача «Подписать договор с подрядчиком» — исполнитель **Вася**, постановщик **Иван**, deadline 22.05.2026; `/sick до 25.05.2026` от Васи; передача на **Марию** (нужен привязанный Telegram).
+**Проверка (сид):** задача «Подписать договор с подрядчиком» — исполнитель **Вася**, постановщик **Иван**; `/sick до 25.05.2026`; «1, 3» → «Маше» → «да» → Маша принимает задачи.
 
 ### Уведомления по задачам (Telegram)
 

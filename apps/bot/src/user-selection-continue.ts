@@ -26,7 +26,6 @@ import {
   ONLY_OWN_TASKS_MESSAGE,
   replyWithTasksForUser,
 } from "./my-tasks-flow";
-import { startPendingAbsenceDelegationConfirm } from "./pending-absence-delegation";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -180,16 +179,17 @@ export async function continueAfterUserSelection(
   }
 
   if (payload.intent === "absence_delegation") {
-    const taskLines = payload.affectedTasks
-      .map((t, i) => `${i + 1}. ${t.title}`)
-      .join("\n");
-    startPendingAbsenceDelegationConfirm(telegramUserId, {
+    const taskLines = payload.selectedTasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
+    setPendingConfirmation(telegramUserId, {
+      type: "confirm_absence_delegation",
       absenceId: payload.absenceId,
       absenceUserId: payload.absenceUserId,
+      absenceUserName: payload.absenceUserName,
       absenceType: payload.absenceType,
       startDate: payload.startDate,
       endDate: payload.endDate,
-      affectedTasks: payload.affectedTasks,
+      selectedTaskIds: payload.selectedTaskIds,
+      selectedTasks: payload.selectedTasks,
       toUserId: selectedUser.id,
       toUserName: selectedUser.fullName,
       toUserTelegramId: selectedUser.telegramId ?? null,

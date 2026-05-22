@@ -7,18 +7,20 @@ import {
 import { executeResolvedIntent } from "./intent-executor";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
+import { executeAbsenceDelegationTransfers } from "./absence-impact-flow";
 import {
   clearPendingConfirmation,
   getPendingConfirmation,
   setPendingConfirmation,
 } from "./pending-intent";
+import { fetchUsers } from "./api";
 import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-comment-details";
 import { handlePendingTaskMentionDetailsMessage } from "./handle-pending-task-mention-details";
 import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
-import { fetchProjects, fetchUsers } from "./api";
+import { fetchProjects } from "./api";
 import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
 import { handlePendingCreateTaskAssigneeMessage } from "./handle-pending-create-task-assignee";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
@@ -46,6 +48,49 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   if (pending) {
     if (pending.type === "confirm_link_by_username") {
       await handleLinkByUsernameConfirmation(ctx, pending, text, telegramUserId);
+      return;
+    }
+
+    if (pending.type === "confirm_absence_delegation") {
+      if (isConfirmationNo(text)) {
+        clearPendingConfirmation(telegramUserId);
+        await ctx.reply("Ок, задачи остаются за вами.");
+        return;
+      }
+      if (isConfirmationYes(text)) {
+        const linked = await getLinkedUserByTelegramId(telegramUserId);
+        if (!linked) {
+          clearPendingConfirmation(telegramUserId);
+          await ctx.reply(NOT_LINKED_MESSAGE);
+          return;
+        }
+        const users = await fetchUsers();
+        const absenceUser = users.find((u) => u.id === pending.absenceUserId) ?? linked;
+        const toUser = users.find((u) => u.id === pending.toUserId);
+        if (!toUser) {
+          clearPendingConfirmation(telegramUserId);
+          await ctx.reply("Сотрудник не найден. Повторите команду.");
+          return;
+        }
+        clearPendingConfirmation(telegramUserId);
+        try {
+          const reply = await executeAbsenceDelegationTransfers(ctx.api, {
+            absenceId: pending.absenceId,
+            absenceUser,
+            absenceType: pending.absenceType,
+            startDate: pending.startDate,
+            endDate: pending.endDate,
+            toUser,
+            selectedTasks: pending.selectedTasks,
+          });
+          await ctx.reply(reply);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+        }
+        return;
+      }
+      await ctx.reply("Ожидаю подтверждение. Ответьте: да / нет");
       return;
     }
 
@@ -103,11 +148,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskTransferDecisionMessage(ctx, telegramUserId, text)) {
     return;
   }
 
-  if (await handlePendingTaskTransferDecisionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
     return;
   }
 
@@ -126,6 +171,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   const linked = await getLinkedUserByTelegramId(telegramUserId);
   if (!linked) {
     await ctx.reply(NOT_LINKED_MESSAGE);
+    return;
+  }
+
+  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
     return;
   }
 

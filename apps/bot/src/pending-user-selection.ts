@@ -68,8 +68,8 @@ export type AbsenceDelegationUserSelectionPayload = {
   absenceType: "SICK_LEAVE" | "VACATION";
   startDate: string;
   endDate: string;
-  affectedTaskIds: string[];
-  affectedTasks: import("./api").ApiAbsenceAffectedTask[];
+  selectedTaskIds: string[];
+  selectedTasks: import("./pending-absence-delegation").AbsenceDelegationTaskItem[];
 };
 
 export type LinkUserSelectionPayload = {
