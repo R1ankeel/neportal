@@ -48,6 +48,97 @@ export function addDaysToIsoDate(iso: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** Сдвиг ISO date YYYY-MM-DD на N календарных месяцев (UTC, с переносом дня). */
+export function addMonthsToIsoDate(iso: string, months: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1 + months, d));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Первое число следующего календарного месяца относительно baseDate. */
+export function firstDayOfNextCalendarMonth(baseIso: string): string {
+  const [y, m] = baseIso.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m, 1));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** N-е число следующего календарного месяца относительно baseDate. */
+export function nthDayOfNextCalendarMonth(baseIso: string, day: number): string {
+  const first = firstDayOfNextCalendarMonth(baseIso);
+  const [y, m] = first.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, day));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+const NEXT_CALENDAR_MONTH_RE =
+  /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?|следующ(?:ий|ем)\s+месяц(?:е)?/iu;
+const THROUGH_ONE_MONTH_RE = /через\s+месяц/iu;
+const NEXT_MONTH_DAY_RE =
+  /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?.*?(?:до\s+)?(\d{1,2})\s*числ/iu;
+
+function extractMonthRelativeDeadline(
+  text: string,
+  baseDate: string,
+): { deadlineDate: string | null } {
+  const lower = text.toLowerCase();
+
+  if (THROUGH_ONE_MONTH_RE.test(lower) && !NEXT_CALENDAR_MONTH_RE.test(lower)) {
+    return { deadlineDate: addMonthsToIsoDate(baseDate, 1) };
+  }
+
+  const dayInNextMonth = text.match(NEXT_MONTH_DAY_RE);
+  if (dayInNextMonth) {
+    const day = Number(dayInNextMonth[1]);
+    if (day >= 1 && day <= 31) {
+      return { deadlineDate: nthDayOfNextCalendarMonth(baseDate, day) };
+    }
+  }
+
+  if (NEXT_CALENDAR_MONTH_RE.test(lower)) {
+    return { deadlineDate: firstDayOfNextCalendarMonth(baseDate) };
+  }
+
+  return { deadlineDate: null };
+}
+
+/** «В следующем месяце» ошибочно как +1 месяц от текущего дня → 1-е число след. месяца. */
+export function correctNextCalendarMonthMisparse(
+  userText: string,
+  baseDate: string,
+  deadlineDate: string | undefined,
+): string | undefined {
+  if (!deadlineDate) return deadlineDate;
+  const lower = userText.toLowerCase();
+  if (!NEXT_CALENDAR_MONTH_RE.test(lower) || THROUGH_ONE_MONTH_RE.test(lower)) {
+    return deadlineDate;
+  }
+
+  const dayMatch = userText.match(NEXT_MONTH_DAY_RE);
+  if (dayMatch) {
+    const day = Number(dayMatch[1]);
+    if (day >= 1 && day <= 31) {
+      return nthDayOfNextCalendarMonth(baseDate, day);
+    }
+  }
+
+  const expectedFirst = firstDayOfNextCalendarMonth(baseDate);
+  const oneMonthLaterSameDay = addMonthsToIsoDate(baseDate, 1);
+  if (deadlineDate === oneMonthLaterSameDay && deadlineDate !== expectedFirst) {
+    return expectedFirst;
+  }
+
+  return deadlineDate;
+}
+
 /** Ближайший указанный день недели (0=вс … 6=сб), не раньше baseDate. */
 export function nextWeekdayFromIso(baseIso: string, targetDow: number): string {
   const [y, m, d] = baseIso.split("-").map(Number);
@@ -87,6 +178,7 @@ function extractWeekdayFromText(text: string, baseDate: string): string | null {
 export function hasRussianDateHint(text: string): boolean {
   const lower = text.toLowerCase();
   if (/послезавтра|завтра|сегодня/u.test(lower)) return true;
+  if (THROUGH_ONE_MONTH_RE.test(lower) || NEXT_CALENDAR_MONTH_RE.test(lower)) return true;
   if (getWeekdayMentionDow(text) !== null) return true;
   if (/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/iu.test(text)) return true;
   if (/\d{4}-\d{2}-\d{2}/.test(text) || /\d{1,2}\.\d{1,2}\.\d{4}/.test(text)) return true;
@@ -145,6 +237,9 @@ export function extractDeadlineFromRussianText(
   const weekday = extractWeekdayFromText(text, baseDate);
   if (weekday) return { deadlineDate: weekday };
 
+  const monthRelative = extractMonthRelativeDeadline(text, baseDate);
+  if (monthRelative.deadlineDate) return monthRelative;
+
   if (/послезавтра/u.test(lower)) {
     return { deadlineDate: addDaysToIsoDate(baseDate, 2) };
   }
@@ -171,6 +266,10 @@ export function extractDeadlineFromRussianText(
 export function stripDeadlineMarkersFromText(text: string): string | undefined {
   let s = text;
   s = s.replace(/сегодня|завтра|послезавтра/giu, "");
+  s = s.replace(
+    /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?(?:\s+до\s+\d{1,2}\s*числ(?:а)?)?|\d{1,2}\s*числ(?:а)?\s+следующ(?:его|ем)\s+месяца|через\s+месяц/giu,
+    "",
+  );
   for (const { pattern } of WEEKDAY_PATTERNS) {
     s = s.replace(pattern, "");
   }
@@ -218,4 +317,42 @@ export function parseDeadlineCommandPayload(
   if (!title) return null;
 
   return { title, dateIso };
+}
+
+const RELATIVE_MONTH_DEADLINE_SELF_CHECK_BASE = "2026-05-22";
+
+const RELATIVE_MONTH_DEADLINE_SELF_CHECK_CASES: ReadonlyArray<{
+  text: string;
+  expected: string;
+}> = [
+  {
+    text: "Поставь задачу Васе заключить договор с Ешкин Кот в следующем месяце",
+    expected: "2026-06-01",
+  },
+  {
+    text: "Поставь задачу Васе заключить договор через месяц",
+    expected: "2026-06-22",
+  },
+  {
+    text: "Поставь задачу Васе заключить договор в следующем месяце 15 числа",
+    expected: "2026-06-15",
+  },
+];
+
+/** Dev-проверка парсинга «следующий месяц» / «через месяц» (BOT_DEV_LOG=0 отключает). */
+export function devLogRelativeMonthDeadlineChecks(
+  baseDate: string = RELATIVE_MONTH_DEADLINE_SELF_CHECK_BASE,
+): void {
+  if (process.env.BOT_DEV_LOG === "0") return;
+
+  for (const { text, expected } of RELATIVE_MONTH_DEADLINE_SELF_CHECK_CASES) {
+    const got = resolveDeadlineFromUserMessage(text, baseDate);
+    const ok = got === expected;
+    const line = ok ? "OK" : "FAIL";
+    console.log(`[parse-ru-date] relative month deadline ${line}`, {
+      text,
+      expected,
+      got,
+    });
+  }
 }

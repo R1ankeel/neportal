@@ -22,7 +22,12 @@ import {
 } from "./api";
 import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
-import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
+import {
+  devLogRelativeMonthDeadlineChecks,
+  formatIsoDateRu,
+  parseRuDate,
+  todayIsoDate,
+} from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import { handleStartBinding } from "./start-binding";
@@ -654,6 +659,7 @@ bot.on("message:text", async (ctx) => {
 const mode = process.env.BOT_MODE ?? "polling";
 
 async function main() {
+  devLogRelativeMonthDeadlineChecks();
   startTaskNotificationScheduler(bot);
 
   if (mode === "webhook") {

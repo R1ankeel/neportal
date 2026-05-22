@@ -1,6 +1,7 @@
 import { preprocessAiIntentInput } from "./ai-contracts";
 import {
   coerceDeadlineDateLoose,
+  correctNextCalendarMonthMisparse,
   extractDeadlineFromRussianText,
   hasRussianDateHint,
   resolveDeadlineFromUserMessage,
@@ -25,6 +26,15 @@ function applyDeadlineFields(
     const coerced = coerceDeadlineDateLoose(p.deadlineDate, opts.baseDate);
     if (coerced) p.deadlineDate = coerced;
     else delete p.deadlineDate;
+  }
+
+  if (userText && typeof p.deadlineDate === "string") {
+    const corrected = correctNextCalendarMonthMisparse(
+      userText,
+      opts.baseDate,
+      p.deadlineDate,
+    );
+    if (corrected) p.deadlineDate = corrected;
   }
 
   if (!p.deadlineDate && intent === "create_task") {
