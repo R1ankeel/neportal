@@ -275,7 +275,69 @@ create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
 
 create_absence.payload:
-{ "userHint"?: string, "type": "SICK_LEAVE" | "VACATION", "startDate"?: "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "documentNumber"?: string, "comment"?: string }
+{ "userHint"?: string, "type": "SICK_LEAVE" | "VACATION", "startDate"?: "YYYY-MM-DD", "endDate"?: "YYYY-MM-DD", "documentNumber"?: string, "comment"?: string }
+
+create_absence — сотрудник (userHint):
+- От первого лица: «я заболел», «я заболела», «у меня больничный», «я на больничном», «мне поставили больничный», «я ухожу в отпуск», «я в отпуске», «у меня отпуск» → userHint = "__self__" (не ФИО).
+- «Вася заболел», «Ваня заболел», «Маша уходит в отпуск» → userHint = имя из текста (Вася, Ваня, Маша). Не подставляй полное ФИО и не выбирай конкретного Ивана — бот сам разрешит неоднозначность.
+- Не возвращай userHint: null. Если сотрудник не назван и нет первого лица — не добавляй userHint в payload (бот возьмёт текущего пользователя).
+
+Пример create_absence (я):
+Input: «Я заболел. Больничный до 25.05.2026»
+Output:
+{
+  "intent": "create_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "__self__",
+    "type": "SICK_LEAVE",
+    "endDate": "2026-05-25"
+  }
+}
+
+Пример create_absence (у меня):
+Input: «У меня больничный до 25.05.2026»
+Output:
+{
+  "intent": "create_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "__self__",
+    "type": "SICK_LEAVE",
+    "endDate": "2026-05-25"
+  }
+}
+
+Пример create_absence (другой сотрудник):
+Input: «Ваня заболел. Больничный до 25.05.2026»
+Output:
+{
+  "intent": "create_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "Ваня",
+    "type": "SICK_LEAVE",
+    "endDate": "2026-05-25"
+  }
+}
+
+Пример create_absence (отпуск):
+Input: «Маша уходит в отпуск с 01.06.2026 по 10.06.2026»
+Output:
+{
+  "intent": "create_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "Маша",
+    "type": "VACATION",
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-10"
+  }
+}
 
 set_task_deadline.payload:
 { "taskTitle": string, "deadlineDate": "YYYY-MM-DD" }

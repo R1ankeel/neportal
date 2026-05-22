@@ -8,11 +8,15 @@ import {
   type PendingUserSelectionType,
   type UserSelectionPayload,
 } from "./pending-user-selection";
-import { resolveUsersByHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import {
+  isResolvableNamedUserHint,
+  sanitizeAiUserHint,
+} from "./fix-ai-intent-absence-user";
+import { isSelfHint, resolveUsersByHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
 function isAssigneeSelfHint(hint: string): boolean {
   const t = hint.trim();
-  return t === SELF_HINT_MARKER;
+  return t === SELF_HINT_MARKER || isSelfHint(t);
 }
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 
@@ -70,18 +74,27 @@ export function normalizeAiUserHint(hint: string | undefined): string | undefine
 }
 
 export function extractUserHintFromIntent(intent: AiIntent): string | undefined {
+  let raw: string | undefined;
   switch (intent.intent) {
     case "create_task":
-      return intent.payload.assigneeHint;
+      raw = intent.payload.assigneeHint;
+      break;
     case "create_absence":
-      return intent.payload.userHint;
+      raw = intent.payload.userHint;
+      break;
     case "mention_in_task":
-      return intent.payload.userHint;
+      raw = intent.payload.userHint;
+      break;
     case "transfer_task":
-      return intent.payload.toUserHint;
+      raw = intent.payload.toUserHint;
+      break;
+    case "list_user_tasks":
+      raw = intent.payload.userHint;
+      break;
     default:
       return undefined;
   }
+  return sanitizeAiUserHint(raw);
 }
 
 export type PendingUserSelectionTypeForIntent = PendingUserSelectionType;
@@ -155,9 +168,9 @@ export async function tryHandleAmbiguousUserHintBeforeResolve(
   users: ApiUser[],
 ): Promise<boolean> {
   const hint = extractUserHintFromIntent(intent);
-  if (!hint?.trim()) return false;
+  if (!isResolvableNamedUserHint(hint)) return false;
 
-  if (intent.intent === "create_task" && isAssigneeSelfHint(hint)) {
+  if (isAssigneeSelfHint(hint)) {
     return false;
   }
 

@@ -1,6 +1,9 @@
 import { Bot, type Context } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
-import { createAbsenceWithImpact } from "./absence-impact-flow";
+import {
+  handleSickSlashCommand,
+  handleVacationSlashCommand,
+} from "./absence-slash-flow";
 import {
   createBudgetExpense,
   createExpenseAttachment,
@@ -21,13 +24,9 @@ import {
 } from "./api";
 import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
+import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user";
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
-import {
-  devLogRelativeMonthDeadlineChecks,
-  formatIsoDateRu,
-  parseRuDate,
-  todayIsoDate,
-} from "./parse-ru-date";
+import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import {
@@ -395,68 +394,12 @@ bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
   await ctx.reply("Использование: /expense <сумма> <описание>");
 });
 
-const SICK_USAGE = "Использование: /sick до 25.05.2026 номер 123456";
-const VACATION_USAGE = "Использование: /vacation с 01.06.2026 по 10.06.2026";
-
-/** grammY: bot.hears не ловит Telegram-команды — только bot.command. */
-function parseSickPayload(payload: string): { endIso: string; documentNumber?: string } | null {
-  const m = payload.trim().match(/^(?:до\s+)?(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+номер\s+(\S+))?$/iu);
-  if (!m) return null;
-  const endIso = parseRuDate(m[1]);
-  if (!endIso) return null;
-  return { endIso, documentNumber: m[2]?.trim() || undefined };
-}
-
-function parseVacationPayload(payload: string): { startIso: string; endIso: string } | null {
-  const trimmed = payload.trim();
-  const m =
-    trimmed.match(/^с\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+по\s+(\d{1,2}\.\d{1,2}\.\d{4})$/iu) ??
-    trimmed.match(/^(\d{1,2}\.\d{1,2}\.\d{4})\s+(\d{1,2}\.\d{1,2}\.\d{4})$/iu);
-  if (!m) return null;
-  const startIso = parseRuDate(m[1]);
-  const endIso = parseRuDate(m[2]);
-  if (!startIso || !endIso) return null;
-  return { startIso, endIso };
-}
-
 bot.command("sick", async (ctx) => {
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
   devLog("parsed sick command", { payload });
 
-  const parsed = parseSickPayload(payload);
-  if (!parsed) {
-    await ctx.reply(SICK_USAGE);
-    return;
-  }
-
-  const { endIso, documentNumber } = parsed;
-  const startIso = todayIsoDate();
-
   try {
-    const employee = await requireLinkedUser(ctx);
-    if (!employee) return;
-
-    devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
-
-    await createAbsenceWithImpact(
-      ctx.api,
-      {
-        userId: employee.id,
-        type: "SICK_LEAVE",
-        startDate: startIso,
-        endDate: endIso,
-        documentNumber,
-        status: "APPROVED",
-      },
-      employee,
-    );
-
-    await ctx.reply(
-      [
-        `Больничный добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`,
-        `Номер: ${documentNumber ?? "не указан"}.`,
-      ].join("\n"),
-    );
+    await handleSickSlashCommand(ctx, payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] sick command error: ${msg}`);
@@ -755,37 +698,8 @@ bot.command("vacation", async (ctx) => {
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
   devLog("parsed vacation command", { payload });
 
-  const parsed = parseVacationPayload(payload);
-  if (!parsed) {
-    await ctx.reply(VACATION_USAGE);
-    return;
-  }
-
-  const { startIso, endIso } = parsed;
-  if (endIso < startIso) {
-    await ctx.reply("Дата окончания не может быть раньше даты начала.");
-    return;
-  }
-
   try {
-    const employee = await requireLinkedUser(ctx);
-    if (!employee) return;
-
-    devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
-
-    await createAbsenceWithImpact(
-      ctx.api,
-      {
-        userId: employee.id,
-        type: "VACATION",
-        startDate: startIso,
-        endDate: endIso,
-        status: "APPROVED",
-      },
-      employee,
-    );
-
-    await ctx.reply(`Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`);
+    await handleVacationSlashCommand(ctx, payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] vacation command error: ${msg}`);
@@ -862,6 +776,7 @@ const mode = process.env.BOT_MODE ?? "polling";
 async function main() {
   devLogRelativeMonthDeadlineChecks();
   devLogCreateTaskAssigneeSelfChecks();
+  devLogCreateAbsenceUserSelfChecks();
   startTaskNotificationScheduler(bot);
 
   if (mode === "webhook") {

@@ -1,11 +1,15 @@
 import { z } from "zod";
 
-/** Coerces model output: null / blank → undefined; non-empty strings → trimmed. */
+const PLACEHOLDER_AI_STRINGS = new Set(["null", "undefined", "none", "nil"]);
+
+/** Coerces model output: null / blank / "null" → undefined; non-empty strings → trimmed. */
 export function preprocessOptionalAiString(value: unknown): unknown {
   if (value === null || value === undefined) return undefined;
   if (typeof value === "string") {
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
+    if (trimmed.length === 0) return undefined;
+    if (PLACEHOLDER_AI_STRINGS.has(trimmed.toLowerCase())) return undefined;
+    return trimmed;
   }
   return value;
 }

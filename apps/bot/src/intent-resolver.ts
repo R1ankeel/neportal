@@ -13,8 +13,13 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { findBudgetByHint, findProjectByHint, findUserByHint } from "./hint-matchers";
+import {
+  isResolvableNamedUserHint,
+  sanitizeAiUserHint,
+} from "./fix-ai-intent-absence-user";
 import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
+import { isSelfHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
 export type ResolvedCreateTask = {
   intent: "create_task";
@@ -241,24 +246,31 @@ export async function resolveIntent(
 
       if (overrides?.absenceUserId) {
         user = users.find((u) => u.id === overrides.absenceUserId);
-      } else if (intent.payload.userHint) {
-        const hint = intent.payload.userHint.trim();
-        const match = findUserByNameHint(users, hint, currentUser);
-        if (match.kind === "none") {
-          return {
-            ok: false,
-            message: `Не нашёл сотрудника «${hint}». Проверьте имя.`,
-          };
-        }
-        if (match.kind === "many") {
-          return {
-            ok: false,
-            message: "USER_SELECTION_NEEDED",
-          };
-        }
-        user = match.user;
       } else {
-        user = currentUser;
+        const rawHint = sanitizeAiUserHint(intent.payload.userHint);
+        const useSelf =
+          rawHint === SELF_HINT_MARKER ||
+          (rawHint != null && isSelfHint(rawHint)) ||
+          !isResolvableNamedUserHint(rawHint);
+
+        if (useSelf) {
+          user = currentUser;
+        } else {
+          const match = findUserByNameHint(users, rawHint, currentUser);
+          if (match.kind === "none") {
+            return {
+              ok: false,
+              message: `Не нашёл сотрудника «${rawHint}». Проверьте имя.`,
+            };
+          }
+          if (match.kind === "many") {
+            return {
+              ok: false,
+              message: "USER_SELECTION_NEEDED",
+            };
+          }
+          user = match.user;
+        }
       }
 
       if (!user) {
