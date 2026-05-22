@@ -1,5 +1,6 @@
 import type { Api } from "grammy";
 import type { ApiTask, ApiUser } from "./api";
+import { notifyAbsenceTaskDelegatedToCreator } from "./absence-impact-flow";
 import {
   acceptTaskTransfer,
   createTaskTransfer,
@@ -343,6 +344,7 @@ export async function executeAcceptTransfer(
 ): Promise<string> {
   const result = await acceptTaskTransfer(transferId, { userId: accepter.id });
   const task = result.task;
+  const transfer = result.transfer;
 
   try {
     await notifyTransferAccepted(api, {
@@ -353,6 +355,23 @@ export async function executeAcceptTransfer(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[task-notifications] transfer accepted error: ${msg}`);
+  }
+
+  if (transfer.absenceId) {
+    const fromName = transfer.fromUser.fullName ?? pending.requestedByName;
+    try {
+      await notifyAbsenceTaskDelegatedToCreator(api, {
+        absenceId: transfer.absenceId,
+        taskId: task.id,
+        taskTitle: task.title,
+        creatorId: task.creatorId,
+        fromUserName: fromName,
+        toUserName: accepter.fullName,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[absence-impact] delegated creator notify error: ${msg}`);
+    }
   }
 
   return `Задача принята: ${task.title}.`;

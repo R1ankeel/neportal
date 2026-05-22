@@ -16,6 +16,7 @@ async function ensureDemoContractTask(
   organizationId: string,
   projectId: string,
   ivanId: string,
+  vasyaId: string,
 ) {
   const deadlineAt = new Date(Date.UTC(2026, 4, 22, 23, 59, 59, 999));
 
@@ -30,7 +31,7 @@ async function ensureDemoContractTask(
   const data = {
     description: "Дедлайн в период демо-больничного",
     creatorId: ivanId,
-    assigneeId: ivanId,
+    assigneeId: vasyaId,
     status: TaskStatus.NEW,
     deadlineAt,
   };
@@ -167,7 +168,7 @@ async function main() {
     },
   });
 
-  await ensureDemoContractTask(org.id, project.id, ivan.id);
+  await ensureDemoContractTask(org.id, project.id, ivan.id, vasya.id);
 
   console.log("Seed completed: Neportal Demo organization and demo data created.");
 }

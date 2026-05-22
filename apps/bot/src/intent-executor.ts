@@ -1,5 +1,5 @@
+import { createAbsenceWithImpact } from "./absence-impact-flow";
 import {
-  createAbsence,
   createBudgetExpense,
   createNote,
   createTask,
@@ -95,14 +95,21 @@ export async function executeResolvedIntent(
     }
 
     case "create_absence": {
-      await createAbsence({
-        userId: resolved.user.id,
-        type: resolved.type,
-        startDate: resolved.startDate,
-        endDate: resolved.endDate,
-        documentNumber: resolved.documentNumber,
-        status: "APPROVED",
-      });
+      if (!botApi) {
+        return "Не удалось обработать отсутствие: бот недоступен.";
+      }
+      await createAbsenceWithImpact(
+        botApi,
+        {
+          userId: resolved.user.id,
+          type: resolved.type,
+          startDate: resolved.startDate,
+          endDate: resolved.endDate,
+          documentNumber: resolved.documentNumber,
+          status: "APPROVED",
+        },
+        resolved.user,
+      );
 
       const label = resolved.type === "SICK_LEAVE" ? "Больничный" : "Отпуск";
       return `${label} добавлен для ${resolved.user.fullName}: с ${formatIsoDateRu(resolved.startDate)} по ${formatIsoDateRu(resolved.endDate)}.`;

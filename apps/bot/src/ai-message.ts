@@ -28,6 +28,7 @@ import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-transfer-comment";
 import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-transfer-decision";
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
+import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
@@ -99,6 +100,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   }
 
   if (await handlePendingTaskTransferRejectionMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
     return;
   }
 

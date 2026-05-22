@@ -135,6 +135,9 @@ export type ApiAbsenceAffectedTask = {
   title: string;
   status: string;
   deadlineAt: string | null;
+  project: { id: string; name: string } | null;
+  creator: { id: string; fullName: string; telegramId: string | null };
+  assignee: { id: string; fullName: string; telegramId: string | null } | null;
 };
 
 export type ApiAbsence = {

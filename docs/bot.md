@@ -407,7 +407,9 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 Даты в формате **DD.MM.YYYY** (`apps/bot/src/parse-ru-date.ts` → ISO `YYYY-MM-DD`, например `25.05.2026` → `2026-05-25`).
 
-`createAbsence()` делает `POST ${API_URL}/absences` с телом `{ userId, type, startDate, endDate, documentNumber?, status: "APPROVED" }`.
+После `POST /absences` вызывается **`handleAbsenceImpact`** (`apps/bot/src/absence-impact-flow.ts`): уведомления сотруднику и постановщикам, опциональная передача задач через Task Transfer Flow.
+
+`createAbsenceWithImpact()` → `POST /absences` → при непустых `affectedTasks` — Telegram + `POST /absences/:id/notifications`.
 
 **Dev-логи** (консоль бота, без токенов): payload команды, выбранный пользователь, тело POST, при ошибке — `status` и body. Отключить: `BOT_DEV_LOG=0`.
 
@@ -435,7 +437,18 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 Ответ: «Дедлайн задачи «…» установлен на …». Ошибки: задача не найдена; несколько совпадений.
 
-Для проверки **affectedTasks**: в сиде есть задача «Подписать договор с подрядчиком» (исполнитель Иван, deadline 22.05.2026) + `/sick до 25.05.2026` для Ивана.
+### Absence Impact Flow v1
+
+После `/sick`, `/vacation` или AI `create_absence` (после «да»):
+
+1. Если есть затронутые задачи (`NEW` / `IN_PROGRESS`, дедлайн в периоде отсутствия) — сотруднику: список задач и «Хотите передать? да / нет».
+2. Постановщикам с `telegramId` (и `creatorId ≠` отсутствующий) — предупреждение по каждой задаче.
+3. «да» → «Кому передать?» → имя → подтверждение → `POST /tasks/:id/transfers` с `absenceId` и комментарием `Передача из-за отсутствия: …`.
+4. Новый исполнитель принимает через обычный Task Transfer Flow; после accept постановщик получает уведомление о новом исполнителе.
+
+Pending: `pending_absence_delegation` → `awaiting_absence_delegation_assignee` → `confirm_absence_delegation` (обрабатываются до выбора задачи/сотрудника в plain text).
+
+**Проверка (сид):** задача «Подписать договор с подрядчиком» — исполнитель **Вася**, постановщик **Иван**, deadline 22.05.2026; `/sick до 25.05.2026` от Васи; передача на **Марию** (нужен привязанный Telegram).
 
 ### Уведомления по задачам (Telegram)
 

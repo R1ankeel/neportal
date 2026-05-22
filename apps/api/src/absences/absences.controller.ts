@@ -5,6 +5,7 @@ import {
   CreateAbsenceDto,
   UpdateAbsenceStatusDto,
 } from "./dto/absence.dto";
+import { RecordAbsenceNotificationDto } from "./dto/absence-notification.dto";
 import { AbsencesService } from "./absences.service";
 
 @ApiTags("absences")
@@ -25,6 +26,31 @@ export class AbsencesController {
     @Query("status") status?: AbsenceStatus,
   ) {
     return this.absencesService.findAll({ projectId, userId, type, status });
+  }
+
+  @Get(":id/affected-tasks")
+  @ApiOperation({ summary: "Задачи, затронутые отсутствием" })
+  @ApiParam({ name: "id" })
+  @ApiQuery({
+    name: "projectId",
+    required: false,
+    description: "Ограничить задачами проекта",
+  })
+  findAffectedTasks(
+    @Param("id") id: string,
+    @Query("projectId") projectId?: string,
+  ) {
+    return this.absencesService.findAffectedTasks(id, projectId);
+  }
+
+  @Post(":id/notifications")
+  @ApiOperation({ summary: "Записать отправленное уведомление (идемпотентно)" })
+  @ApiParam({ name: "id" })
+  recordNotification(
+    @Param("id") id: string,
+    @Body() dto: RecordAbsenceNotificationDto,
+  ) {
+    return this.absencesService.recordNotification(id, dto);
   }
 
   @Get(":id")

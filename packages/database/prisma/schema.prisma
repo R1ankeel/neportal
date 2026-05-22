@@ -102,6 +102,12 @@ enum TaskTransferStatus {
   CANCELLED
 }
 
+enum AbsenceNotificationType {
+  ABSENCE_AFFECTED_TASKS_EMPLOYEE
+  ABSENCE_AFFECTED_TASK_CREATOR
+  ABSENCE_TASK_DELEGATED_CREATOR
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
@@ -125,7 +131,8 @@ model Organization {
   taskNotificationLogs  TaskNotificationLog[]
   taskComments          TaskComment[]
   taskCommentMentions   TaskCommentMention[]
-  taskTransfers         TaskTransfer[]
+  taskTransfers            TaskTransfer[]
+  absenceNotificationLogs  AbsenceNotificationLog[]
 }
 
 model User {
@@ -159,9 +166,10 @@ model User {
   taskComments           TaskComment[]
   mentionsReceived       TaskCommentMention[] @relation("MentionedUser")
   mentionsRequested      TaskCommentMention[] @relation("RequestedBy")
-  transfersFrom          TaskTransfer[]       @relation("TransferFromUser")
-  transfersTo            TaskTransfer[]       @relation("TransferToUser")
-  transfersRequested     TaskTransfer[]       @relation("TransferRequestedBy")
+  transfersFrom              TaskTransfer[]            @relation("TransferFromUser")
+  transfersTo                TaskTransfer[]            @relation("TransferToUser")
+  transfersRequested         TaskTransfer[]            @relation("TransferRequestedBy")
+  absenceNotificationLogs    AbsenceNotificationLog[]
 
   @@unique([organizationId, telegramUsername])
   @@index([organizationId])
@@ -240,7 +248,8 @@ model Task {
   notificationLogs     TaskNotificationLog[]
   comments             TaskComment[]
   commentMentions      TaskCommentMention[]
-  transfers            TaskTransfer[]
+  transfers                 TaskTransfer[]
+  absenceNotificationLogs   AbsenceNotificationLog[]
 
   @@index([organizationId])
   @@index([projectId])
@@ -261,6 +270,8 @@ model TaskTransfer {
   toUser           User               @relation("TransferToUser", fields: [toUserId], references: [id], onDelete: Restrict)
   requestedById    String
   requestedBy      User               @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  absenceId        String?
+  absence          Absence?           @relation(fields: [absenceId], references: [id], onDelete: SetNull)
   comment          String?
   status           TaskTransferStatus @default(PENDING)
   rejectionReason  String?
@@ -273,6 +284,7 @@ model TaskTransfer {
   @@index([fromUserId])
   @@index([toUserId])
   @@index([requestedById])
+  @@index([absenceId])
   @@index([status])
   @@index([createdAt])
 }
@@ -464,8 +476,34 @@ model Absence {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  transfers         TaskTransfer[]
+  notificationLogs  AbsenceNotificationLog[]
+
   @@index([organizationId])
   @@index([userId])
+}
+
+model AbsenceNotificationLog {
+  id             String                  @id @default(cuid())
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  absenceId      String
+  absence        Absence                 @relation(fields: [absenceId], references: [id], onDelete: Cascade)
+  taskId         String
+  task           Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           AbsenceNotificationType
+  sentAt         DateTime                @default(now())
+  createdAt      DateTime                @default(now())
+
+  @@unique([absenceId, taskId, userId, type])
+  @@index([organizationId])
+  @@index([absenceId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([type])
+  @@index([sentAt])
 }
 
 model Reminder {

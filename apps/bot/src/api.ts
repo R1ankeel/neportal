@@ -511,6 +511,7 @@ export type ApiTaskTransfer = {
   fromUserId: string;
   toUserId: string;
   requestedById: string;
+  absenceId: string | null;
   comment: string | null;
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
   rejectionReason: string | null;
@@ -528,7 +529,7 @@ export type ApiTaskTransferResult = {
 
 export async function createTaskTransfer(
   taskId: string,
-  body: { requestedById: string; toUserId: string; comment?: string },
+  body: { requestedById: string; toUserId: string; comment?: string; absenceId?: string },
 ): Promise<ApiTaskTransferResult> {
   devLog("POST /tasks/:id/transfers payload", { taskId, ...body });
 
@@ -617,6 +618,16 @@ export function pickAssigneeId(users: ApiUser[]): string | undefined {
   return users.find((u) => u.role === "EMPLOYEE")?.id;
 }
 
+export type ApiAbsenceAffectedTask = {
+  id: string;
+  title: string;
+  status: string;
+  deadlineAt: string | null;
+  project: { id: string; name: string } | null;
+  creator: { id: string; fullName: string; telegramId: string | null };
+  assignee: { id: string; fullName: string; telegramId: string | null } | null;
+};
+
 export type ApiAbsence = {
   id: string;
   type: "SICK_LEAVE" | "VACATION";
@@ -624,7 +635,9 @@ export type ApiAbsence = {
   startDate: string;
   endDate: string;
   documentNumber: string | null;
+  comment?: string | null;
   user: { id: string; fullName: string; role: string };
+  affectedTasks?: ApiAbsenceAffectedTask[];
 };
 
 export async function createAbsence(body: {
@@ -657,6 +670,39 @@ export async function createAbsence(body: {
     throw new Error(`Не удалось создать отсутствие (${res.status}). ${text}`.trim());
   }
   return res.json() as Promise<ApiAbsence>;
+}
+
+export async function fetchAbsenceAffectedTasks(
+  absenceId: string,
+): Promise<ApiAbsenceAffectedTask[]> {
+  const res = await fetch(`${getApiBaseUrl()}/absences/${absenceId}/affected-tasks`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /absences/${absenceId}/affected-tasks → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiAbsenceAffectedTask[]>;
+}
+
+export type AbsenceNotificationType =
+  | "ABSENCE_AFFECTED_TASKS_EMPLOYEE"
+  | "ABSENCE_AFFECTED_TASK_CREATOR"
+  | "ABSENCE_TASK_DELEGATED_CREATOR";
+
+export async function recordAbsenceNotification(
+  absenceId: string,
+  body: { taskId: string; userId: string; type: AbsenceNotificationType },
+): Promise<void> {
+  const res = await fetch(`${getApiBaseUrl()}/absences/${absenceId}/notifications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /absences/${absenceId}/notifications → ${res.status} ${text}`.trim());
+  }
 }
 
 export async function fetchAbsences(projectId: string): Promise<ApiAbsence[]> {

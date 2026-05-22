@@ -1,7 +1,7 @@
 import { Bot, type Context } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
+import { createAbsenceWithImpact } from "./absence-impact-flow";
 import {
-  createAbsence,
   createBudgetExpense,
   createExpenseAttachment,
   createNote,
@@ -438,14 +438,18 @@ bot.command("sick", async (ctx) => {
 
     devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
 
-    await createAbsence({
-      userId: employee.id,
-      type: "SICK_LEAVE",
-      startDate: startIso,
-      endDate: endIso,
-      documentNumber,
-      status: "APPROVED",
-    });
+    await createAbsenceWithImpact(
+      ctx.api,
+      {
+        userId: employee.id,
+        type: "SICK_LEAVE",
+        startDate: startIso,
+        endDate: endIso,
+        documentNumber,
+        status: "APPROVED",
+      },
+      employee,
+    );
 
     await ctx.reply(
       [
@@ -769,13 +773,17 @@ bot.command("vacation", async (ctx) => {
 
     devLog("selected absence user", { id: employee.id, fullName: employee.fullName });
 
-    await createAbsence({
-      userId: employee.id,
-      type: "VACATION",
-      startDate: startIso,
-      endDate: endIso,
-      status: "APPROVED",
-    });
+    await createAbsenceWithImpact(
+      ctx.api,
+      {
+        userId: employee.id,
+        type: "VACATION",
+        startDate: startIso,
+        endDate: endIso,
+        status: "APPROVED",
+      },
+      employee,
+    );
 
     await ctx.reply(`Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`);
   } catch (e) {

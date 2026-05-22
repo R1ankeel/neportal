@@ -8,12 +8,14 @@ import { clearPendingTaskTransferComment } from "./pending-task-transfer-comment
 import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
+import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
 
 export type PendingUserSelectionType =
   | "select_user_for_task_assignee"
   | "select_user_for_transfer"
   | "select_user_for_mention"
   | "select_user_for_absence"
+  | "select_user_for_absence_delegation"
   | "select_user_for_link"
   | "select_user_for_task_list"
   | "select_user_for_other";
@@ -58,6 +60,18 @@ export type AbsenceUserSelectionPayload = {
   comment?: string;
 };
 
+export type AbsenceDelegationUserSelectionPayload = {
+  intent: "absence_delegation";
+  absenceId: string;
+  absenceUserId: string;
+  absenceUserName: string;
+  absenceType: "SICK_LEAVE" | "VACATION";
+  startDate: string;
+  endDate: string;
+  affectedTaskIds: string[];
+  affectedTasks: import("./api").ApiAbsenceAffectedTask[];
+};
+
 export type LinkUserSelectionPayload = {
   intent: "link_telegram";
 };
@@ -72,6 +86,7 @@ export type UserSelectionPayload =
   | TransferUserSelectionPayload
   | MentionUserSelectionPayload
   | AbsenceUserSelectionPayload
+  | AbsenceDelegationUserSelectionPayload
   | LinkUserSelectionPayload
   | TaskListUserSelectionPayload;
 
@@ -133,6 +148,7 @@ export function startPendingUserSelection(
   clearPendingTaskTransferDecision(telegramUserId);
   clearPendingTaskTransferRejection(telegramUserId);
   clearPendingCreateTaskAssignee(telegramUserId);
+  clearPendingAbsenceDelegation(telegramUserId);
   setPendingUserSelection(telegramUserId, {
     type,
     candidates,

@@ -651,6 +651,15 @@ export class TasksService {
     const now = new Date();
     const immediate = this.isManagerRole(requestedBy.role);
 
+    if (dto.absenceId) {
+      const absence = await this.prisma.absence.findFirst({
+        where: { id: dto.absenceId, organizationId: org },
+      });
+      if (!absence) {
+        throw new NotFoundException(`Absence with id "${dto.absenceId}" not found`);
+      }
+    }
+
     if (immediate) {
       const result = await this.prisma.$transaction(async (tx) => {
         const transfer = await tx.taskTransfer.create({
@@ -660,6 +669,7 @@ export class TasksService {
             fromUserId,
             toUserId: dto.toUserId,
             requestedById: dto.requestedById,
+            absenceId: dto.absenceId,
             comment,
             status: TaskTransferStatus.ACCEPTED,
             decidedAt: now,
@@ -687,6 +697,7 @@ export class TasksService {
           fromUserId,
           toUserId: dto.toUserId,
           requestedById: dto.requestedById,
+          absenceId: dto.absenceId,
           comment,
           status: TaskTransferStatus.PENDING,
         },

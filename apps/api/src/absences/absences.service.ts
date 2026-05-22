@@ -7,6 +7,17 @@ import {
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateAbsenceDto, UpdateAbsenceStatusDto } from "./dto/absence.dto";
+import { RecordAbsenceNotificationDto } from "./dto/absence-notification.dto";
+
+export type AbsenceAffectedTask = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  deadlineAt: Date | null;
+  project: { id: string; name: string } | null;
+  creator: { id: string; fullName: string; telegramId: string | null };
+  assignee: { id: string; fullName: string; telegramId: string | null } | null;
+};
 
 export type AbsenceListItem = {
   id: string;
@@ -19,13 +30,18 @@ export type AbsenceListItem = {
   createdAt: Date;
   updatedAt: Date;
   user: { id: string; fullName: string; role: string };
-  affectedTasks: {
-    id: string;
-    title: string;
-    status: TaskStatus;
-    deadlineAt: Date | null;
-  }[];
+  affectedTasks: AbsenceAffectedTask[];
 };
+
+const affectedTaskSelect = {
+  id: true,
+  title: true,
+  status: true,
+  deadlineAt: true,
+  project: { select: { id: true, name: true } },
+  creator: { select: { id: true, fullName: true, telegramId: true } },
+  assignee: { select: { id: true, fullName: true, telegramId: true } },
+} as const;
 
 @Injectable()
 export class AbsencesService {
@@ -67,30 +83,25 @@ export class AbsencesService {
   }
 
   private async getAffectedTasks(
-    projectId: string,
     userId: string,
     startDate: Date,
     endDate: Date,
-  ) {
+    projectId?: string,
+  ): Promise<AbsenceAffectedTask[]> {
     return this.prisma.task.findMany({
       where: {
         organizationId: this.orgId(),
-        projectId,
+        ...(projectId != null ? { projectId } : {}),
         assigneeId: userId,
         deadlineAt: {
           not: null,
           gte: this.startOfDay(startDate),
           lte: this.endOfDay(endDate),
         },
-        status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] },
+        status: { in: [TaskStatus.NEW, TaskStatus.IN_PROGRESS] },
       },
       orderBy: { deadlineAt: "asc" },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        deadlineAt: true,
-      },
+      select: affectedTaskSelect,
     });
   }
 
@@ -108,11 +119,13 @@ export class AbsencesService {
       user: { id: string; fullName: string; role: string };
     },
     projectId?: string,
+    affectedTasksOverride?: AbsenceAffectedTask[],
   ): Promise<AbsenceListItem> {
     const affectedTasks =
-      projectId != null
-        ? await this.getAffectedTasks(projectId, absence.user.id, absence.startDate, absence.endDate)
-        : [];
+      affectedTasksOverride ??
+      (projectId != null
+        ? await this.getAffectedTasks(absence.user.id, absence.startDate, absence.endDate, projectId)
+        : await this.getAffectedTasks(absence.user.id, absence.startDate, absence.endDate));
 
     return {
       id: absence.id,
@@ -186,6 +199,27 @@ export class AbsencesService {
     return this.mapListItem(absence, projectId);
   }
 
+  async findAffectedTasks(id: string, projectId?: string) {
+    const absence = await this.prisma.absence.findFirst({
+      where: { id, organizationId: this.orgId() },
+      include: { user: { select: { id: true } } },
+    });
+    if (!absence) {
+      throw new NotFoundException(`Absence with id "${id}" not found`);
+    }
+
+    if (projectId) {
+      await this.assertProjectInOrg(projectId);
+    }
+
+    return this.getAffectedTasks(
+      absence.user.id,
+      absence.startDate,
+      absence.endDate,
+      projectId,
+    );
+  }
+
   async create(dto: CreateAbsenceDto) {
     const org = this.orgId();
 
@@ -219,7 +253,64 @@ export class AbsencesService {
       include: { user: { select: this.userSelect } },
     });
 
-    return this.mapListItem(absence);
+    const affectedTasks = await this.getAffectedTasks(
+      absence.user.id,
+      absence.startDate,
+      absence.endDate,
+      dto.projectId,
+    );
+
+    return this.mapListItem(absence, dto.projectId, affectedTasks);
+  }
+
+  async recordNotification(id: string, dto: RecordAbsenceNotificationDto) {
+    const absence = await this.prisma.absence.findFirst({
+      where: { id, organizationId: this.orgId() },
+    });
+    if (!absence) {
+      throw new NotFoundException(`Absence with id "${id}" not found`);
+    }
+
+    const task = await this.prisma.task.findFirst({
+      where: { id: dto.taskId, organizationId: this.orgId() },
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${dto.taskId}" not found`);
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: dto.userId, organizationId: this.orgId() },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with id "${dto.userId}" not found in this organization`);
+    }
+
+    const existing = await this.prisma.absenceNotificationLog.findUnique({
+      where: {
+        absenceId_taskId_userId_type: {
+          absenceId: id,
+          taskId: dto.taskId,
+          userId: dto.userId,
+          type: dto.type,
+        },
+      },
+    });
+
+    if (existing) {
+      return { ok: true as const, log: existing };
+    }
+
+    const log = await this.prisma.absenceNotificationLog.create({
+      data: {
+        organizationId: this.orgId(),
+        absenceId: id,
+        taskId: dto.taskId,
+        userId: dto.userId,
+        type: dto.type,
+      },
+    });
+
+    return { ok: true as const, log };
   }
 
   async updateStatus(id: string, dto: UpdateAbsenceStatusDto) {

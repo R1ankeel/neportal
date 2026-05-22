@@ -80,7 +80,13 @@ erDiagram
 - Статусы: `PENDING`, `APPROVED`, `REJECTED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`.
 - Поля: `userId`, `startDate`, `endDate`, опционально `documentNumber`, `comment`.
 - REST: модуль `AbsencesModule` — см. [api.md](api.md).
-- В выдаче по проекту — `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия).
+- В выдаче по проекту — `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия, статус `NEW` / `IN_PROGRESS`).
+- `AbsenceNotificationLog` — идемпотентный лог Telegram-уведомлений (`AbsenceNotificationType`: employee summary per task, creator warning, creator notified on delegation).
+- Связь с передачей задач: `TaskTransfer.absenceId` (optional) — передача из-за отсутствия.
+
+### TaskTransfer (дополнение)
+
+- `absenceId` — optional FK на `Absence`; при accept бот уведомляет постановщика (`ABSENCE_TASK_DELEGATED_CREATOR`).
 
 ### Reminder
 
@@ -96,6 +102,7 @@ erDiagram
 | ExpenseStatus | PENDING, APPROVED, REJECTED, CANCELLED |
 | AbsenceType | SICK_LEAVE, VACATION |
 | AbsenceStatus | PENDING, APPROVED, REJECTED |
+| AbsenceNotificationType | ABSENCE_AFFECTED_TASKS_EMPLOYEE, ABSENCE_AFFECTED_TASK_CREATOR, ABSENCE_TASK_DELEGATED_CREATOR |
 | ReminderStatus | SCHEDULED, SENT, CANCELLED |
 
 Дублирование части enum'ов в `@neportal/shared` — для кода вне Prisma (см. [packages.md](packages.md)).

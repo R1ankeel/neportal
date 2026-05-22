@@ -143,7 +143,8 @@
 {
   "requestedById": "cuid инициатора",
   "toUserId": "cuid нового исполнителя",
-  "comment": "потому что он отвечает за склад"
+  "comment": "потому что он отвечает за склад",
+  "absenceId": "опционально — передача из Absence Impact Flow"
 }
 ```
 
@@ -224,8 +225,10 @@
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?` | Список отсутствий |
-| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` — `affectedTasks` |
-| POST | `/absences` | — | Создать отсутствие |
+| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` — `affectedTasks` по проекту |
+| GET | `/absences/:id/affected-tasks` | `projectId?` | Затронутые задачи (по org или по проекту) |
+| POST | `/absences` | — | Создать отсутствие (+ `affectedTasks` в ответе) |
+| POST | `/absences/:id/notifications` | — | Идемпотентная запись отправленного уведомления |
 | PATCH | `/absences/:id/status` | — | Сменить статус |
 
 **POST /absences** (`CreateAbsenceDto`):
@@ -238,16 +241,38 @@
   "endDate": "2026-05-25",
   "documentNumber": "123456",
   "comment": "опционально",
-  "status": "APPROVED"
+  "status": "APPROVED",
+  "projectId": "опционально — ограничить affectedTasks проектом"
 }
 ```
 
 По умолчанию `status` = `APPROVED`. `endDate` не может быть раньше `startDate`. `userId` должен быть в текущей организации.
 
+Ответ **POST** и элементы списка включают `affectedTasks` (без `projectId` в POST — по всей организации):
+
+- `assigneeId` = пользователь отсутствия;
+- `deadlineAt` в `[startDate, endDate]` включительно;
+- `status` ∈ `NEW`, `IN_PROGRESS`;
+- для каждой задачи: `project`, `creator`, `assignee` (с `telegramId`).
+
+**GET /absences/:id/affected-tasks** — тот же набор полей, что в `affectedTasks` выше.
+
+**POST /absences/:id/notifications** (идемпотентно):
+
+```json
+{
+  "taskId": "cuid",
+  "userId": "cuid",
+  "type": "ABSENCE_AFFECTED_TASKS_EMPLOYEE"
+}
+```
+
+Типы: `ABSENCE_AFFECTED_TASKS_EMPLOYEE`, `ABSENCE_AFFECTED_TASK_CREATOR`, `ABSENCE_TASK_DELEGATED_CREATOR`. Уникальность: `(absenceId, taskId, userId, type)`.
+
 **GET /absences?projectId=…`** — только отсутствия участников проекта (`ProjectMember`). В каждом элементе:
 
 - поля отсутствия и `user` (`id`, `fullName`, `role`);
-- `affectedTasks` — задачи проекта с `assigneeId` = пользователь отсутствия, `deadlineAt` в периоде `[startDate, endDate]` включительно, статус не `DONE` и не `CANCELLED`.
+- `affectedTasks` — только задачи этого проекта (те же правила фильтра).
 
 **PATCH /absences/:id/status**:
 

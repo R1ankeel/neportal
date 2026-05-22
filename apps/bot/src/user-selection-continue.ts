@@ -26,6 +26,7 @@ import {
   ONLY_OWN_TASKS_MESSAGE,
   replyWithTasksForUser,
 } from "./my-tasks-flow";
+import { startPendingAbsenceDelegationConfirm } from "./pending-absence-delegation";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -175,6 +176,33 @@ export async function continueAfterUserSelection(
       },
     };
     await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (payload.intent === "absence_delegation") {
+    const taskLines = payload.affectedTasks
+      .map((t, i) => `${i + 1}. ${t.title}`)
+      .join("\n");
+    startPendingAbsenceDelegationConfirm(telegramUserId, {
+      absenceId: payload.absenceId,
+      absenceUserId: payload.absenceUserId,
+      absenceType: payload.absenceType,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      affectedTasks: payload.affectedTasks,
+      toUserId: selectedUser.id,
+      toUserName: selectedUser.fullName,
+      toUserTelegramId: selectedUser.telegramId ?? null,
+    });
+    await ctx.reply(
+      [
+        `Передать задачи сотруднику ${selectedUser.fullName}?`,
+        "",
+        taskLines,
+        "",
+        "Ответьте: да / нет",
+      ].join("\n"),
+    );
     return;
   }
 

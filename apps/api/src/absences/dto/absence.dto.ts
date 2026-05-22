@@ -34,6 +34,13 @@ export class CreateAbsenceDto {
   @IsOptional()
   @IsEnum(AbsenceStatus)
   status?: AbsenceStatus;
+
+  @ApiPropertyOptional({
+    description: "Если указан — affectedTasks только по этому проекту; иначе по всей организации",
+  })
+  @IsOptional()
+  @IsString()
+  projectId?: string;
 }
 
 export class UpdateAbsenceStatusDto {

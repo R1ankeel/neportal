@@ -16,6 +16,11 @@ export class CreateTaskTransferDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @ApiPropertyOptional({ description: "Связь с отсутствием при передаче из-за absence flow" })
+  @IsOptional()
+  @IsString()
+  absenceId?: string;
 }
 
 export class AcceptTaskTransferDto {
