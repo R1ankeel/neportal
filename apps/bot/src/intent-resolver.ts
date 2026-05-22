@@ -2,7 +2,6 @@ import type { AiIntent } from "./ai-contracts";
 import {
   fetchBudgets,
   fetchProjects,
-  fetchTasks,
   fetchUsers,
   findUserByNameHint,
   pickAssigneeId,
@@ -14,8 +13,7 @@ import {
   getLinkedUserByTelegramId,
   NOT_LINKED_MESSAGE,
 } from "./current-user";
-import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
-import { lookupTaskForStatusChange } from "./task-status-flow";
+import { findBudgetByHint, findProjectByHint, findUserByHint } from "./hint-matchers";
 import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
@@ -231,74 +229,6 @@ export async function resolveIntent(
           startDate,
           endDate,
           documentNumber: intent.payload.documentNumber,
-        },
-      };
-    }
-
-    case "set_task_deadline": {
-      const allTasks = await fetchTasks();
-      const match = findTaskByTitle(allTasks, intent.payload.taskTitle);
-
-      if (match.kind === "not_found") {
-        return { ok: false, message: "Задача не найдена." };
-      }
-      if (match.kind === "ambiguous") {
-        const names = match.tasks.map((t) => `«${t.title}»`).join(", ");
-        return { ok: false, message: `Найдено несколько задач: ${names}. Уточните название.` };
-      }
-
-      return {
-        ok: true,
-        resolved: {
-          intent: "set_task_deadline",
-          taskId: match.task.id,
-          taskTitle: match.task.title,
-          deadlineDate: intent.payload.deadlineDate,
-          projectName: match.task.project?.name,
-        },
-      };
-    }
-
-    case "complete_task": {
-      const lookup = await lookupTaskForStatusChange(
-        currentUser,
-        intent.payload.taskTitle,
-        "DONE",
-      );
-      if (!lookup.ok) {
-        return { ok: false, message: lookup.message };
-      }
-
-      const completionResult = intent.payload.completionResult?.trim();
-      return {
-        ok: true,
-        resolved: {
-          intent: "complete_task",
-          taskId: lookup.task.id,
-          taskTitle: lookup.task.title,
-          ...(completionResult ? { completionResult } : {}),
-        },
-      };
-    }
-
-    case "cancel_task": {
-      const lookup = await lookupTaskForStatusChange(
-        currentUser,
-        intent.payload.taskTitle,
-        "CANCELLED",
-      );
-      if (!lookup.ok) {
-        return { ok: false, message: lookup.message };
-      }
-
-      const cancellationReason = intent.payload.cancellationReason?.trim();
-      return {
-        ok: true,
-        resolved: {
-          intent: "cancel_task",
-          taskId: lookup.task.id,
-          taskTitle: lookup.task.title,
-          ...(cancellationReason ? { cancellationReason } : {}),
         },
       };
     }

@@ -8,12 +8,10 @@ import {
   createTask,
   fetchBudgets,
   fetchProjects,
-  fetchTasks,
   fetchUserByTelegramId,
   fetchUsers,
   findUserByNameHint,
   linkTelegramUser,
-  updateTaskDeadline,
   formatMoney,
   parseAmount,
   pickAssigneeId,
@@ -24,17 +22,13 @@ import {
 } from "./api";
 import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
-import {
-  formatIsoDateRu,
-  parseDeadlineCommandPayload,
-  parseRuDate,
-  todayIsoDate,
-} from "./parse-ru-date";
+import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import { handleStartBinding } from "./start-binding";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
+import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -340,7 +334,6 @@ bot.hears(/^\/expense(?:@\w+)?\s*$/i, async (ctx) => {
 
 const SICK_USAGE = "Использование: /sick до 25.05.2026 номер 123456";
 const VACATION_USAGE = "Использование: /vacation с 01.06.2026 по 10.06.2026";
-const DEADLINE_USAGE = "Использование: /deadline <название задачи> <дата>";
 
 /** grammY: bot.hears не ловит Telegram-команды — только bot.command. */
 function parseSickPayload(payload: string): { endIso: string; documentNumber?: string } | null {
@@ -492,39 +485,20 @@ bot.command("deadline", async (ctx) => {
   const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
   devLog("parsed deadline command", { payload });
 
-  const parsed = parseDeadlineCommandPayload(payload);
-  if (!parsed) {
-    await ctx.reply(DEADLINE_USAGE);
-    return;
-  }
-
-  const { title, dateIso } = parsed;
-
+  const telegramUserId = ctx.from?.id;
   try {
-    if (!(await requireLinkedUser(ctx))) return;
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
 
-    const projects = await fetchProjects();
-    const projectId = pickDefaultProjectId(projects);
-    if (!projectId) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
-      return;
+    const usageOrNull = await handleDeadlineSlashCommand(
+      ctx,
+      currentUser,
+      telegramUserId,
+      payload,
+    );
+    if (usageOrNull) {
+      await ctx.reply(usageOrNull);
     }
-
-    const tasks = await fetchTasks(projectId);
-    const matches = tasks.filter((t) => t.title === title);
-
-    if (matches.length === 0) {
-      await ctx.reply("Задача не найдена.");
-      return;
-    }
-    if (matches.length > 1) {
-      await ctx.reply("Найдено несколько задач с таким названием. Уточнение пока не реализовано.");
-      return;
-    }
-
-    await updateTaskDeadline(matches[0].id, dateIso);
-
-    await ctx.reply(`Дедлайн задачи «${title}» установлен на ${formatIsoDateRu(dateIso)}.`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] deadline command error: ${msg}`);

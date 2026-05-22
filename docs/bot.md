@@ -102,9 +102,18 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 1. Pending confirmation (да/нет)
 2. Pending details (результат/причина) — **не** отправляется в YandexGPT
-3. Иначе AI parser
+3. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
+4. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 **Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
+
+**Несколько похожих задач:** если после фильтрации по правам и статусу остаётся больше одной задачи, бот показывает нумерованный список (проект, исполнитель, дедлайн, статус) и ждёт номер (TTL 30 мин). Пример:
+
+> Отмени задачу заключить договор, он уже заключён в рамках предыдущей задачи
+
+→ список из 2 задач «Заключить договор» → ответ `1` → confirmation с сохранённой причиной из AI → `да` → отменяется только выбранная задача.
+
+Отмена выбора: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
 **Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` — любая задача.
 
@@ -307,6 +316,12 @@ REST для scheduler (вызывает бот):
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
 | `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
 | `task-status-flow.ts` | `/done`, `/cancel`: поиск, права, confirmation, PATCH status |
+| `resolve-task-by-title.ts` | Общий поиск задачи + запуск selection flow |
+| `pending-task-selection.ts` | Ожидание номера задачи (TTL 30 мин) |
+| `task-selection-format.ts` | Формат списка кандидатов |
+| `handle-pending-task-selection.ts` | Выбор по номеру → details или confirmation |
+| `handle-task-intent.ts` | AI complete/cancel/deadline с selection |
+| `handle-deadline-slash.ts` | `/deadline` с selection и confirmation |
 | `pending-task-status-details.ts` | Ожидание результата/причины (TTL 30 мин) |
 | `handle-pending-task-status-details.ts` | Ответ на уточняющий вопрос → confirmation |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |

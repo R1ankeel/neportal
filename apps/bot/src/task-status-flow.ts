@@ -3,10 +3,8 @@ import type { AiIntent } from "./ai-contracts";
 import {
   type ApiTask,
   type ApiUser,
-  fetchTasks,
   updateTaskStatus,
 } from "./api";
-import { findTaskByTitle } from "./hint-matchers";
 import type { ResolvedCancelTask, ResolvedCompleteTask } from "./intent-resolver";
 import {
   clearPendingTaskStatusDetails,
@@ -14,6 +12,12 @@ import {
   setPendingTaskStatusDetails,
 } from "./pending-task-status-details";
 import { clearPendingConfirmation } from "./pending-intent";
+import {
+  purposeFromStatusTarget,
+  resolveResultToMessage,
+  resolveTaskByTitle,
+} from "./resolve-task-by-title";
+import type { TaskSelectionPayload } from "./pending-task-selection";
 import { notifyTaskStatusChanged } from "./task-notifications";
 
 export type TaskStatusChangeTarget = "DONE" | "CANCELLED";
@@ -45,44 +49,30 @@ export type TaskLookupResult =
 
 export async function lookupTaskForStatusChange(
   currentUser: ApiUser,
+  telegramUserId: number,
   titleQuery: string,
   target: TaskStatusChangeTarget,
+  options?: { completionResult?: string; cancellationReason?: string },
 ): Promise<TaskLookupResult> {
-  const trimmed = titleQuery.trim();
-  if (!trimmed) {
-    return {
-      ok: false,
-      message:
-        target === "DONE"
-          ? "Укажите название: /done Проверить склад"
-          : "Укажите название: /cancel Проверить склад",
-    };
+  const purpose = purposeFromStatusTarget(target);
+  const selectionPayload: TaskSelectionPayload = {};
+  if (options?.completionResult?.trim()) {
+    selectionPayload.completionResult = options.completionResult.trim();
+  }
+  if (options?.cancellationReason?.trim()) {
+    selectionPayload.cancellationReason = options.cancellationReason.trim();
   }
 
-  const tasks = await fetchTasks();
-  const match = findTaskByTitle(tasks, trimmed);
+  const resolution = await resolveTaskByTitle(currentUser, titleQuery, purpose, {
+    telegramUserId,
+    selectionPayload,
+  });
 
-  if (match.kind === "not_found") {
-    return { ok: false, message: "Задача не найдена." };
-  }
-  if (match.kind === "ambiguous") {
-    const names = match.tasks.map((t) => `«${t.title}»`).join(", ");
-    return { ok: false, message: `Найдено несколько задач: ${names}. Уточните название.` };
+  if (resolution.kind === "found") {
+    return { ok: true, task: resolution.task };
   }
 
-  const task = match.task;
-  if (!canModifyTask(currentUser, task)) {
-    return { ok: false, message: "Вы не можете изменить эту задачу." };
-  }
-
-  if (target === "DONE" && task.status === "DONE") {
-    return { ok: false, message: `Задача уже закрыта: ${task.title}` };
-  }
-  if (target === "CANCELLED" && task.status === "CANCELLED") {
-    return { ok: false, message: `Задача уже отменена: ${task.title}` };
-  }
-
-  return { ok: true, task };
+  return { ok: false, message: resolveResultToMessage(resolution) };
 }
 
 export function questionForPendingDetails(
@@ -178,7 +168,11 @@ export async function handleTaskStatusSlashCommand(
   target: TaskStatusChangeTarget,
 ): Promise<SlashTaskStatusResult> {
   const { title, suffix } = parseTaskTitleAndSuffix(payload);
-  const lookup = await lookupTaskForStatusChange(currentUser, title, target);
+  const lookup = await lookupTaskForStatusChange(currentUser, telegramUserId, title, target, {
+    ...(target === "DONE"
+      ? { completionResult: suffix }
+      : { cancellationReason: suffix }),
+  });
   if (!lookup.ok) {
     return { kind: "reply", message: lookup.message };
   }
