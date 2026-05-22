@@ -1,4 +1,5 @@
 import { preprocessAiIntentInput } from "./ai-contracts";
+import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
 import {
   coerceDeadlineDateLoose,
   correctNextCalendarMonthMisparse,
@@ -67,7 +68,10 @@ export function fixAiIntentBeforeValidation(
 
   const p = { ...(payload as Record<string, unknown>) };
 
-  if (intent === "create_task" || intent === "set_task_deadline") {
+  if (intent === "create_task") {
+    applyCreateTaskAssigneeSelfFix(p, opts.userText);
+    applyDeadlineFields(p, intent as string, opts);
+  } else if (intent === "set_task_deadline") {
     applyDeadlineFields(p, intent as string, opts);
   }
 

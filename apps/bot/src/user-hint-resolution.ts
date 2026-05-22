@@ -9,6 +9,11 @@ import {
   type UserSelectionPayload,
 } from "./pending-user-selection";
 import { resolveUsersByHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+
+function isAssigneeSelfHint(hint: string): boolean {
+  const t = hint.trim();
+  return t === SELF_HINT_MARKER;
+}
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 
 export function resolveUserByHint(
@@ -151,6 +156,10 @@ export async function tryHandleAmbiguousUserHintBeforeResolve(
 ): Promise<boolean> {
   const hint = extractUserHintFromIntent(intent);
   if (!hint?.trim()) return false;
+
+  if (intent.intent === "create_task" && isAssigneeSelfHint(hint)) {
+    return false;
+  }
 
   const selectionType = selectionTypeForIntent(intent);
   const payload = buildUserSelectionPayload(intent, linked);

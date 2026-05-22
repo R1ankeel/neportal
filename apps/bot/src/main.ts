@@ -21,6 +21,7 @@ import {
 } from "./api";
 import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
+import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import {
   devLogRelativeMonthDeadlineChecks,
   formatIsoDateRu,
@@ -772,6 +773,7 @@ const mode = process.env.BOT_MODE ?? "polling";
 
 async function main() {
   devLogRelativeMonthDeadlineChecks();
+  devLogCreateTaskAssigneeSelfChecks();
   startTaskNotificationScheduler(bot);
 
   if (mode === "webhook") {

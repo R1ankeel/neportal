@@ -106,6 +106,13 @@ payload по intent:
 create_task.payload:
 { "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
+create_task — семантические роли (исполнитель vs объект задачи):
+- assigneeHint — только тот, КОМУ назначают задачу (исполнитель). Имена внутри действия задачи НЕ становятся assigneeHint.
+- Если есть «мне», «на меня», «себе», «для меня» как получатель задачи → assigneeHint = "__self__" (приоритет над именами в title).
+- После «задачу» идёт действие с именем человека («уволить Васю», «позвонить Ивану», «встретиться с Петром», «договор для Маши») → это title/description, НЕ исполнитель.
+- Исполнитель обычно у глаголов назначения: «поставь Васе задачу», «назначь Пете», «дай Маше задачу», «поручи Ивану», «пусть Вася …».
+- Не ставь assigneeHint по имени из середины title.
+
 create_task — дедлайн и формулировка:
 - Слова и фразы «сегодня», «завтра», «послезавтра», «до <дата>», «к <дата>», «на <дата>», «в <дата>», «завтра в 13:00» — это deadlineDate (и при необходимости время), НЕ description.
 - «Завтра» / «сегодня» / «послезавтра» / «в понедельник» считай от «Текущая дата» из контекста; deadlineDate — готовая дата YYYY-MM-DD (например 2026-05-25), НЕ плейсхолдер и НЕ текст вроде «<завтра…>».
@@ -127,6 +134,62 @@ Output:
   "payload": {
     "assigneeHint": "__self__",
     "title": "Проверить склад",
+    "deadlineDate": "2026-05-23"
+  }
+}
+
+Пример create_task (мне + имя в title, текущая дата 2026-05-22):
+Input: «Поставь мне задачу уволить Васю за кутежи через месяц»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "__self__",
+    "title": "Уволить Васю за кутежи",
+    "deadlineDate": "2026-06-22"
+  }
+}
+
+Пример create_task (исполнитель Вася, объект Петя в title):
+Input: «Поставь Васе задачу уволить Петю через месяц»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Уволить Петю",
+    "deadlineDate": "2026-06-22"
+  }
+}
+
+Пример create_task (поручи Ивану, Вася в title):
+Input: «Поручи Ивану позвонить Васе завтра»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Иван",
+    "title": "Позвонить Васе",
+    "deadlineDate": "2026-05-23"
+  }
+}
+
+Пример create_task (запиши мне, Иван в title):
+Input: «Запиши мне в задачи позвонить Ивану завтра»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "__self__",
+    "title": "Позвонить Ивану",
     "deadlineDate": "2026-05-23"
   }
 }
@@ -534,7 +597,7 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
     userText: userText.trim(),
   });
   if (fixed !== parsed) {
-    yandexGptDevLog("deadlineDate coerced before validation", { fixed });
+    yandexGptDevLog("intent fields coerced before validation", { fixed });
   }
 
   const validated = safeParseAiIntent(fixed);
