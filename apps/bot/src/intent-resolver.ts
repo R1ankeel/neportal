@@ -74,6 +74,15 @@ export type ResolvedCancelTask = {
   cancellationReason?: string;
 };
 
+export type ResolvedAddTaskComment = {
+  intent: "add_task_comment";
+  taskId: string;
+  taskTitle: string;
+  text: string;
+  creatorId: string;
+  assigneeId: string | null;
+};
+
 export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
@@ -81,7 +90,8 @@ export type ResolvedIntent =
   | ResolvedCreateAbsence
   | ResolvedSetTaskDeadline
   | ResolvedCompleteTask
-  | ResolvedCancelTask;
+  | ResolvedCancelTask
+  | ResolvedAddTaskComment;
 
 export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }

@@ -29,6 +29,7 @@ import { handleStartBinding } from "./start-binding";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
+import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -62,6 +63,7 @@ bot.command("start", async (ctx) => {
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/done <название> — закрыть задачу",
       "/cancel <название> — отменить задачу",
+      "/comment <задача> — <комментарий> — комментарий к задаче",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -83,6 +85,7 @@ bot.command("demo", async (ctx) => {
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
       "/done Проверить склад — закрыть задачу",
       "/cancel Проверить склад — отменить задачу",
+      "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -95,6 +98,7 @@ bot.command("demo", async (ctx) => {
       "- Закрой задачу Проверить склад, всё проверил",
       "- Отмени задачу Проверить склад",
       "- Отмени задачу Проверить склад, склад закрыт",
+      "- Напиши комментарий к задаче Проверить склад: склад закрыт до завтра",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -477,6 +481,45 @@ bot.command("cancel", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] cancel command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("comment", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleCommentSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+    );
+    if (result.kind === "reply" || result.kind === "awaiting_text") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "add_task_comment",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          text: resolved.text,
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] comment command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

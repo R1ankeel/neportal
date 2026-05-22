@@ -8,6 +8,7 @@ import {
 } from "./pending-task-selection";
 import { continueAfterTaskSelection } from "./task-selection-continue";
 import { candidateToApiTask } from "./pending-task-selection";
+import { canCommentTask } from "./task-comment-flow";
 import { canModifyTask } from "./task-status-flow";
 
 function parseSelectionNumber(text: string): number | null {
@@ -57,9 +58,17 @@ export async function handlePendingTaskSelectionMessage(
   const selected = pending.candidates[num - 1];
   const task = candidateToApiTask(selected);
 
-  if (!canModifyTask(linked, task)) {
+  const canAct =
+    pending.type === "select_task_for_comment"
+      ? canCommentTask(linked, task)
+      : canModifyTask(linked, task);
+  if (!canAct) {
     clearPendingTaskSelection(telegramUserId);
-    await ctx.reply("Вы не можете изменить эту задачу.");
+    await ctx.reply(
+      pending.type === "select_task_for_comment"
+        ? "Вы не можете комментировать эту задачу."
+        : "Вы не можете изменить эту задачу.",
+    );
     return true;
   }
 

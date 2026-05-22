@@ -10,6 +10,10 @@ import {
   type TaskSelectionPayload,
 } from "./pending-task-selection";
 import {
+  buildResolvedAddTaskComment,
+  startPendingTaskCommentDetails,
+} from "./task-comment-flow";
+import {
   buildResolvedCancelTask,
   buildResolvedCompleteTask,
   startPendingTaskStatusDetails,
@@ -109,5 +113,30 @@ export async function continueAfterTaskSelection(
       resolved,
     });
     await ctx.reply(buildIntentPreview(resolved));
+    return;
+  }
+
+  if (selectionType === "select_task_for_comment") {
+    if (payload.commentText?.trim()) {
+      const resolved = buildResolvedAddTaskComment(task, payload.commentText);
+      setPendingConfirmation(telegramUserId, {
+        type: "ai_intent",
+        intent: {
+          intent: "add_task_comment",
+          confidence: 1,
+          requiresConfirmation: true,
+          payload: {
+            taskTitle: resolved.taskTitle,
+            text: resolved.text,
+          },
+        },
+        resolved,
+      });
+      await ctx.reply(buildIntentPreview(resolved));
+      return;
+    }
+
+    const question = startPendingTaskCommentDetails(telegramUserId, task);
+    await ctx.reply(question);
   }
 }

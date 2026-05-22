@@ -12,8 +12,10 @@ import {
   getPendingConfirmation,
   setPendingConfirmation,
 } from "./pending-intent";
+import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-comment-details";
 import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
+import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
@@ -70,6 +72,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingTaskCommentDetailsMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
@@ -112,6 +118,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     intent.intent === "set_task_deadline"
   ) {
     await handleTaskActionIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "add_task_comment") {
+    await handleAddTaskCommentIntent(ctx, linked, telegramUserId, intent);
     return;
   }
 

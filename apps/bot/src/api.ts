@@ -418,6 +418,37 @@ export async function recordTaskNotification(
   return res.json() as Promise<{ id: string }>;
 }
 
+export type ApiTaskCommentCreated = {
+  id: string;
+  text: string;
+  source: string;
+  createdAt: string;
+  author: { id: string; fullName: string; role: string };
+};
+
+export async function createTaskComment(
+  taskId: string,
+  body: {
+    authorId: string;
+    text: string;
+    source?: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
+  },
+): Promise<ApiTaskCommentCreated> {
+  devLog("POST /tasks/:id/comments payload", { taskId, ...body });
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`POST /tasks/${taskId}/comments`, res.status, text);
+    throw new Error(`Не удалось добавить комментарий (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskCommentCreated>;
+}
+
 export async function createNote(body: {
   text: string;
   creatorId: string;

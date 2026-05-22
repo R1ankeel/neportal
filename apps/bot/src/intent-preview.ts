@@ -77,6 +77,13 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
       return lines.join("\n") + CONFIRM_FOOTER;
     }
 
+    case "add_task_comment":
+      return [
+        `Добавить комментарий к задаче «${resolved.taskTitle}»?`,
+        "",
+        `Комментарий: ${resolved.text}`,
+      ].join("\n") + CONFIRM_FOOTER;
+
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;
   }

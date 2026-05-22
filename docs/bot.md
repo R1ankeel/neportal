@@ -73,6 +73,38 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
 | `/done <название>` | `PATCH /tasks/:id/status` → `DONE` |
 | `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
+| `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
+
+### Комментарии к задачам
+
+**Slash:**
+
+| Команда | Пример |
+|---------|--------|
+| `/comment` с текстом | `/comment Проверить склад — склад закрыт до завтра` (разделитель `—`, `-` или `:`) → confirmation → `да` |
+| `/comment` без текста | `/comment Проверить склад` → *«Что написать в комментарии к задаче «…»?»* → confirmation → `да` |
+
+**AI:**
+
+| Текст | Поведение |
+|-------|-----------|
+| Напиши комментарий к задаче Проверить склад: склад закрыт | confirmation с `text` |
+| Напиши комментарий к задаче Проверить склад | вопрос о тексте → confirmation |
+
+**Pending comment details** (TTL 30 мин): `pending-task-comment-details.ts`. Отмена: *отмена*, *отмени*, *нет*, *стоп*.
+
+**Selection:** тип `select_task_for_comment`; если `commentText` уже в payload — после выбора номера сразу confirmation, иначе — уточняющий вопрос.
+
+**Права (MVP):** постановщик, исполнитель, `OWNER`, `MANAGER` — те же, что для изменения задачи.
+
+**Уведомления (без TaskNotificationLog):**
+
+- комментарий от **исполнителя** → Telegram **постановщику** (если есть `telegramId` и это не автор);
+- комментарий от **постановщика** → Telegram **исполнителю** (если есть `telegramId` и это не автор).
+
+Текст: *«Новый комментарий к задаче «…». Автор: … Комментарий: …»*
+
+В Web комментарий отображается с source **Telegram**.
 
 ### Закрытие и отмена задач
 
@@ -102,8 +134,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 1. Pending confirmation (да/нет)
 2. Pending details (результат/причина) — **не** отправляется в YandexGPT
-3. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-4. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+3. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
+4. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
+5. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 **Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
 
@@ -324,6 +357,10 @@ REST для scheduler (вызывает бот):
 | `handle-deadline-slash.ts` | `/deadline` с selection и confirmation |
 | `pending-task-status-details.ts` | Ожидание результата/причины (TTL 30 мин) |
 | `handle-pending-task-status-details.ts` | Ответ на уточняющий вопрос → confirmation |
+| `task-comment-flow.ts` | Комментарий: slash, lookup, execute, notify |
+| `pending-task-comment-details.ts` | Ожидание текста комментария (TTL 30 мин) |
+| `handle-pending-task-comment-details.ts` | Ответ на вопрос о тексте → confirmation |
+| `handle-task-comment-intent.ts` | AI `add_task_comment` с selection |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |

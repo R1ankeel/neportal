@@ -8,6 +8,7 @@ import {
   setTaskDeadline,
 } from "./api";
 import { getLinkedUserByTelegramId } from "./current-user";
+import { executeTaskComment } from "./task-comment-flow";
 import { executeTaskStatusChange } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
@@ -128,6 +129,18 @@ export async function executeResolvedIntent(
       }
 
       return executeTaskStatusChange(botApi, linked, resolved);
+    }
+
+    case "add_task_comment": {
+      const linked =
+        telegramUserId != null ? await getLinkedUserByTelegramId(telegramUserId) : null;
+      if (!linked) {
+        return "Вы не привязаны ни к какому проекту.";
+      }
+      if (!botApi) {
+        return "Не удалось отправить уведомление.";
+      }
+      return executeTaskComment(botApi, linked, resolved);
     }
 
     default:

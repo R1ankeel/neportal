@@ -1,17 +1,20 @@
 import type { ApiTask } from "./api";
 import { clearPendingConfirmation } from "./pending-intent";
+import { clearPendingTaskCommentDetails } from "./pending-task-comment-details";
 import { clearPendingTaskStatusDetails } from "./pending-task-status-details";
 
 export type PendingTaskSelectionType =
   | "select_task_for_complete"
   | "select_task_for_cancel"
-  | "select_task_for_deadline";
+  | "select_task_for_deadline"
+  | "select_task_for_comment";
 
 export type TaskSelectionPayload = {
   completionResult?: string;
   cancellationReason?: string;
   deadlineDate?: string;
   deadlineAt?: string;
+  commentText?: string;
 };
 
 export type TaskCandidate = {
@@ -95,6 +98,7 @@ export function startPendingTaskSelection(
 ): void {
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskStatusDetails(telegramUserId);
+  clearPendingTaskCommentDetails(telegramUserId);
   setPendingTaskSelection(telegramUserId, {
     type,
     candidates,

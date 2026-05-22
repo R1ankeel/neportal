@@ -11,7 +11,7 @@ import {
 import { formatTaskCandidates } from "./task-selection-format";
 import { canModifyTask, type TaskStatusChangeTarget } from "./task-status-flow";
 
-export type TaskResolvePurpose = "complete" | "cancel" | "deadline";
+export type TaskResolvePurpose = "complete" | "cancel" | "deadline" | "comment";
 
 export type ResolveTaskByTitleResult =
   | { kind: "found"; task: ApiTask }
@@ -31,6 +31,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_cancel";
     case "deadline":
       return "select_task_for_deadline";
+    case "comment":
+      return "select_task_for_comment";
   }
 }
 
@@ -45,6 +47,7 @@ function filterTasksForPurpose(
 ): ApiTask[] {
   return tasks.filter((task) => {
     if (!canModifyTask(user, task)) return false;
+    if (purpose === "comment") return true;
     if (purpose === "complete" || purpose === "cancel") {
       return task.status !== "DONE" && task.status !== "CANCELLED";
     }
@@ -55,6 +58,9 @@ function filterTasksForPurpose(
 function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   if (purpose === "complete") return "Укажите название: /done Проверить склад";
   if (purpose === "cancel") return "Укажите название: /cancel Проверить склад";
+  if (purpose === "comment") {
+    return "Использование: /comment <задача> — <комментарий>";
+  }
   return "Укажите название задачи.";
 }
 
@@ -107,7 +113,16 @@ export async function resolveTaskByTitle(
 
   if (filtered.length === 0) {
     if (matchedTasks.length === 1 && !canModifyTask(user, matchedTasks[0])) {
-      return { kind: "cannot_modify", message: "Вы не можете изменить эту задачу." };
+      return {
+        kind: "cannot_modify",
+        message:
+          purpose === "comment"
+            ? "Вы не можете комментировать эту задачу."
+            : "Вы не можете изменить эту задачу.",
+      };
+    }
+    if (purpose === "comment") {
+      return { kind: "no_modifiable", message: "Вы не можете комментировать найденные задачи." };
     }
     return noModifiableMessage(matchedTasks, purpose);
   }

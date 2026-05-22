@@ -30,7 +30,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -50,6 +50,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
 | `complete_task` | `taskTitle`, `completionResult?` |
 | `cancel_task` | `taskTitle`, `cancellationReason?` |
+| `add_task_comment` | `taskTitle`, `text?` |
 | `unknown` | `reason?` |
 
 ### Пример: закрыть задачу (без результата в фразе)
@@ -111,6 +112,37 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
   }
 }
 ```
+
+### Пример: комментарий к задаче (с текстом)
+
+> Напиши комментарий к задаче Проверить склад: склад закрыт до завтра
+
+```json
+{
+  "intent": "add_task_comment",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "text": "склад закрыт до завтра"
+  }
+}
+```
+
+### Пример: комментарий без текста в фразе
+
+> Напиши комментарий к задаче Проверить склад
+
+```json
+{
+  "intent": "add_task_comment",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+```
+
+Бот спросит: *«Что написать в комментарии к задаче «…»?»*, затем confirmation.
 
 ### Пример: заметка
 

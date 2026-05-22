@@ -1,11 +1,13 @@
 import type { Api } from "grammy";
 import {
+  fetchUsers,
   type ApiTaskCreated,
   type ApiTaskStatusUpdated,
   type ApiUser,
   type TaskNotificationType,
   recordTaskNotification,
 } from "./api";
+import type { ResolvedAddTaskComment } from "./intent-resolver";
 import type { TaskStatusChangeTarget } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { sendTelegramMessage } from "./send-telegram";
@@ -113,6 +115,33 @@ export async function notifyTaskStatusChanged(
 
   await sendTelegramMessage(api, creator.telegramId, lines.join("\n"));
   await recordTaskNotification(task.id, creator.id, logType);
+}
+
+/** Уведомление creator/assignee о новом комментарии (без TaskNotificationLog). */
+export async function notifyTaskCommentAdded(
+  api: Api,
+  task: ResolvedAddTaskComment,
+  author: ApiUser,
+): Promise<void> {
+  const users = await fetchUsers();
+  const creator = users.find((u) => u.id === task.creatorId);
+  const assignee = task.assigneeId ? users.find((u) => u.id === task.assigneeId) : undefined;
+
+  const text = [
+    `Новый комментарий к задаче «${task.taskTitle}».`,
+    "",
+    `Автор: ${author.fullName}`,
+    `Комментарий: ${task.text}`,
+  ].join("\n");
+
+  if (author.id === task.assigneeId && creator?.telegramId && creator.id !== author.id) {
+    await sendTelegramMessage(api, creator.telegramId, text);
+    return;
+  }
+
+  if (author.id === task.creatorId && assignee?.telegramId && assignee.id !== author.id) {
+    await sendTelegramMessage(api, assignee.telegramId, text);
+  }
 }
 
 export async function sendAndLogNotification(

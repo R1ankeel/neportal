@@ -91,7 +91,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -154,6 +154,54 @@ complete_task.payload:
 
 cancel_task.payload:
 { "taskTitle": string, "cancellationReason"?: string }
+
+add_task_comment.payload:
+{ "taskTitle": string, "text"?: string }
+
+add_task_comment — текст:
+- Фразы «напиши комментарий», «добавь комментарий», «напиши в задаче» → intent add_task_comment.
+- taskTitle — название задачи без префиксов «к задаче», «в задаче».
+- text — текст комментария после «:», «—» или «, что …»; если текста нет — только taskTitle.
+
+Пример add_task_comment с текстом:
+Input: «Напиши комментарий к задаче Проверить склад: склад закрыт до завтра»
+Output:
+{
+  "intent": "add_task_comment",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад", "text": "склад закрыт до завтра" }
+}
+
+Пример add_task_comment:
+Input: «Добавь к задаче Проверить склад комментарий: нужно уточнить у кладовщика»
+Output:
+{
+  "intent": "add_task_comment",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад", "text": "нужно уточнить у кладовщика" }
+}
+
+Пример add_task_comment (в задаче):
+Input: «В задаче Проверить склад напиши, что склад закрыт до завтра»
+Output:
+{
+  "intent": "add_task_comment",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад", "text": "склад закрыт до завтра" }
+}
+
+Пример add_task_comment без текста:
+Input: «Напиши комментарий к задаче Проверить склад»
+Output:
+{
+  "intent": "add_task_comment",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
 
 complete_task — результат:
 - «Закрой задачу X» без результата → только taskTitle, без completionResult.
