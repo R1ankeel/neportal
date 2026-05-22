@@ -198,8 +198,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 6. Pending transfer rejection reason — **не** отправляется в YandexGPT
 7. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
 8. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-9. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
-10. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+9. Pending create task assignee (имя или «мне») — **не** отправляется в YandexGPT
+10. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
+11. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 ### Поиск сотрудника (User Resolution Flow v1)
 
@@ -224,7 +225,17 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Не найден:** *«Не нашёл сотрудника «{hint}». Проверьте имя.»*
 
-**Где используется:** `create_task` (assignee), `transfer_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/mention`, `/link` (dev).
+**Где используется:** `create_task` (assignee после уточнения или из `assigneeHint`), `transfer_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/mention`, `/link` (dev).
+
+**create_task без исполнителя в AI:** если `assigneeHint` пустой, бот спрашивает (TTL 30 мин):
+
+```
+Кому назначить задачу «Уволить Машу»?
+
+Напишите имя сотрудника или «мне».
+```
+
+Ответ «мне», «себе», «на меня», «меня» или `__self__` → исполнитель = привязанный пользователь. Имя → User Resolution Flow (один → confirmation, несколько → список с номерами). Ответ только цифрой (например `1`) без списка → *«Напишите имя сотрудника или «мне».»* (номера — только в User Selection Flow). Отмена: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
 **Slash с «мне»:** `/transfer Проверить склад | мне | …`, `/mention мне | Проверить склад | …`
 
@@ -324,7 +335,7 @@ Pending confirmation хранится **в памяти** процесса (`pen
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…` предпочитается заголовок, содержащий «Реклама VK», иначе первый.
 3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
-4. **Исполнитель задачи:** **Вася** (`EMPLOYEE`), иначе первый `EMPLOYEE` (если не указан `assigneeHint` в AI).
+4. **Исполнитель задачи (AI):** если `assigneeHint` не указан — бот уточняет исполнителя (см. выше); иначе подсказка / `__self__` / User Resolution Flow. Slash `/task` по-прежнему использует `pickAssigneeId` (Вася или первый `EMPLOYEE`).
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
 
@@ -443,6 +454,9 @@ REST для scheduler (вызывает бот):
 | `pending-task-selection.ts` | Ожидание номера задачи (TTL 30 мин) |
 | `task-selection-format.ts` | Формат списка кандидатов |
 | `handle-pending-task-selection.ts` | Выбор по номеру → details или confirmation |
+| `pending-create-task-assignee.ts` | Ожидание исполнителя для create_task (TTL 30 мин) |
+| `create-task-assignee-flow.ts` | Текст вопроса и confirmation после выбора исполнителя |
+| `handle-pending-create-task-assignee.ts` | Ответ «мне» / имя → confirmation или User Selection |
 | `handle-task-intent.ts` | AI complete/cancel/deadline с selection |
 | `handle-deadline-slash.ts` | `/deadline` с selection и confirmation |
 | `pending-task-status-details.ts` | Ожидание результата/причины (TTL 30 мин) |

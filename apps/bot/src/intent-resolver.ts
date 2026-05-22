@@ -4,7 +4,6 @@ import {
   fetchProjects,
   fetchUsers,
   findUserByNameHint,
-  pickAssigneeId,
   type ApiBudget,
   type ApiProject,
   type ApiUser,
@@ -163,14 +162,11 @@ export async function resolveIntent(
         return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
       }
 
-      const assigneeIdDefault = pickAssigneeId(users);
       let assignee: ApiUser | undefined;
       if (overrides?.assigneeId) {
         assignee = users.find((u) => u.id === overrides.assigneeId);
       } else if (payload.assigneeHint) {
         assignee = findUserByHint(users, payload.assigneeHint, currentUser);
-      } else if (assigneeIdDefault) {
-        assignee = users.find((u) => u.id === assigneeIdDefault);
       }
 
       return {

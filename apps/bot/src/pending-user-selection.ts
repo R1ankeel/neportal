@@ -7,6 +7,7 @@ import { clearPendingTaskStatusDetails } from "./pending-task-status-details";
 import { clearPendingTaskTransferComment } from "./pending-task-transfer-comment";
 import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
+import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 
 export type PendingUserSelectionType =
   | "select_user_for_task_assignee"
@@ -124,6 +125,7 @@ export function startPendingUserSelection(
   clearPendingTaskTransferComment(telegramUserId);
   clearPendingTaskTransferDecision(telegramUserId);
   clearPendingTaskTransferRejection(telegramUserId);
+  clearPendingCreateTaskAssignee(telegramUserId);
   setPendingUserSelection(telegramUserId, {
     type,
     candidates,

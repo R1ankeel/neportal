@@ -18,7 +18,11 @@ import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-sta
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
-import { fetchUsers } from "./api";
+import { fetchProjects, fetchUsers } from "./api";
+import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
+import { handlePendingCreateTaskAssigneeMessage } from "./handle-pending-create-task-assignee";
+import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
+import { findProjectByHint } from "./hint-matchers";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-transfer-comment";
@@ -105,6 +109,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingCreateTaskAssigneeMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   if (await handlePendingUserSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
@@ -162,6 +170,24 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "transfer_task") {
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "create_task" && !intent.payload.assigneeHint?.trim()) {
+    const projects = await fetchProjects();
+    const project = findProjectByHint(projects, intent.payload.projectHint);
+    if (!project) {
+      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+      return;
+    }
+    startPendingCreateTaskAssignee(telegramUserId, {
+      projectHint: intent.payload.projectHint,
+      title: intent.payload.title,
+      description: intent.payload.description,
+      deadlineDate: intent.payload.deadlineDate,
+      creatorId: linked.id,
+    });
+    await ctx.reply(questionForCreateTaskAssignee(intent.payload.title));
     return;
   }
 
