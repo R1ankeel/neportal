@@ -51,6 +51,7 @@
 | POST | `/tasks` | — | Создать задачу |
 | GET | `/tasks/:id/comments` | — | Комментарии задачи (по `createdAt` asc) |
 | POST | `/tasks/:id/comments` | — | Добавить комментарий |
+| POST | `/tasks/:id/comments/mention` | — | Комментарий с призывом сотрудника |
 | PATCH | `/tasks/:id/deadline` | — | Установить или сбросить дедлайн |
 | PATCH | `/tasks/:id/status` | — | Сменить статус |
 
@@ -85,7 +86,7 @@
 
 Статусы: `NEW`, `IN_PROGRESS`, `DONE`, `CANCELLED`.
 
-**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author`).
+**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`: `id`, `mentionedUser` — `id`, `fullName`, `role`).
 
 **POST /tasks/:id/comments** (`CreateTaskCommentDto`):
 
@@ -98,6 +99,19 @@
 ```
 
 `source` опционален (`WEB` | `TELEGRAM_TEXT` | `TELEGRAM_VOICE`, по умолчанию `WEB`). `text` обязателен, trim, минимум 1 символ. Задача и автор должны принадлежать текущей организации.
+
+**POST /tasks/:id/comments/mention** (`CreateTaskCommentMentionDto`):
+
+```json
+{
+  "authorId": "cuid автора",
+  "mentionedUserId": "cuid приглашённого",
+  "text": "Нужны ваши комментарии",
+  "source": "TELEGRAM_TEXT"
+}
+```
+
+Транзакционно создаёт `TaskComment` и `TaskCommentMention`. Ответ: `{ comment, mention, task, mentionedUser, author }` (task с `project`, `creator`, `assignee`). `mentionedUserId` и `authorId` должны быть в текущей org.
 
 ## Notes
 

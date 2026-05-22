@@ -30,7 +30,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -51,6 +51,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `complete_task` | `taskTitle`, `completionResult?` |
 | `cancel_task` | `taskTitle`, `cancellationReason?` |
 | `add_task_comment` | `taskTitle`, `text?` |
+| `mention_in_task` | `userHint`, `taskTitle`, `text?` |
 | `unknown` | `reason?` |
 
 ### Пример: закрыть задачу (без результата в фразе)
@@ -143,6 +144,40 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 ```
 
 Бот спросит: *«Что написать в комментарии к задаче «…»?»*, затем confirmation.
+
+### Пример: призвать в задачу (с текстом)
+
+> Позови Васю в задачу Проверить склад, нужны его комментарии
+
+```json
+{
+  "intent": "mention_in_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "Вася",
+    "taskTitle": "Проверить склад",
+    "text": "нужны его комментарии"
+  }
+}
+```
+
+Confirmation: *«Позвать Вася Пупкин в задачу «…»? Комментарий: …»*
+
+### Пример: призвать без текста
+
+> Попроси Петра прокомментировать задачу Реклама VK
+
+```json
+{
+  "intent": "mention_in_task",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": { "userHint": "Петр", "taskTitle": "Реклама VK" }
+}
+```
+
+Бот спросит: *«Что написать в комментарии для … по задаче «…»?»*, затем confirmation.
 
 ### Пример: заметка
 

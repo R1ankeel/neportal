@@ -116,6 +116,7 @@ model Organization {
   reminders             Reminder[]
   taskNotificationLogs  TaskNotificationLog[]
   taskComments          TaskComment[]
+  taskCommentMentions   TaskCommentMention[]
 }
 
 model User {
@@ -147,6 +148,8 @@ model User {
   reminders              Reminder[]
   taskNotificationLogs   TaskNotificationLog[]
   taskComments           TaskComment[]
+  mentionsReceived       TaskCommentMention[] @relation("MentionedUser")
+  mentionsRequested      TaskCommentMention[] @relation("RequestedBy")
 
   @@unique([organizationId, telegramUsername])
   @@index([organizationId])
@@ -223,6 +226,7 @@ model Task {
   reminders            Reminder[]
   notificationLogs     TaskNotificationLog[]
   comments             TaskComment[]
+  commentMentions      TaskCommentMention[]
 
   @@index([organizationId])
   @@index([projectId])
@@ -243,10 +247,33 @@ model TaskComment {
   source         TaskCommentSource @default(WEB)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+  mentions       TaskCommentMention[]
 
   @@index([organizationId])
   @@index([taskId])
   @@index([authorId])
+  @@index([createdAt])
+}
+
+model TaskCommentMention {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  commentId        String
+  comment          TaskComment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  taskId           String
+  task             Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mentionedUserId  String
+  mentionedUser    User         @relation("MentionedUser", fields: [mentionedUserId], references: [id], onDelete: Restrict)
+  requestedById    String
+  requestedBy      User         @relation("RequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([commentId])
+  @@index([taskId])
+  @@index([mentionedUserId])
+  @@index([requestedById])
   @@index([createdAt])
 }
 

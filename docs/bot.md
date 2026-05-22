@@ -74,6 +74,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/done <название>` | `PATCH /tasks/:id/status` → `DONE` |
 | `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
+| `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
 
 ### Комментарии к задачам
 
@@ -106,6 +107,41 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 В Web комментарий отображается с source **Telegram**.
 
+### Призыв в задачу (mention)
+
+**Slash** (разделители `|`, `—`, `-`):
+
+| Команда | Пример |
+|---------|--------|
+| `/mention` | `/mention Вася \| Проверить склад \| нужны его комментарии` → confirmation → `да` |
+| `/mention` без текста | не поддерживается в slash (нужны три части) |
+
+**AI:**
+
+| Текст | Поведение |
+|-------|-----------|
+| Позови Васю в задачу Проверить склад, нужны его комментарии | поиск сотрудника + задачи → confirmation |
+| Попроси Петра прокомментировать задачу Реклама VK | вопрос о тексте → confirmation |
+
+**Pending mention details** (TTL 30 мин): `pending-task-mention-details.ts`, тип `awaiting_task_mention_text`. Отмена: *отмена*, *отмени*, *нет*, *стоп*.
+
+**Selection:** тип `select_task_for_mention`; payload: `mentionedUserId`, `mentionedUserName`, `mentionText?`. После выбора номера — confirmation или вопрос о тексте.
+
+**Права:** те же, что для комментариев (постановщик, исполнитель, OWNER, MANAGER).
+
+**Уведомление приглашённому** (без TaskNotificationLog):
+
+```
+{author.fullName} попросил вас прокомментировать задачу «{task.title}».
+
+Проект: {project.name}
+Комментарий: {text}
+```
+
+Если у сотрудника нет `telegramId` — комментарий и mention всё равно создаются; автору: *«… приглашён …, но Telegram у сотрудника не привязан.»*
+
+**Порядок обработки текста** (дополнение): после pending comment details — **pending mention details**, затем task selection.
+
 ### Закрытие и отмена задач
 
 **Двухшаговый сценарий:** если результат (`completionResult`) или причина (`cancellationReason`) не указаны, бот сначала спрашивает уточнение, затем показывает confirmation (да/нет). Права проверяются **до** уточняющего вопроса.
@@ -135,8 +171,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 1. Pending confirmation (да/нет)
 2. Pending details (результат/причина) — **не** отправляется в YandexGPT
 3. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
-4. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-5. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+4. Pending mention details (текст призыва) — **не** отправляется в YandexGPT
+5. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
+6. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 **Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
 
@@ -361,6 +398,9 @@ REST для scheduler (вызывает бот):
 | `pending-task-comment-details.ts` | Ожидание текста комментария (TTL 30 мин) |
 | `handle-pending-task-comment-details.ts` | Ответ на вопрос о тексте → confirmation |
 | `handle-task-comment-intent.ts` | AI `add_task_comment` с selection |
+| `handle-mention-intent.ts` | AI `mention_in_task` с selection |
+| `task-mention-flow.ts` | slash `/mention`, execute mention |
+| `pending-task-mention-details.ts` | ожидание текста призыва |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |

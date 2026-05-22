@@ -13,9 +13,11 @@ import {
   setPendingConfirmation,
 } from "./pending-intent";
 import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-comment-details";
+import { handlePendingTaskMentionDetailsMessage } from "./handle-pending-task-mention-details";
 import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
+import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
@@ -76,6 +78,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingTaskMentionDetailsMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
@@ -123,6 +129,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "add_task_comment") {
     await handleAddTaskCommentIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "mention_in_task") {
+    await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
     return;
   }
 

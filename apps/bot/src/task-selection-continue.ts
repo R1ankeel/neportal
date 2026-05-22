@@ -14,6 +14,11 @@ import {
   startPendingTaskCommentDetails,
 } from "./task-comment-flow";
 import {
+  buildResolvedMentionInTask,
+  startPendingTaskMentionDetails,
+} from "./task-mention-flow";
+import { fetchUsers } from "./api";
+import {
   buildResolvedCancelTask,
   buildResolvedCompleteTask,
   startPendingTaskStatusDetails,
@@ -137,6 +142,43 @@ export async function continueAfterTaskSelection(
     }
 
     const question = startPendingTaskCommentDetails(telegramUserId, task);
+    await ctx.reply(question);
+    return;
+  }
+
+  if (selectionType === "select_task_for_mention" && payload.mentionedUserId) {
+    const users = await fetchUsers();
+    const mentionedUser = users.find((u) => u.id === payload.mentionedUserId);
+    if (!mentionedUser) {
+      await ctx.reply("Сотрудник не найден. Повторите команду.");
+      return;
+    }
+
+    if (payload.mentionText?.trim()) {
+      const resolved = buildResolvedMentionInTask(
+        task,
+        mentionedUser,
+        payload.mentionText,
+      );
+      setPendingConfirmation(telegramUserId, {
+        type: "ai_intent",
+        intent: {
+          intent: "mention_in_task",
+          confidence: 1,
+          requiresConfirmation: true,
+          payload: {
+            userHint: mentionedUser.fullName,
+            taskTitle: resolved.taskTitle,
+            text: resolved.text,
+          },
+        },
+        resolved,
+      });
+      await ctx.reply(buildIntentPreview(resolved));
+      return;
+    }
+
+    const question = startPendingTaskMentionDetails(telegramUserId, task, mentionedUser);
     await ctx.reply(question);
   }
 }

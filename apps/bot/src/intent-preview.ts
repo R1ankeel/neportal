@@ -84,6 +84,13 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         `Комментарий: ${resolved.text}`,
       ].join("\n") + CONFIRM_FOOTER;
 
+    case "mention_in_task":
+      return [
+        `Позвать ${resolved.mentionedUserName} в задачу «${resolved.taskTitle}»?`,
+        "",
+        `Комментарий: ${resolved.text}`,
+      ].join("\n") + CONFIRM_FOOTER;
+
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;
   }

@@ -144,6 +144,31 @@ export async function notifyTaskCommentAdded(
   }
 }
 
+/** Уведомление приглашённому сотруднику (без TaskNotificationLog). Возвращает true, если Telegram отправлен. */
+export async function notifyTaskMentionRequested(
+  api: Api,
+  params: {
+    taskTitle: string;
+    projectName?: string | null;
+    text: string;
+    author: ApiUser;
+    mentionedUser: { id: string; fullName: string; telegramId: string | null };
+  },
+): Promise<boolean> {
+  const { mentionedUser, author, taskTitle, projectName, text } = params;
+  if (!mentionedUser.telegramId) return false;
+
+  const lines = [
+    `${author.fullName} попросил вас прокомментировать задачу «${taskTitle}».`,
+    "",
+    projectName ? `Проект: ${projectName}` : null,
+    `Комментарий: ${text}`,
+  ].filter((line): line is string => line != null);
+
+  await sendTelegramMessage(api, mentionedUser.telegramId, lines.join("\n"));
+  return true;
+}
+
 export async function sendAndLogNotification(
   api: Api,
   taskId: string,

@@ -449,6 +449,46 @@ export async function createTaskComment(
   return res.json() as Promise<ApiTaskCommentCreated>;
 }
 
+export type ApiTaskCommentMentionCreated = {
+  comment: ApiTaskCommentCreated & {
+    mentions?: Array<{
+      id: string;
+      mentionedUser: { id: string; fullName: string; role: string };
+    }>;
+  };
+  mention: {
+    id: string;
+    mentionedUser: { id: string; fullName: string; role: string };
+  };
+  task: ApiTask;
+  mentionedUser: { id: string; fullName: string; role: string; telegramId: string | null };
+  author: { id: string; fullName: string; role: string; telegramId: string | null };
+};
+
+export async function createTaskCommentMention(
+  taskId: string,
+  body: {
+    authorId: string;
+    mentionedUserId: string;
+    text: string;
+    source?: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
+  },
+): Promise<ApiTaskCommentMentionCreated> {
+  devLog("POST /tasks/:id/comments/mention payload", { taskId, ...body });
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/comments/mention`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`POST /tasks/${taskId}/comments/mention`, res.status, text);
+    throw new Error(`Не удалось пригласить в задачу (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskCommentMentionCreated>;
+}
+
 export async function createNote(body: {
   text: string;
   creatorId: string;

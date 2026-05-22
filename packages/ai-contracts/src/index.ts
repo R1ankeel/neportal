@@ -9,6 +9,7 @@ export const AiIntentNameSchema = z.enum([
   "complete_task",
   "cancel_task",
   "add_task_comment",
+  "mention_in_task",
   "unknown",
 ]);
 
@@ -76,6 +77,12 @@ export const AddTaskCommentPayloadSchema = z.object({
   text: z.string().min(1).optional(),
 });
 
+export const MentionInTaskPayloadSchema = z.object({
+  userHint: z.string().min(1),
+  taskTitle: z.string().min(1),
+  text: z.string().min(1).optional(),
+});
+
 export const UnknownPayloadSchema = z.object({
   reason: z.string().optional(),
 });
@@ -128,6 +135,11 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: AddTaskCommentPayloadSchema,
   }),
   z.object({
+    intent: z.literal("mention_in_task"),
+    ...intentFields,
+    payload: MentionInTaskPayloadSchema,
+  }),
+  z.object({
     intent: z.literal("unknown"),
     ...intentFields,
     payload: UnknownPayloadSchema,
@@ -143,6 +155,7 @@ export type SetTaskDeadlinePayload = z.infer<typeof SetTaskDeadlinePayloadSchema
 export type CompleteTaskPayload = z.infer<typeof CompleteTaskPayloadSchema>;
 export type CancelTaskPayload = z.infer<typeof CancelTaskPayloadSchema>;
 export type AddTaskCommentPayload = z.infer<typeof AddTaskCommentPayloadSchema>;
+export type MentionInTaskPayload = z.infer<typeof MentionInTaskPayloadSchema>;
 export type UnknownPayload = z.infer<typeof UnknownPayloadSchema>;
 
 /** Removes legacy fields and coerces common model mistakes before Zod parse. */

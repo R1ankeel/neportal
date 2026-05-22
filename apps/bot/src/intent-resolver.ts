@@ -83,6 +83,19 @@ export type ResolvedAddTaskComment = {
   assigneeId: string | null;
 };
 
+export type ResolvedMentionInTask = {
+  intent: "mention_in_task";
+  taskId: string;
+  taskTitle: string;
+  text: string;
+  mentionedUserId: string;
+  mentionedUserName: string;
+  mentionedUserTelegramId: string | null;
+  creatorId: string;
+  assigneeId: string | null;
+  projectName?: string;
+};
+
 export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
@@ -91,7 +104,8 @@ export type ResolvedIntent =
   | ResolvedSetTaskDeadline
   | ResolvedCompleteTask
   | ResolvedCancelTask
-  | ResolvedAddTaskComment;
+  | ResolvedAddTaskComment
+  | ResolvedMentionInTask;
 
 export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }

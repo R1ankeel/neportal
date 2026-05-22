@@ -112,6 +112,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                   <span className="rounded bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{noteSourceLabel(c.source)}</span>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-lg text-zinc-700 dark:text-zinc-300">{c.text}</p>
+                {c.mentions && c.mentions.length > 0 ? (
+                  <p className="mt-2 text-sm text-zinc-500">
+                    Упомянуты:{" "}
+                    {c.mentions.map((m) => m.mentionedUser.fullName).join(", ")}
+                  </p>
+                ) : null}
               </li>
             ))
           )}

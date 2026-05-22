@@ -26,12 +26,18 @@ export type ApiTaskUser = {
   telegramId?: string | null;
 };
 
+export type ApiTaskCommentMention = {
+  id: string;
+  mentionedUser: { id: string; fullName: string; role: string };
+};
+
 export type ApiTaskComment = {
   id: string;
   text: string;
   source: string;
   createdAt: string;
   author: { id: string; fullName: string; role: string };
+  mentions?: ApiTaskCommentMention[];
 };
 
 export type ApiTask = {

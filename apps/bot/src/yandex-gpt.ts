@@ -91,7 +91,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -247,6 +247,45 @@ Output:
   "confidence": 0.85,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Проверить склад" }
+}
+
+mention_in_task.payload:
+{ "userHint": string, "taskTitle": string, "text"?: string }
+
+mention_in_task — текст:
+- Фразы «позови», «призови», «попроси … прокомментировать» → intent mention_in_task.
+- userHint — имя/часть ФИО сотрудника (Вася, Маша, Петр).
+- taskTitle — название задачи без «в задачу», «к задаче».
+- text — пояснение/просьба после запятой или в конце; если нет — только userHint и taskTitle.
+
+Пример mention_in_task с текстом:
+Input: «Позови Васю в задачу Проверить склад, нужны его комментарии»
+Output:
+{
+  "intent": "mention_in_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "userHint": "Вася", "taskTitle": "Проверить склад", "text": "нужны его комментарии" }
+}
+
+Пример mention_in_task:
+Input: «Призови Машу в задачу Заключить договор, пусть проверит условия»
+Output:
+{
+  "intent": "mention_in_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "userHint": "Маша", "taskTitle": "Заключить договор", "text": "пусть проверит условия" }
+}
+
+Пример mention_in_task без текста:
+Input: «Попроси Петра прокомментировать задачу Реклама VK»
+Output:
+{
+  "intent": "mention_in_task",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": { "userHint": "Петр", "taskTitle": "Реклама VK" }
 }
 
 complete_task — результат:

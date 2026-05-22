@@ -11,7 +11,7 @@ import {
 import { formatTaskCandidates } from "./task-selection-format";
 import { canModifyTask, type TaskStatusChangeTarget } from "./task-status-flow";
 
-export type TaskResolvePurpose = "complete" | "cancel" | "deadline" | "comment";
+export type TaskResolvePurpose = "complete" | "cancel" | "deadline" | "comment" | "mention";
 
 export type ResolveTaskByTitleResult =
   | { kind: "found"; task: ApiTask }
@@ -33,6 +33,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_deadline";
     case "comment":
       return "select_task_for_comment";
+    case "mention":
+      return "select_task_for_mention";
   }
 }
 
@@ -47,7 +49,7 @@ function filterTasksForPurpose(
 ): ApiTask[] {
   return tasks.filter((task) => {
     if (!canModifyTask(user, task)) return false;
-    if (purpose === "comment") return true;
+    if (purpose === "comment" || purpose === "mention") return true;
     if (purpose === "complete" || purpose === "cancel") {
       return task.status !== "DONE" && task.status !== "CANCELLED";
     }
@@ -60,6 +62,9 @@ function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   if (purpose === "cancel") return "Укажите название: /cancel Проверить склад";
   if (purpose === "comment") {
     return "Использование: /comment <задача> — <комментарий>";
+  }
+  if (purpose === "mention") {
+    return "Использование: /mention <сотрудник> | <задача> | <комментарий>";
   }
   return "Укажите название задачи.";
 }
@@ -116,12 +121,12 @@ export async function resolveTaskByTitle(
       return {
         kind: "cannot_modify",
         message:
-          purpose === "comment"
+          purpose === "comment" || purpose === "mention"
             ? "Вы не можете комментировать эту задачу."
             : "Вы не можете изменить эту задачу.",
       };
     }
-    if (purpose === "comment") {
+    if (purpose === "comment" || purpose === "mention") {
       return { kind: "no_modifiable", message: "Вы не можете комментировать найденные задачи." };
     }
     return noModifiableMessage(matchedTasks, purpose);

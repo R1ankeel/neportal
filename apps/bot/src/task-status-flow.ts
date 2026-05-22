@@ -7,6 +7,7 @@ import {
 } from "./api";
 import type { ResolvedCancelTask, ResolvedCompleteTask } from "./intent-resolver";
 import { clearPendingTaskCommentDetails } from "./pending-task-comment-details";
+import { clearPendingTaskMentionDetails } from "./pending-task-mention-details";
 import {
   clearPendingTaskStatusDetails,
   type PendingTaskStatusDetailsType,
@@ -93,6 +94,7 @@ export function startPendingTaskStatusDetails(
 ): string {
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskCommentDetails(telegramUserId);
+  clearPendingTaskMentionDetails(telegramUserId);
   setPendingTaskStatusDetails(telegramUserId, {
     type,
     taskId: task.id,

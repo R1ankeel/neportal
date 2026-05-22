@@ -79,7 +79,7 @@ pnpm --filter @neportal/web dev
 - Данные: `GET /tasks/:id` (задача + комментарии по `createdAt` asc).
 - Назад: к `/projects/[id]/tasks`, если у задачи есть проект, иначе к `/tasks`.
 - Результат (`DONE` + `completionResult`) и причина отмены (`CANCELLED` + `cancellationReason`) — отдельные блоки.
-- Комментарии: автор, дата, метка источника (`noteSourceLabel`: Web / Telegram / Голос Telegram).
+- Комментарии: автор, дата, метка источника (`noteSourceLabel`: Web / Telegram / Голос Telegram). Если у комментария есть `mentions[]` — строка *«Упомянуты: …»* (ФИО приглашённых).
 - Добавление: Server Action `POST /tasks/:id/comments`, автор — `findWebAuthor` (`src/lib/webAuthor.ts`): **Иван Иванов** OWNER из сида, иначе первый OWNER.
 
 ## Паттерны UI

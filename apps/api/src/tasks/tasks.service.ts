@@ -3,6 +3,7 @@ import { PrismaService } from "@neportal/database";
 import { TaskCommentSource, TaskNotificationType, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateTaskCommentDto } from "./dto/task-comment.dto";
+import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 
@@ -59,8 +60,20 @@ export class TasksService {
     role: true,
   } as const;
 
+  private readonly mentionUserSelect = {
+    id: true,
+    fullName: true,
+    role: true,
+  } as const;
+
   private readonly commentInclude = {
     author: { select: this.commentAuthorSelect },
+    mentions: {
+      orderBy: { createdAt: "asc" as const },
+      include: {
+        mentionedUser: { select: this.mentionUserSelect },
+      },
+    },
   } as const;
 
   private readonly taskDetailInclude = {
@@ -133,6 +146,87 @@ export class TasksService {
         source: dto.source ?? TaskCommentSource.WEB,
       },
       include: this.commentInclude,
+    });
+  }
+
+  async createCommentMention(taskId: string, dto: CreateTaskCommentMentionDto) {
+    const org = this.orgId();
+    await this.assertTaskInOrg(taskId);
+
+    const author = await this.prisma.user.findFirst({
+      where: { id: dto.authorId, organizationId: org },
+    });
+    if (!author) {
+      throw new NotFoundException(`User with id "${dto.authorId}" not found in this organization`);
+    }
+
+    const mentionedUser = await this.prisma.user.findFirst({
+      where: { id: dto.mentionedUserId, organizationId: org },
+    });
+    if (!mentionedUser) {
+      throw new NotFoundException(
+        `User with id "${dto.mentionedUserId}" not found in this organization`,
+      );
+    }
+
+    const text = dto.text.trim();
+    if (!text) {
+      throw new BadRequestException("text must not be empty");
+    }
+
+    const source = dto.source ?? TaskCommentSource.WEB;
+
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.taskComment.create({
+        data: {
+          organizationId: org,
+          taskId,
+          authorId: dto.authorId,
+          text,
+          source,
+        },
+        include: this.commentInclude,
+      });
+
+      const mention = await tx.taskCommentMention.create({
+        data: {
+          organizationId: org,
+          commentId: comment.id,
+          taskId,
+          mentionedUserId: dto.mentionedUserId,
+          requestedById: dto.authorId,
+        },
+        include: {
+          mentionedUser: { select: this.mentionUserSelect },
+        },
+      });
+
+      const task = await tx.task.findFirstOrThrow({
+        where: { id: taskId, organizationId: org },
+        include: {
+          project: { select: { id: true, name: true } },
+          creator: { select: this.taskUserDetailSelect },
+          assignee: { select: this.taskUserDetailSelect },
+        },
+      });
+
+      return {
+        comment,
+        mention,
+        task,
+        mentionedUser: {
+          id: mentionedUser.id,
+          fullName: mentionedUser.fullName,
+          role: mentionedUser.role,
+          telegramId: mentionedUser.telegramId,
+        },
+        author: {
+          id: author.id,
+          fullName: author.fullName,
+          role: author.role,
+          telegramId: author.telegramId,
+        },
+      };
     });
   }
 

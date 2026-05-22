@@ -35,6 +35,7 @@ import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleCommentSlashCommand } from "./task-comment-flow";
+import { handleMentionSlashCommand } from "./task-mention-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -69,6 +70,7 @@ bot.command("start", async (ctx) => {
       "/done <название> — закрыть задачу",
       "/cancel <название> — отменить задачу",
       "/comment <задача> — <комментарий> — комментарий к задаче",
+      "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -91,6 +93,7 @@ bot.command("demo", async (ctx) => {
       "/done Проверить склад — закрыть задачу",
       "/cancel Проверить склад — отменить задачу",
       "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
+      "/mention Вася | Проверить склад | нужны его комментарии — призвать в задачу",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -104,6 +107,7 @@ bot.command("demo", async (ctx) => {
       "- Отмени задачу Проверить склад",
       "- Отмени задачу Проверить склад, склад закрыт",
       "- Напиши комментарий к задаче Проверить склад: склад закрыт до завтра",
+      "- Позови Васю в задачу Проверить склад, нужны его комментарии",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -525,6 +529,46 @@ bot.command("comment", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] comment command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("mention", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleMentionSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+    );
+    if (result.kind === "reply" || result.kind === "awaiting_text") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "mention_in_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          userHint: resolved.mentionedUserName,
+          taskTitle: resolved.taskTitle,
+          text: resolved.text,
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] mention command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

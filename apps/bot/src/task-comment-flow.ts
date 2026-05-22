@@ -7,6 +7,7 @@ import {
   clearPendingTaskCommentDetails,
   setPendingTaskCommentDetails,
 } from "./pending-task-comment-details";
+import { clearPendingTaskMentionDetails } from "./pending-task-mention-details";
 import { clearPendingTaskSelection } from "./pending-task-selection";
 import { clearPendingTaskStatusDetails } from "./pending-task-status-details";
 import {
@@ -44,6 +45,7 @@ export function startPendingTaskCommentDetails(
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskSelection(telegramUserId);
   clearPendingTaskStatusDetails(telegramUserId);
+  clearPendingTaskMentionDetails(telegramUserId);
   setPendingTaskCommentDetails(telegramUserId, {
     type: "awaiting_task_comment_text",
     taskId: task.id,
