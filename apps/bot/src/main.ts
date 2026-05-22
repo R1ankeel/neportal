@@ -44,6 +44,7 @@ import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
 import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
+import { formatMyTasksReply } from "./my-tasks-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 
@@ -79,6 +80,7 @@ bot.command("start", async (ctx) => {
       "/comment <задача> — <комментарий> — комментарий к задаче",
       "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
       "/transfer <задача> | <исполнитель> | <комментарий> — передать задачу",
+      "/tasks — мои ближайшие задачи",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -103,6 +105,7 @@ bot.command("demo", async (ctx) => {
       "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
       "/mention Вася | Проверить склад | нужны его комментарии — призвать в задачу",
       "/transfer Проверить склад | Вася | потому что он отвечает за склад — передать задачу",
+      "/tasks — показать мои ближайшие задачи",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -118,6 +121,7 @@ bot.command("demo", async (ctx) => {
       "- Напиши комментарий к задаче Проверить склад: склад закрыт до завтра",
       "- Позови Васю в задачу Проверить склад, нужны его комментарии",
       "- Передай задачу Проверить склад Васе, потому что он отвечает за склад",
+      "- покажи мои задачи",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -197,6 +201,20 @@ bot.command("me", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] me command error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("tasks", async (ctx) => {
+  const user = await requireLinkedUser(ctx);
+  if (!user) return;
+
+  try {
+    const reply = await formatMyTasksReply(user.id, 5);
+    await ctx.reply(reply);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] tasks command error: ${msg}`);
     await ctx.reply(`Ошибка API: ${msg}`);
   }
 });

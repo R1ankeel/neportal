@@ -4,6 +4,7 @@ import { CreateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskTransferDto } from "./dto/task-transfer.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
+import { MyTasksQueryDto } from "./dto/my-tasks-query.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
 
@@ -23,6 +24,12 @@ export class TasksController {
   @ApiOperation({ summary: "Создать задачу" })
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);
+  }
+
+  @Get("my")
+  @ApiOperation({ summary: "Активные задачи исполнителя по дедлайну (бот)" })
+  findMy(@Query() query: MyTasksQueryDto) {
+    return this.tasksService.findMyTasks(query.userId, query.limit ?? 5);
   }
 
   @Get("notifications/deadline-tomorrow")

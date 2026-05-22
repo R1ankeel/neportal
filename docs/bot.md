@@ -76,6 +76,22 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
 | `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
 | `/transfer <задача> \| <исполнитель> \| <комментарий>` | `POST /tasks/:id/transfers` |
+| `/tasks` | `GET /tasks/my?userId=…&limit=5` — ближайшие активные задачи исполнителя |
+
+### Список моих задач
+
+**Slash:** `/tasks` — до 5 активных задач (`NEW`, `IN_PROGRESS`), сортировка по дедлайну.
+
+**AI** (без confirmation, `requiresConfirmation: false`):
+
+| Текст | intent |
+|-------|--------|
+| покажи мои задачи | `list_my_tasks` |
+| какие у меня задачи | `list_my_tasks` |
+| что у меня по задачам | `list_my_tasks` |
+| что мне нужно сделать | `list_my_tasks` |
+
+Формат ответа: нумерованный список с проектом, дедлайном (сегодня / завтра / DD.MM.YYYY / не указан), статусом (Новая / В работе). Пустой список: *«У вас нет активных задач.»*
 
 ### Комментарии к задачам
 

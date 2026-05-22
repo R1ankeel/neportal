@@ -95,7 +95,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -491,6 +491,39 @@ Output:
   "payload": { "taskTitle": "Проверить склад", "cancellationReason": "склад закрыт" }
 }
 
+list_my_tasks.payload:
+{} (пустой объект)
+
+Пример list_my_tasks:
+Input: «покажи мои задачи»
+Output:
+{
+  "intent": "list_my_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
+Пример list_my_tasks (что сделать):
+Input: «что мне нужно сделать»
+Output:
+{
+  "intent": "list_my_tasks",
+  "confidence": 0.85,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
+Пример list_my_tasks (список):
+Input: «какие у меня задачи»
+Output:
+{
+  "intent": "list_my_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
 unknown.payload:
 { "reason"?: string }
 
@@ -510,7 +543,8 @@ unknown.payload:
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
 - Если команда непонятна: intent unknown, низкая confidence.
-- requiresConfirmation: true для всех известных intent.`;
+- list_my_tasks: показать активные задачи текущего пользователя («мои задачи», «что мне сделать», «список задач») — requiresConfirmation: false, payload {}.
+- requiresConfirmation: true для остальных известных intent (кроме list_my_tasks).`;
 
 /** Dev-only logs (отключить: BOT_DEV_LOG=0). */
 function yandexGptDevLog(message: string, data?: Record<string, unknown>): void {

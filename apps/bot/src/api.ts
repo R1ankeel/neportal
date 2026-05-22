@@ -243,6 +243,8 @@ export type ApiTask = {
   project?: { id: string; name: string } | null;
 };
 
+export type ApiMyTask = ApiTask;
+
 export type ApiTaskStatusUpdated = ApiTaskCreated;
 
 export type TaskNotificationType =
@@ -295,6 +297,18 @@ export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
     throw new Error(`GET /tasks → ${res.status} ${text}`.trim());
   }
   return res.json() as Promise<ApiTask[]>;
+}
+
+export async function fetchMyTasks(userId: string, limit = 5): Promise<ApiMyTask[]> {
+  const url = new URL(`${getApiBaseUrl()}/tasks/my`);
+  url.searchParams.set("userId", userId);
+  url.searchParams.set("limit", String(limit));
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks/my → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiMyTask[]>;
 }
 
 /** Alias for AI intent execution. */

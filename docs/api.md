@@ -47,6 +47,7 @@
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/tasks` | `projectId?` | Список задач |
+| GET | `/tasks/my` | `userId`, `limit?` (1–20, default 5) | Активные задачи исполнителя по дедлайну |
 | GET | `/tasks/:id` | — | Карточка задачи с комментариями |
 | POST | `/tasks` | — | Создать задачу |
 | GET | `/tasks/:id/comments` | — | Комментарии задачи (по `createdAt` asc) |
@@ -71,6 +72,14 @@
 ```
 
 `projectId` опционален — без него задача «глобальная» в рамках org.
+
+**GET /tasks/my** (`MyTasksQueryDto`):
+
+- `userId` — исполнитель (должен быть в org из контекста).
+- `limit` — по умолчанию `5`, максимум `20`.
+- Фильтр: `status` ∈ `NEW`, `IN_PROGRESS`; `assigneeId = userId`.
+- Сортировка: `deadlineAt` asc (без дедлайна — в конце), затем `createdAt` asc.
+- Include: `project { id, name }`, `creator { id, fullName }`, `assignee { id, fullName }`.
 
 **PATCH /tasks/:id/deadline** (`UpdateTaskDeadlineDto`):
 

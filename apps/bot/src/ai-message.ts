@@ -30,6 +30,7 @@ import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
+import { formatMyTasksReply } from "./my-tasks-flow";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
 
@@ -170,6 +171,18 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "transfer_task") {
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "list_my_tasks") {
+    try {
+      const reply = await formatMyTasksReply(linked.id, 5);
+      await ctx.reply(reply);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_my_tasks error: ${msg}`);
+      await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+    }
     return;
   }
 

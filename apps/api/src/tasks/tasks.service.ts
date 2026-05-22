@@ -99,10 +99,21 @@ export class TasksService {
     },
   } as const;
 
+  private readonly taskListUserSelect = {
+    id: true,
+    fullName: true,
+  } as const;
+
   private readonly taskWithProjectInclude = {
     project: { select: { id: true, name: true } },
     creator: { select: this.taskUserDetailSelect },
     assignee: { select: this.taskUserDetailSelect },
+  } as const;
+
+  private readonly myTaskInclude = {
+    project: { select: { id: true, name: true } },
+    creator: { select: this.taskListUserSelect },
+    assignee: { select: this.taskListUserSelect },
   } as const;
 
   private readonly taskDetailInclude = {
@@ -293,6 +304,29 @@ export class TasksService {
         assignee: { select: { id: true, fullName: true } },
         project: { select: { id: true, name: true } },
       },
+    });
+  }
+
+  async findMyTasks(userId: string, limit = 5) {
+    const org = this.orgId();
+    const cappedLimit = Math.min(Math.max(limit, 1), 20);
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId: org },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with id "${userId}" not found in this organization`);
+    }
+
+    return this.prisma.task.findMany({
+      where: {
+        organizationId: org,
+        assigneeId: userId,
+        status: { in: [TaskStatus.NEW, TaskStatus.IN_PROGRESS] },
+      },
+      orderBy: [{ deadlineAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+      take: cappedLimit,
+      include: this.myTaskInclude,
     });
   }
 
