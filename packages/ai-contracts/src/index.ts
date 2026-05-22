@@ -1,4 +1,16 @@
 import { z } from "zod";
+import {
+  optionalAiDeadlineDate,
+  optionalAiString,
+  optionalAiStringMin1,
+} from "./optional-ai-string";
+
+export {
+  optionalAiString,
+  optionalAiStringMin1,
+  optionalAiDeadlineDate,
+  preprocessOptionalAiString,
+} from "./optional-ai-string";
 
 export const AiIntentNameSchema = z.enum([
   "create_task",
@@ -25,35 +37,32 @@ const intentBase = {
 };
 
 export const CreateTaskPayloadSchema = z.object({
-  projectHint: z.string().optional(),
-  assigneeHint: z.string().optional(),
+  projectHint: optionalAiString,
+  assigneeHint: optionalAiString,
   title: z.string().min(1),
-  description: z.string().optional(),
-  deadlineDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "deadlineDate must be YYYY-MM-DD")
-    .optional(),
+  description: optionalAiString,
+  deadlineDate: optionalAiDeadlineDate,
 });
 
 export const CreateNotePayloadSchema = z.object({
-  projectHint: z.string().optional(),
+  projectHint: optionalAiString,
   text: z.string().min(1),
 });
 
 export const CreateExpensePayloadSchema = z.object({
-  projectHint: z.string().optional(),
-  budgetHint: z.string().optional(),
+  projectHint: optionalAiString,
+  budgetHint: optionalAiString,
   amount: z.number().positive(),
-  description: z.string().optional(),
+  description: optionalAiString,
 });
 
 export const CreateAbsencePayloadSchema = z.object({
-  userHint: z.string().optional(),
+  userHint: optionalAiString,
   type: AbsenceTypeSchema,
-  startDate: z.string().optional(),
+  startDate: optionalAiString,
   endDate: z.string(),
-  documentNumber: z.string().optional(),
-  comment: z.string().optional(),
+  documentNumber: optionalAiString,
+  comment: optionalAiString,
 });
 
 export const SetTaskDeadlinePayloadSchema = z.object({
@@ -65,33 +74,33 @@ export const SetTaskDeadlinePayloadSchema = z.object({
 
 export const CompleteTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
-  completionResult: z.string().min(1).optional(),
+  completionResult: optionalAiStringMin1,
 });
 
 export const CancelTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
-  cancellationReason: z.string().min(1).optional(),
+  cancellationReason: optionalAiStringMin1,
 });
 
 export const AddTaskCommentPayloadSchema = z.object({
   taskTitle: z.string().min(1),
-  text: z.string().min(1).optional(),
+  text: optionalAiStringMin1,
 });
 
 export const MentionInTaskPayloadSchema = z.object({
   userHint: z.string().min(1),
   taskTitle: z.string().min(1),
-  text: z.string().min(1).optional(),
+  text: optionalAiStringMin1,
 });
 
 export const TransferTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
   toUserHint: z.string().min(1),
-  comment: z.string().min(1).optional(),
+  comment: optionalAiStringMin1,
 });
 
 export const UnknownPayloadSchema = z.object({
-  reason: z.string().optional(),
+  reason: optionalAiString,
 });
 
 /** Intent-based AI contract (no version / action / entity). */

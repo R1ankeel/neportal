@@ -89,6 +89,10 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 ЗАПРЕЩЕНО использовать поля: version, action, entity, rawText.
 Используй ТОЛЬКО: intent, confidence, requiresConfirmation, payload.
 
+Опциональные поля в payload:
+- Не возвращай null.
+- Если значения нет, не добавляй поле в объект.
+
 JSON Schema ответа:
 {
   "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "unknown",
