@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TaskTitleCell } from "@/components/TaskTitleCell";
 import { apiGet } from "@/lib/api";
 import { budgetRemainder, formatDateTime, formatMoney, taskStatusLabel } from "@/lib/format";
 import type { ApiBudget, ApiNote, ApiTask } from "@/lib/types";
@@ -45,9 +46,9 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             <li className="py-4 text-lg text-zinc-500">Задач пока нет</li>
           ) : (
             recentTasks.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-                <span className="text-lg font-medium">{t.title}</span>
-                <span className="text-sm text-zinc-500">{taskStatusLabel(t.status)}</span>
+              <li key={t.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
+                <TaskTitleCell task={t} />
+                <span className="shrink-0 text-sm text-zinc-500">{taskStatusLabel(t.status)}</span>
               </li>
             ))
           )}

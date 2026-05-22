@@ -1,3 +1,4 @@
+import { TaskTitleCell } from "@/components/TaskTitleCell";
 import { apiGet } from "@/lib/api";
 import { formatDate, taskStatusLabel } from "@/lib/format";
 import type { ApiTask } from "@/lib/types";
@@ -45,7 +46,7 @@ export default async function TasksPage() {
               tasks.map((t) => (
                 <tr key={t.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
                   <td className="px-4 py-4 align-top">
-                    <div className="font-medium">{t.title}</div>
+                    <TaskTitleCell task={t} />
                     <div className="mt-1 text-sm text-zinc-500 sm:hidden">
                       {taskStatusLabel(t.status)}
                       {t.assignee ? ` · ${t.assignee.fullName}` : ""}
