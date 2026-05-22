@@ -180,3 +180,95 @@ export async function sendAndLogNotification(
   await sendTelegramMessage(api, telegramId, text);
   await recordTaskNotification(taskId, userId, type);
 }
+
+/** OWNER/MANAGER: задача передана сразу. */
+export async function notifyTransferImmediate(
+  api: Api,
+  params: {
+    taskTitle: string;
+    projectName?: string | null;
+    comment: string;
+    author: ApiUser;
+    toUser: { id: string; fullName: string; telegramId: string | null };
+  },
+): Promise<void> {
+  if (!params.toUser.telegramId) return;
+
+  const lines = [
+    `Вам передали задачу «${params.taskTitle}».`,
+    "",
+    params.projectName ? `Проект: ${params.projectName}` : null,
+    `Передал: ${params.author.fullName}`,
+    `Комментарий: ${params.comment}`,
+  ].filter((line): line is string => line != null);
+
+  await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+}
+
+/** EMPLOYEE: запрос на принятие передачи. */
+export async function notifyTransferPending(
+  api: Api,
+  params: {
+    taskTitle: string;
+    projectName?: string | null;
+    comment: string;
+    author: ApiUser;
+    toUser: { id: string; fullName: string; telegramId: string | null };
+  },
+): Promise<void> {
+  if (!params.toUser.telegramId) return;
+
+  const lines = [
+    `${params.author.fullName} хочет передать вам задачу «${params.taskTitle}».`,
+    "",
+    params.projectName ? `Проект: ${params.projectName}` : null,
+    `Комментарий: ${params.comment}`,
+    "",
+    "Принять задачу? Ответьте: да / нет",
+  ].filter((line): line is string => line != null);
+
+  await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+}
+
+/** Уведомление инициатору о принятии. */
+export async function notifyTransferAccepted(
+  api: Api,
+  params: {
+    taskTitle: string;
+    toUserName: string;
+    requestedById: string;
+  },
+): Promise<void> {
+  const users = await fetchUsers();
+  const requester = users.find((u) => u.id === params.requestedById);
+  if (!requester?.telegramId) return;
+
+  await sendTelegramMessage(
+    api,
+    requester.telegramId,
+    `${params.toUserName} принял задачу «${params.taskTitle}».`,
+  );
+}
+
+/** Уведомление инициатору об отказе. */
+export async function notifyTransferRejected(
+  api: Api,
+  params: {
+    taskTitle: string;
+    toUserName: string;
+    requestedById: string;
+    rejectionReason: string;
+  },
+): Promise<void> {
+  const users = await fetchUsers();
+  const requester = users.find((u) => u.id === params.requestedById);
+  if (!requester?.telegramId) return;
+
+  const text = [
+    `${params.toUserName} отказался принять задачу «${params.taskTitle}».`,
+    "",
+    `Причина: ${params.rejectionReason}`,
+  ].join("\n");
+
+  await sendTelegramMessage(api, requester.telegramId, text);
+}

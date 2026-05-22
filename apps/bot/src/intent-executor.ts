@@ -10,6 +10,7 @@ import {
 import { getLinkedUserByTelegramId } from "./current-user";
 import { executeTaskComment } from "./task-comment-flow";
 import { executeMentionInTask } from "./task-mention-flow";
+import { executeTransferTask } from "./task-transfer-flow";
 import { executeTaskStatusChange } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
@@ -154,6 +155,18 @@ export async function executeResolvedIntent(
         return "Не удалось отправить уведомление.";
       }
       return executeMentionInTask(botApi, linked, resolved);
+    }
+
+    case "transfer_task": {
+      const linked =
+        telegramUserId != null ? await getLinkedUserByTelegramId(telegramUserId) : null;
+      if (!linked) {
+        return "Вы не привязаны ни к какому проекту.";
+      }
+      if (!botApi) {
+        return "Не удалось отправить уведомление.";
+      }
+      return executeTransferTask(botApi, linked, resolved);
     }
 
     default:

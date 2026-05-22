@@ -52,6 +52,8 @@
 | GET | `/tasks/:id/comments` | — | Комментарии задачи (по `createdAt` asc) |
 | POST | `/tasks/:id/comments` | — | Добавить комментарий |
 | POST | `/tasks/:id/comments/mention` | — | Комментарий с призывом сотрудника |
+| GET | `/tasks/:id/transfers` | — | История передач задачи |
+| POST | `/tasks/:id/transfers` | — | Передать задачу другому исполнителю |
 | PATCH | `/tasks/:id/deadline` | — | Установить или сбросить дедлайн |
 | PATCH | `/tasks/:id/status` | — | Сменить статус |
 
@@ -86,7 +88,7 @@
 
 Статусы: `NEW`, `IN_PROGRESS`, `DONE`, `CANCELLED`.
 
-**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`: `id`, `mentionedUser` — `id`, `fullName`, `role`).
+**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`), `transfers[]` (с `fromUser`, `toUser`, `requestedBy`, `status`, `comment`, `rejectionReason`).
 
 **POST /tasks/:id/comments** (`CreateTaskCommentDto`):
 
@@ -112,6 +114,27 @@
 ```
 
 Транзакционно создаёт `TaskComment` и `TaskCommentMention`. Ответ: `{ comment, mention, task, mentionedUser, author }` (task с `project`, `creator`, `assignee`). `mentionedUserId` и `authorId` должны быть в текущей org.
+
+**POST /tasks/:id/transfers** (`CreateTaskTransferDto`):
+
+```json
+{
+  "requestedById": "cuid инициатора",
+  "toUserId": "cuid нового исполнителя",
+  "comment": "потому что он отвечает за склад"
+}
+```
+
+Задача в статусе `NEW` или `IN_PROGRESS`. `toUserId` ≠ текущий `assigneeId`. `fromUserId` = `assigneeId` или `requestedById`, если исполнитель не назначен.
+
+- **OWNER / MANAGER:** `TaskTransfer` со статусом `ACCEPTED`, `decidedAt` = now, `task.assigneeId` обновляется сразу.
+- **EMPLOYEE / ACCOUNTANT:** `TaskTransfer` со статусом `PENDING`, `assigneeId` не меняется до принятия.
+
+Ответ: `{ transfer, task }`.
+
+**POST /task-transfers/:id/accept** — body `{ userId }` (должен быть `toUserId`), transfer `PENDING` → `ACCEPTED`, обновление `assigneeId`.
+
+**POST /task-transfers/:id/reject** — body `{ userId, rejectionReason }`, transfer `PENDING` → `REJECTED`, `assigneeId` не меняется.
 
 ## Notes
 

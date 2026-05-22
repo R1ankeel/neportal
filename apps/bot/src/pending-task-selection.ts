@@ -2,6 +2,9 @@ import type { ApiTask } from "./api";
 import { clearPendingConfirmation } from "./pending-intent";
 import { clearPendingTaskCommentDetails } from "./pending-task-comment-details";
 import { clearPendingTaskMentionDetails } from "./pending-task-mention-details";
+import { clearPendingTaskTransferComment } from "./pending-task-transfer-comment";
+import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decision";
+import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingTaskStatusDetails } from "./pending-task-status-details";
 
 export type PendingTaskSelectionType =
@@ -9,7 +12,8 @@ export type PendingTaskSelectionType =
   | "select_task_for_cancel"
   | "select_task_for_deadline"
   | "select_task_for_comment"
-  | "select_task_for_mention";
+  | "select_task_for_mention"
+  | "select_task_for_transfer";
 
 export type TaskSelectionPayload = {
   completionResult?: string;
@@ -20,6 +24,9 @@ export type TaskSelectionPayload = {
   mentionedUserId?: string;
   mentionedUserName?: string;
   mentionText?: string;
+  toUserId?: string;
+  toUserName?: string;
+  transferComment?: string;
 };
 
 export type TaskCandidate = {
@@ -105,6 +112,9 @@ export function startPendingTaskSelection(
   clearPendingTaskStatusDetails(telegramUserId);
   clearPendingTaskCommentDetails(telegramUserId);
   clearPendingTaskMentionDetails(telegramUserId);
+  clearPendingTaskTransferComment(telegramUserId);
+  clearPendingTaskTransferDecision(telegramUserId);
+  clearPendingTaskTransferRejection(telegramUserId);
   setPendingTaskSelection(telegramUserId, {
     type,
     candidates,

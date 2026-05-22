@@ -40,6 +40,22 @@ export type ApiTaskComment = {
   mentions?: ApiTaskCommentMention[];
 };
 
+export type ApiTaskTransfer = {
+  id: string;
+  taskId: string;
+  fromUserId: string;
+  toUserId: string;
+  requestedById: string;
+  comment: string | null;
+  status: string;
+  rejectionReason: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  fromUser: { id: string; fullName: string; role: string };
+  toUser: { id: string; fullName: string; role: string };
+  requestedBy: { id: string; fullName: string; role: string };
+};
+
 export type ApiTask = {
   id: string;
   title: string;
@@ -56,6 +72,7 @@ export type ApiTask = {
   assignee?: ApiTaskUser | null;
   project?: { id: string; name: string } | null;
   comments?: ApiTaskComment[];
+  transfers?: ApiTaskTransfer[];
 };
 
 export type ApiBudget = {

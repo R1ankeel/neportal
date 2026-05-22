@@ -94,6 +94,13 @@ enum TaskNotificationType {
   TASK_CANCELLED_CREATOR
 }
 
+enum TaskTransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
@@ -117,6 +124,7 @@ model Organization {
   taskNotificationLogs  TaskNotificationLog[]
   taskComments          TaskComment[]
   taskCommentMentions   TaskCommentMention[]
+  taskTransfers         TaskTransfer[]
 }
 
 model User {
@@ -150,6 +158,9 @@ model User {
   taskComments           TaskComment[]
   mentionsReceived       TaskCommentMention[] @relation("MentionedUser")
   mentionsRequested      TaskCommentMention[] @relation("RequestedBy")
+  transfersFrom          TaskTransfer[]       @relation("TransferFromUser")
+  transfersTo            TaskTransfer[]       @relation("TransferToUser")
+  transfersRequested     TaskTransfer[]       @relation("TransferRequestedBy")
 
   @@unique([organizationId, telegramUsername])
   @@index([organizationId])
@@ -227,12 +238,41 @@ model Task {
   notificationLogs     TaskNotificationLog[]
   comments             TaskComment[]
   commentMentions      TaskCommentMention[]
+  transfers            TaskTransfer[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([creatorId])
   @@index([assigneeId])
   @@index([deadlineAt])
+}
+
+model TaskTransfer {
+  id               String             @id @default(cuid())
+  organizationId   String
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId           String
+  task             Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromUserId       String
+  fromUser         User               @relation("TransferFromUser", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUserId         String
+  toUser           User               @relation("TransferToUser", fields: [toUserId], references: [id], onDelete: Restrict)
+  requestedById    String
+  requestedBy      User               @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  comment          String?
+  status           TaskTransferStatus @default(PENDING)
+  rejectionReason  String?
+  createdAt        DateTime           @default(now())
+  decidedAt        DateTime?
+  updatedAt        DateTime           @updatedAt
+
+  @@index([organizationId])
+  @@index([taskId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([requestedById])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model TaskComment {

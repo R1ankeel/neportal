@@ -18,6 +18,10 @@ import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-sta
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
+import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-transfer-comment";
+import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-transfer-decision";
+import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
+import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
@@ -82,6 +86,18 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingTaskTransferCommentMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (await handlePendingTaskTransferRejectionMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (await handlePendingTaskTransferDecisionMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
@@ -134,6 +150,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "mention_in_task") {
     await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "transfer_task") {
+    await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
     return;
   }
 

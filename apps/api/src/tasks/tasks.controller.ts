@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CreateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
+import { CreateTaskTransferDto } from "./dto/task-transfer.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
@@ -83,5 +84,19 @@ export class TasksController {
   @ApiParam({ name: "id" })
   createCommentMention(@Param("id") id: string, @Body() dto: CreateTaskCommentMentionDto) {
     return this.tasksService.createCommentMention(id, dto);
+  }
+
+  @Get(":id/transfers")
+  @ApiOperation({ summary: "История передач задачи" })
+  @ApiParam({ name: "id" })
+  findTransfers(@Param("id") id: string) {
+    return this.tasksService.findTransfers(id);
+  }
+
+  @Post(":id/transfers")
+  @ApiOperation({ summary: "Передать задачу другому исполнителю" })
+  @ApiParam({ name: "id" })
+  createTransfer(@Param("id") id: string, @Body() dto: CreateTaskTransferDto) {
+    return this.tasksService.createTransfer(id, dto);
   }
 }

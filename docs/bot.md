@@ -75,6 +75,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
 | `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
+| `/transfer <задача> \| <исполнитель> \| <комментарий>` | `POST /tasks/:id/transfers` |
 
 ### Комментарии к задачам
 
@@ -142,6 +143,27 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Порядок обработки текста** (дополнение): после pending comment details — **pending mention details**, затем task selection.
 
+### Передача задачи (transfer)
+
+**Slash:** `/transfer Проверить склад | Вася | потому что он отвечает за склад` (разделители `|`, `—`, `-`). Без комментария в slash — уточняющий вопрос *«Почему передаём задачу «…»?»*.
+
+**AI:** «Передай задачу Проверить склад Васе, потому что …» → confirmation → `да`.
+
+**Роли:**
+
+| Инициатор | После «да» |
+|-----------|------------|
+| OWNER / MANAGER | `assigneeId` сразу, уведомление новому исполнителю |
+| EMPLOYEE / ACCOUNTANT | `PENDING`, новому исполнителю «Принять? да/нет»; без Telegram у получателя — передача не создаётся |
+
+**Принятие / отказ:** pending `pending_task_transfer_decision` у получателя. «да» → `POST /task-transfers/:id/accept`. «нет» → вопрос о причине → `POST .../reject`.
+
+**Права:** постановщик, текущий исполнитель, OWNER, MANAGER.
+
+**Selection:** `select_task_for_transfer`, payload `toUserId`, `toUserName`, `transferComment?`.
+
+**Порядок текста:** после mention details — transfer comment → transfer rejection reason → transfer decision → selection.
+
 ### Закрытие и отмена задач
 
 **Двухшаговый сценарий:** если результат (`completionResult`) или причина (`cancellationReason`) не указаны, бот сначала спрашивает уточнение, затем показывает confirmation (да/нет). Права проверяются **до** уточняющего вопроса.
@@ -172,8 +194,11 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 2. Pending details (результат/причина) — **не** отправляется в YandexGPT
 3. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
 4. Pending mention details (текст призыва) — **не** отправляется в YandexGPT
-5. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-6. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+5. Pending transfer comment — **не** отправляется в YandexGPT
+6. Pending transfer rejection reason — **не** отправляется в YandexGPT
+7. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
+8. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
+9. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 **Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
 

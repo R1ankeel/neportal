@@ -1,6 +1,7 @@
 import type { ResolvedIntent } from "./intent-resolver";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
+import { transferPreviewNote } from "./task-transfer-flow";
 
 const CONFIRM_FOOTER = "\n\nОтветьте: да / нет";
 
@@ -89,6 +90,15 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         `Позвать ${resolved.mentionedUserName} в задачу «${resolved.taskTitle}»?`,
         "",
         `Комментарий: ${resolved.text}`,
+      ].join("\n") + CONFIRM_FOOTER;
+
+    case "transfer_task":
+      return [
+        `Передать задачу «${resolved.taskTitle}» сотруднику ${resolved.toUserName}?`,
+        "",
+        `Комментарий: ${resolved.comment?.trim() || "не указан"}`,
+        "",
+        transferPreviewNote(resolved.requestedByRole),
       ].join("\n") + CONFIRM_FOOTER;
 
     default:

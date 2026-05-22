@@ -1,10 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
-import { TaskCommentSource, TaskNotificationType, TaskStatus } from "@neportal/database";
+import {
+  TaskCommentSource,
+  TaskNotificationType,
+  TaskStatus,
+  TaskTransferStatus,
+  UserRole,
+} from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
+import {
+  AcceptTaskTransferDto,
+  CreateTaskTransferDto,
+  RejectTaskTransferDto,
+} from "./dto/task-transfer.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
 
 @Injectable()
@@ -66,6 +77,18 @@ export class TasksService {
     role: true,
   } as const;
 
+  private readonly transferUserSelect = {
+    id: true,
+    fullName: true,
+    role: true,
+  } as const;
+
+  private readonly transferInclude = {
+    fromUser: { select: this.transferUserSelect },
+    toUser: { select: this.transferUserSelect },
+    requestedBy: { select: this.transferUserSelect },
+  } as const;
+
   private readonly commentInclude = {
     author: { select: this.commentAuthorSelect },
     mentions: {
@@ -76,19 +99,38 @@ export class TasksService {
     },
   } as const;
 
-  private readonly taskDetailInclude = {
+  private readonly taskWithProjectInclude = {
     project: { select: { id: true, name: true } },
     creator: { select: this.taskUserDetailSelect },
     assignee: { select: this.taskUserDetailSelect },
+  } as const;
+
+  private readonly taskDetailInclude = {
+    ...this.taskWithProjectInclude,
     comments: {
       orderBy: { createdAt: "asc" as const },
       include: this.commentInclude,
+    },
+    transfers: {
+      orderBy: { createdAt: "desc" as const },
+      include: this.transferInclude,
     },
   } as const;
 
   private readonly activeTaskStatuses = {
     notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] as TaskStatus[],
   };
+
+  private readonly transferableStatuses: TaskStatus[] = [TaskStatus.NEW, TaskStatus.IN_PROGRESS];
+
+  private isManagerRole(role: UserRole): boolean {
+    return role === UserRole.OWNER || role === UserRole.MANAGER;
+  }
+
+  private trimOptionalComment(comment?: string): string | undefined {
+    const trimmed = comment?.trim();
+    return trimmed ? trimmed : undefined;
+  }
 
   private async assertTaskInOrg(taskId: string) {
     const task = await this.prisma.task.findFirst({
@@ -509,6 +551,202 @@ export class TasksService {
         assignee: { select: { id: true, fullName: true } },
         project: { select: { id: true, name: true } },
       },
+    });
+  }
+
+  async findTransfers(taskId: string) {
+    await this.assertTaskInOrg(taskId);
+
+    return this.prisma.taskTransfer.findMany({
+      where: { taskId, organizationId: this.orgId() },
+      orderBy: { createdAt: "desc" },
+      include: this.transferInclude,
+    });
+  }
+
+  async createTransfer(taskId: string, dto: CreateTaskTransferDto) {
+    const org = this.orgId();
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: org },
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${taskId}" not found`);
+    }
+
+    if (!this.transferableStatuses.includes(task.status)) {
+      throw new BadRequestException(
+        "Task transfer is only allowed for NEW or IN_PROGRESS tasks",
+      );
+    }
+
+    const requestedBy = await this.prisma.user.findFirst({
+      where: { id: dto.requestedById, organizationId: org },
+    });
+    if (!requestedBy) {
+      throw new NotFoundException(
+        `User with id "${dto.requestedById}" not found in this organization`,
+      );
+    }
+
+    const toUser = await this.prisma.user.findFirst({
+      where: { id: dto.toUserId, organizationId: org },
+    });
+    if (!toUser) {
+      throw new NotFoundException(`User with id "${dto.toUserId}" not found in this organization`);
+    }
+
+    if (task.assigneeId != null && task.assigneeId === dto.toUserId) {
+      throw new BadRequestException("Target user is already the task assignee");
+    }
+
+    const fromUserId = task.assigneeId ?? dto.requestedById;
+    const comment = this.trimOptionalComment(dto.comment);
+    const now = new Date();
+    const immediate = this.isManagerRole(requestedBy.role);
+
+    if (immediate) {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const transfer = await tx.taskTransfer.create({
+          data: {
+            organizationId: org,
+            taskId,
+            fromUserId,
+            toUserId: dto.toUserId,
+            requestedById: dto.requestedById,
+            comment,
+            status: TaskTransferStatus.ACCEPTED,
+            decidedAt: now,
+          },
+          include: this.transferInclude,
+        });
+
+        const updatedTask = await tx.task.update({
+          where: { id: taskId },
+          data: { assigneeId: dto.toUserId },
+          include: this.taskWithProjectInclude,
+        });
+
+        return { transfer, task: updatedTask };
+      });
+
+      return result;
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const transfer = await tx.taskTransfer.create({
+        data: {
+          organizationId: org,
+          taskId,
+          fromUserId,
+          toUserId: dto.toUserId,
+          requestedById: dto.requestedById,
+          comment,
+          status: TaskTransferStatus.PENDING,
+        },
+        include: this.transferInclude,
+      });
+
+      const unchangedTask = await tx.task.findFirstOrThrow({
+        where: { id: taskId, organizationId: org },
+        include: this.taskWithProjectInclude,
+      });
+
+      return { transfer, task: unchangedTask };
+    });
+
+    return result;
+  }
+
+  async acceptTransfer(transferId: string, dto: AcceptTaskTransferDto) {
+    const org = this.orgId();
+
+    const transfer = await this.prisma.taskTransfer.findFirst({
+      where: { id: transferId, organizationId: org },
+      include: { task: true },
+    });
+    if (!transfer) {
+      throw new NotFoundException(`Task transfer with id "${transferId}" not found`);
+    }
+
+    if (transfer.status !== TaskTransferStatus.PENDING) {
+      throw new BadRequestException("Transfer is not pending");
+    }
+
+    if (dto.userId !== transfer.toUserId) {
+      throw new BadRequestException("Only the target user can accept this transfer");
+    }
+
+    if (!this.transferableStatuses.includes(transfer.task.status)) {
+      throw new BadRequestException(
+        "Task transfer is only allowed for NEW or IN_PROGRESS tasks",
+      );
+    }
+
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTransfer = await tx.taskTransfer.update({
+        where: { id: transferId },
+        data: {
+          status: TaskTransferStatus.ACCEPTED,
+          decidedAt: now,
+        },
+        include: this.transferInclude,
+      });
+
+      const updatedTask = await tx.task.update({
+        where: { id: transfer.taskId },
+        data: { assigneeId: transfer.toUserId },
+        include: this.taskWithProjectInclude,
+      });
+
+      return { transfer: updatedTransfer, task: updatedTask };
+    });
+  }
+
+  async rejectTransfer(transferId: string, dto: RejectTaskTransferDto) {
+    const org = this.orgId();
+
+    const transfer = await this.prisma.taskTransfer.findFirst({
+      where: { id: transferId, organizationId: org },
+      include: { task: true },
+    });
+    if (!transfer) {
+      throw new NotFoundException(`Task transfer with id "${transferId}" not found`);
+    }
+
+    if (transfer.status !== TaskTransferStatus.PENDING) {
+      throw new BadRequestException("Transfer is not pending");
+    }
+
+    if (dto.userId !== transfer.toUserId) {
+      throw new BadRequestException("Only the target user can reject this transfer");
+    }
+
+    const rejectionReason = dto.rejectionReason.trim();
+    if (!rejectionReason) {
+      throw new BadRequestException("rejectionReason must not be empty");
+    }
+
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTransfer = await tx.taskTransfer.update({
+        where: { id: transferId },
+        data: {
+          status: TaskTransferStatus.REJECTED,
+          rejectionReason,
+          decidedAt: now,
+        },
+        include: this.transferInclude,
+      });
+
+      const unchangedTask = await tx.task.findFirstOrThrow({
+        where: { id: transfer.taskId, organizationId: org },
+        include: this.taskWithProjectInclude,
+      });
+
+      return { transfer: updatedTransfer, task: unchangedTask };
     });
   }
 }

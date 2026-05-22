@@ -96,6 +96,19 @@ export type ResolvedMentionInTask = {
   projectName?: string;
 };
 
+export type ResolvedTransferTask = {
+  intent: "transfer_task";
+  taskId: string;
+  taskTitle: string;
+  comment?: string;
+  toUserId: string;
+  toUserName: string;
+  toUserTelegramId: string | null;
+  requestedByRole: string;
+  projectName?: string;
+  currentAssigneeId: string | null;
+};
+
 export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
@@ -105,7 +118,8 @@ export type ResolvedIntent =
   | ResolvedCompleteTask
   | ResolvedCancelTask
   | ResolvedAddTaskComment
-  | ResolvedMentionInTask;
+  | ResolvedMentionInTask
+  | ResolvedTransferTask;
 
 export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }

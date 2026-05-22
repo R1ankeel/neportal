@@ -9,6 +9,7 @@ import {
 import { continueAfterTaskSelection } from "./task-selection-continue";
 import { candidateToApiTask } from "./pending-task-selection";
 import { canCommentTask } from "./task-comment-flow";
+import { canTransferTask } from "./task-transfer-flow";
 import { canModifyTask } from "./task-status-flow";
 
 function parseSelectionNumber(text: string): number | null {
@@ -61,14 +62,18 @@ export async function handlePendingTaskSelectionMessage(
   const canAct =
     pending.type === "select_task_for_comment"
       ? canCommentTask(linked, task)
-      : canModifyTask(linked, task);
+      : pending.type === "select_task_for_transfer"
+        ? canTransferTask(linked, task)
+        : canModifyTask(linked, task);
   if (!canAct) {
     clearPendingTaskSelection(telegramUserId);
-    await ctx.reply(
+    const msg =
       pending.type === "select_task_for_comment"
         ? "Вы не можете комментировать эту задачу."
-        : "Вы не можете изменить эту задачу.",
-    );
+        : pending.type === "select_task_for_transfer"
+          ? "Вы не можете передать эту задачу."
+          : "Вы не можете изменить эту задачу.";
+    await ctx.reply(msg);
     return true;
   }
 

@@ -489,6 +489,84 @@ export async function createTaskCommentMention(
   return res.json() as Promise<ApiTaskCommentMentionCreated>;
 }
 
+export type ApiTaskTransferUser = {
+  id: string;
+  fullName: string;
+  role: string;
+};
+
+export type ApiTaskTransfer = {
+  id: string;
+  taskId: string;
+  fromUserId: string;
+  toUserId: string;
+  requestedById: string;
+  comment: string | null;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  rejectionReason: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  fromUser: ApiTaskTransferUser;
+  toUser: ApiTaskTransferUser;
+  requestedBy: ApiTaskTransferUser;
+};
+
+export type ApiTaskTransferResult = {
+  transfer: ApiTaskTransfer;
+  task: ApiTask;
+};
+
+export async function createTaskTransfer(
+  taskId: string,
+  body: { requestedById: string; toUserId: string; comment?: string },
+): Promise<ApiTaskTransferResult> {
+  devLog("POST /tasks/:id/transfers payload", { taskId, ...body });
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/transfers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`POST /tasks/${taskId}/transfers`, res.status, text);
+    throw new Error(`Не удалось передать задачу (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskTransferResult>;
+}
+
+export async function acceptTaskTransfer(
+  transferId: string,
+  body: { userId: string },
+): Promise<ApiTaskTransferResult> {
+  const res = await fetch(`${getApiBaseUrl()}/task-transfers/${transferId}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Не удалось принять передачу (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskTransferResult>;
+}
+
+export async function rejectTaskTransfer(
+  transferId: string,
+  body: { userId: string; rejectionReason: string },
+): Promise<ApiTaskTransferResult> {
+  const res = await fetch(`${getApiBaseUrl()}/task-transfers/${transferId}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Не удалось отклонить передачу (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskTransferResult>;
+}
+
 export async function createNote(body: {
   text: string;
   creatorId: string;

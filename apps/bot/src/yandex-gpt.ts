@@ -91,7 +91,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -286,6 +286,39 @@ Output:
   "confidence": 0.85,
   "requiresConfirmation": true,
   "payload": { "userHint": "Петр", "taskTitle": "Реклама VK" }
+}
+
+transfer_task.payload:
+{ "taskTitle": string, "toUserHint": string, "comment"?: string }
+
+transfer_task — текст:
+- Фразы «передай задачу», «передать задачу» → intent transfer_task.
+- taskTitle — название задачи.
+- toUserHint — имя нового исполнителя (Вася, Петр).
+- comment — причина/пояснение после запятой; если нет — только taskTitle и toUserHint.
+
+Пример transfer_task с комментарием:
+Input: «Передай задачу Проверить склад Васе, потому что он отвечает за склад»
+Output:
+{
+  "intent": "transfer_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "toUserHint": "Вася",
+    "comment": "потому что он отвечает за склад"
+  }
+}
+
+Пример transfer_task:
+Input: «Передай задачу Заключить договор Петру»
+Output:
+{
+  "intent": "transfer_task",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Заключить договор", "toUserHint": "Петр" }
 }
 
 complete_task — результат:

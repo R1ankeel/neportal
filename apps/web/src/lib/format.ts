@@ -55,6 +55,17 @@ export function taskStatusLabel(status: string): string {
   return taskStatusRu[status] ?? status;
 }
 
+const transferStatusRu: Record<string, string> = {
+  PENDING: "Ожидает принятия",
+  ACCEPTED: "Принята",
+  REJECTED: "Отклонена",
+  CANCELLED: "Отменена",
+};
+
+export function transferStatusLabel(status: string): string {
+  return transferStatusRu[status] ?? status;
+}
+
 const noteSourceRu: Record<string, string> = {
   WEB: "Web",
   TELEGRAM_TEXT: "Telegram",

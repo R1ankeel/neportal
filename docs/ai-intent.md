@@ -30,7 +30,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -52,6 +52,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `cancel_task` | `taskTitle`, `cancellationReason?` |
 | `add_task_comment` | `taskTitle`, `text?` |
 | `mention_in_task` | `userHint`, `taskTitle`, `text?` |
+| `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
 | `unknown` | `reason?` |
 
 ### Пример: закрыть задачу (без результата в фразе)
@@ -178,6 +179,25 @@ Confirmation: *«Позвать Вася Пупкин в задачу «…»? �
 ```
 
 Бот спросит: *«Что написать в комментарии для … по задаче «…»?»*, затем confirmation.
+
+### Пример: передача задачи
+
+> Передай задачу Проверить склад Васе, потому что он отвечает за склад
+
+```json
+{
+  "intent": "transfer_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "toUserHint": "Вася",
+    "comment": "потому что он отвечает за склад"
+  }
+}
+```
+
+OWNER/MANAGER: задача передаётся сразу после «да». EMPLOYEE: запрос на принятие новому исполнителю.
 
 ### Пример: заметка
 

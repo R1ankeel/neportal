@@ -36,6 +36,7 @@ import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
+import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -71,6 +72,7 @@ bot.command("start", async (ctx) => {
       "/cancel <название> — отменить задачу",
       "/comment <задача> — <комментарий> — комментарий к задаче",
       "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
+      "/transfer <задача> | <исполнитель> | <комментарий> — передать задачу",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -94,6 +96,7 @@ bot.command("demo", async (ctx) => {
       "/cancel Проверить склад — отменить задачу",
       "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
       "/mention Вася | Проверить склад | нужны его комментарии — призвать в задачу",
+      "/transfer Проверить склад | Вася | потому что он отвечает за склад — передать задачу",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -108,6 +111,7 @@ bot.command("demo", async (ctx) => {
       "- Отмени задачу Проверить склад, склад закрыт",
       "- Напиши комментарий к задаче Проверить склад: склад закрыт до завтра",
       "- Позови Васю в задачу Проверить склад, нужны его комментарии",
+      "- Передай задачу Проверить склад Васе, потому что он отвечает за склад",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -569,6 +573,46 @@ bot.command("mention", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] mention command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("transfer", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleTransferSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+    );
+    if (result.kind === "reply" || result.kind === "awaiting_text") {
+      await ctx.reply(result.message);
+      return;
+    }
+
+    const resolved = result.resolved;
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "transfer_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          toUserHint: resolved.toUserName,
+          comment: resolved.comment,
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] transfer command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

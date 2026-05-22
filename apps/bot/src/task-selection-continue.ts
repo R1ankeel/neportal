@@ -17,7 +17,12 @@ import {
   buildResolvedMentionInTask,
   startPendingTaskMentionDetails,
 } from "./task-mention-flow";
+import {
+  buildResolvedTransferTask,
+  startPendingTaskTransferComment,
+} from "./task-transfer-flow";
 import { fetchUsers } from "./api";
+import { getLinkedUserByTelegramId } from "./current-user";
 import {
   buildResolvedCancelTask,
   buildResolvedCompleteTask,
@@ -179,6 +184,50 @@ export async function continueAfterTaskSelection(
     }
 
     const question = startPendingTaskMentionDetails(telegramUserId, task, mentionedUser);
+    await ctx.reply(question);
+    return;
+  }
+
+  if (selectionType === "select_task_for_transfer" && payload.toUserId) {
+    const users = await fetchUsers();
+    const toUser = users.find((u) => u.id === payload.toUserId);
+    if (!toUser) {
+      await ctx.reply("Сотрудник не найден. Повторите команду.");
+      return;
+    }
+
+    const linked = await getLinkedUserByTelegramId(telegramUserId);
+    if (!linked) {
+      await ctx.reply("Вы не привязаны ни к какому проекту.");
+      return;
+    }
+
+    if (payload.transferComment?.trim()) {
+      const resolved = buildResolvedTransferTask(
+        task,
+        toUser,
+        payload.transferComment,
+        linked.role,
+      );
+      setPendingConfirmation(telegramUserId, {
+        type: "ai_intent",
+        intent: {
+          intent: "transfer_task",
+          confidence: 1,
+          requiresConfirmation: true,
+          payload: {
+            taskTitle: resolved.taskTitle,
+            toUserHint: toUser.fullName,
+            comment: resolved.comment,
+          },
+        },
+        resolved,
+      });
+      await ctx.reply(buildIntentPreview(resolved));
+      return;
+    }
+
+    const question = startPendingTaskTransferComment(telegramUserId, task, toUser);
     await ctx.reply(question);
   }
 }

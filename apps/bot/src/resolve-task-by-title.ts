@@ -11,7 +11,13 @@ import {
 import { formatTaskCandidates } from "./task-selection-format";
 import { canModifyTask, type TaskStatusChangeTarget } from "./task-status-flow";
 
-export type TaskResolvePurpose = "complete" | "cancel" | "deadline" | "comment" | "mention";
+export type TaskResolvePurpose =
+  | "complete"
+  | "cancel"
+  | "deadline"
+  | "comment"
+  | "mention"
+  | "transfer";
 
 export type ResolveTaskByTitleResult =
   | { kind: "found"; task: ApiTask }
@@ -35,6 +41,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_comment";
     case "mention":
       return "select_task_for_mention";
+    case "transfer":
+      return "select_task_for_transfer";
   }
 }
 
@@ -50,6 +58,9 @@ function filterTasksForPurpose(
   return tasks.filter((task) => {
     if (!canModifyTask(user, task)) return false;
     if (purpose === "comment" || purpose === "mention") return true;
+    if (purpose === "transfer") {
+      return task.status === "NEW" || task.status === "IN_PROGRESS";
+    }
     if (purpose === "complete" || purpose === "cancel") {
       return task.status !== "DONE" && task.status !== "CANCELLED";
     }
@@ -65,6 +76,9 @@ function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   }
   if (purpose === "mention") {
     return "Использование: /mention <сотрудник> | <задача> | <комментарий>";
+  }
+  if (purpose === "transfer") {
+    return "Использование: /transfer <задача> | <новый исполнитель> | <комментарий>";
   }
   return "Укажите название задачи.";
 }
@@ -123,11 +137,16 @@ export async function resolveTaskByTitle(
         message:
           purpose === "comment" || purpose === "mention"
             ? "Вы не можете комментировать эту задачу."
-            : "Вы не можете изменить эту задачу.",
+            : purpose === "transfer"
+              ? "Вы не можете передать эту задачу."
+              : "Вы не можете изменить эту задачу.",
       };
     }
     if (purpose === "comment" || purpose === "mention") {
       return { kind: "no_modifiable", message: "Вы не можете комментировать найденные задачи." };
+    }
+    if (purpose === "transfer") {
+      return { kind: "no_modifiable", message: "Вы не можете передать найденные задачи." };
     }
     return noModifiableMessage(matchedTasks, purpose);
   }
