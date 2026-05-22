@@ -10,7 +10,6 @@ import {
   fetchProjects,
   fetchUserByTelegramId,
   fetchUsers,
-  findUserByNameHint,
   linkTelegramUser,
   formatMoney,
   parseAmount,
@@ -30,6 +29,12 @@ import {
 } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
+import {
+  apiUserToCandidate,
+  startPendingUserSelection,
+} from "./pending-user-selection";
+import { resolveUserByHint } from "./user-hint-resolution";
+import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 import { handleStartBinding } from "./start-binding";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
@@ -137,14 +142,19 @@ bot.command("link", async (ctx) => {
 
   try {
     const users = await fetchUsers();
-    const match = findUserByNameHint(users, hint);
+    const match = resolveUserByHint(users, hint, null);
     if (match.kind === "none") {
-      await ctx.reply(`Не нашёл сотрудника «${hint}». Проверьте имя.`);
+      await ctx.reply(userNotFoundMessage(hint));
       return;
     }
     if (match.kind === "many") {
-      const names = match.users.map((u) => u.fullName).join(", ");
-      await ctx.reply(`Нашёл несколько сотрудников: ${names}. Уточните ФИО.`);
+      startPendingUserSelection(
+        telegramId,
+        "select_user_for_link",
+        match.users.map(apiUserToCandidate),
+        { intent: "link_telegram" },
+      );
+      await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
       return;
     }
 
@@ -548,9 +558,16 @@ bot.command("mention", async (ctx) => {
       currentUser,
       telegramUserId,
       payload,
+      ctx,
     );
-    if (result.kind === "reply" || result.kind === "awaiting_text") {
-      await ctx.reply(result.message);
+    if (
+      result.kind === "reply" ||
+      result.kind === "awaiting_text" ||
+      result.kind === "user_selection_started"
+    ) {
+      if (result.kind !== "user_selection_started") {
+        await ctx.reply(result.message);
+      }
       return;
     }
 
@@ -588,9 +605,16 @@ bot.command("transfer", async (ctx) => {
       currentUser,
       telegramUserId,
       payload,
+      ctx,
     );
-    if (result.kind === "reply" || result.kind === "awaiting_text") {
-      await ctx.reply(result.message);
+    if (
+      result.kind === "reply" ||
+      result.kind === "awaiting_text" ||
+      result.kind === "user_selection_started"
+    ) {
+      if (result.kind !== "user_selection_started") {
+        await ctx.reply(result.message);
+      }
       return;
     }
 

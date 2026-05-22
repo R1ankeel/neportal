@@ -1,5 +1,6 @@
 import type { ApiBudget, ApiProject, ApiTask, ApiUser } from "./api";
 import { pickDefaultBudget, pickDefaultProject } from "./api";
+import { resolveUsersByHint } from "./resolve-users-by-hint";
 
 export function findProjectByHint(projects: ApiProject[], hint?: string): ApiProject | null {
   if (projects.length === 0) return null;
@@ -15,17 +16,17 @@ export function findProjectByHint(projects: ApiProject[], hint?: string): ApiPro
   return exact ?? matches[0];
 }
 
-export function findUserByHint(users: ApiUser[], hint?: string): ApiUser | undefined {
+export function findUserByHint(
+  users: ApiUser[],
+  hint?: string,
+  currentUser?: ApiUser | null,
+): ApiUser | undefined {
   const trimmed = hint?.trim();
   if (!trimmed) return undefined;
 
-  const q = trimmed.toLowerCase();
-  const matches = users.filter((u) => u.fullName.toLowerCase().includes(q));
-  if (matches.length === 0) return undefined;
-  if (matches.length === 1) return matches[0];
-
-  const exact = matches.find((u) => u.fullName.toLowerCase() === q);
-  return exact ?? matches[0];
+  const match = resolveUsersByHint(users, trimmed, currentUser ?? null);
+  if (match.kind === "one") return match.user;
+  return undefined;
 }
 
 export function findBudgetByHint(budgets: ApiBudget[], hint?: string): ApiBudget | null {

@@ -1,4 +1,5 @@
 import { devLog, devLogApiError } from "./dev-log";
+import { resolveUsersByHint } from "./resolve-users-by-hint";
 
 /**
  * Базовый URL REST API (тот же, что для apps/web).
@@ -109,20 +110,13 @@ export async function linkTelegramUser(
   return res.json() as Promise<ApiUser>;
 }
 
-/** Поиск по ФИО для /link: includes, без выбора при неоднозначности. */
+/** Поиск сотрудника по подсказке (без currentUser — без self-hints). */
 export function findUserByNameHint(
   users: ApiUser[],
   hint: string,
+  currentUser?: ApiUser | null,
 ): UserNameMatchResult {
-  const q = hint.trim().toLowerCase();
-  if (!q) return { kind: "none" };
-
-  const matches = users.filter((u) =>
-    u.fullName.toLowerCase().includes(q),
-  );
-  if (matches.length === 0) return { kind: "none" };
-  if (matches.length === 1) return { kind: "one", user: matches[0] };
-  return { kind: "many", users: matches };
+  return resolveUsersByHint(users, hint, currentUser ?? null);
 }
 
 export async function fetchProjects(): Promise<ApiProject[]> {

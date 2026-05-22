@@ -16,6 +16,9 @@ import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-co
 import { handlePendingTaskMentionDetailsMessage } from "./handle-pending-task-mention-details";
 import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
+import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
+import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
+import { fetchUsers } from "./api";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-transfer-comment";
@@ -102,6 +105,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingUserSelectionMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   const linked = await getLinkedUserByTelegramId(telegramUserId);
   if (!linked) {
     await ctx.reply(NOT_LINKED_MESSAGE);
@@ -155,6 +162,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "transfer_task") {
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  const users = await fetchUsers();
+  if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {
     return;
   }
 

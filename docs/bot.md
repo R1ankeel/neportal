@@ -198,7 +198,35 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 6. Pending transfer rejection reason — **не** отправляется в YandexGPT
 7. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
 8. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-9. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+9. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
+10. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+
+### Поиск сотрудника (User Resolution Flow v1)
+
+Модуль: `resolve-users-by-hint.ts`, выбор: `pending-user-selection.ts`.
+
+**Подсказки (hint):** нормализация (trim, lower, `ё`→`е`, без `@`), совпадение по ФИО, имени, фамилии, `telegramUsername`, уменьшительным формам (Ваня, Ване, Ваньку → Иван и т.д.).
+
+**Себя / местоимения:** «мне», «меня», «себе», «на меня», `__self__` от AI → текущий привязанный пользователь.
+
+**Несколько совпадений:** список с номером (TTL 30 мин):
+
+```
+Кого вы имели в виду?
+
+1. Иван Иванов · OWNER · @demo_ivan
+2. Иван Петров · EMPLOYEE · @ivan_petrov
+
+Напишите номер сотрудника.
+```
+
+Отмена: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
+
+**Не найден:** *«Не нашёл сотрудника «{hint}». Проверьте имя.»*
+
+**Где используется:** `create_task` (assignee), `transfer_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/mention`, `/link` (dev).
+
+**Slash с «мне»:** `/transfer Проверить склад | мне | …`, `/mention мне | Проверить склад | …`
 
 **Поиск задачи по названию:** точное совпадение `title` (без учёта регистра), затем `includes`.
 

@@ -3,9 +3,16 @@ import type { ApiTask, ApiUser } from "./api";
 import {
   createTaskCommentMention,
   fetchUsers,
-  findUserByNameHint,
   type UserNameMatchResult,
 } from "./api";
+import { resolveUserByHint } from "./user-hint-resolution";
+import { userNotFoundMessage } from "./user-selection-format";
+import {
+  apiUserToCandidate,
+  startPendingUserSelection,
+} from "./pending-user-selection";
+import { formatUserCandidates } from "./user-selection-format";
+import type { Context } from "grammy";
 import type { ResolvedMentionInTask } from "./intent-resolver";
 import { clearPendingConfirmation } from "./pending-intent";
 import {
@@ -52,20 +59,13 @@ export function questionForMentionText(userName: string, taskTitle: string): str
 export function resolveMentionedUser(
   users: ApiUser[],
   hint: string,
+  currentUser: ApiUser | null,
 ): UserNameMatchResult & { message?: string } {
-  const match = findUserByNameHint(users, hint);
+  const match = resolveUserByHint(users, hint, currentUser);
   if (match.kind === "none") {
     return {
       kind: "none",
-      message: `Не нашёл сотрудника «${hint}». Проверьте имя.`,
-    };
-  }
-  if (match.kind === "many") {
-    const names = match.users.map((u) => u.fullName).join(", ");
-    return {
-      kind: "many",
-      users: match.users,
-      message: `Нашёл несколько сотрудников: ${names}. Уточните ФИО.`,
+      message: userNotFoundMessage(hint),
     };
   }
   return match;
@@ -149,12 +149,14 @@ export async function lookupTaskForMention(
 export type SlashMentionResult =
   | { kind: "reply"; message: string }
   | { kind: "confirmation"; resolved: ResolvedMentionInTask }
-  | { kind: "awaiting_text"; message: string };
+  | { kind: "awaiting_text"; message: string }
+  | { kind: "user_selection_started" };
 
 export async function handleMentionSlashCommand(
   currentUser: ApiUser,
   telegramUserId: number,
   payload: string,
+  ctx?: Context,
 ): Promise<SlashMentionResult> {
   const parsed = parseMentionSlashPayload(payload);
   if (!parsed.userHint || !parsed.taskTitle) {
@@ -165,9 +167,29 @@ export async function handleMentionSlashCommand(
   }
 
   const users = await fetchUsers();
-  const userMatch = resolveMentionedUser(users, parsed.userHint);
-  if (userMatch.kind === "none" || userMatch.kind === "many") {
+  const userMatch = resolveMentionedUser(users, parsed.userHint, currentUser);
+  if (userMatch.kind === "none") {
     return { kind: "reply", message: userMatch.message ?? "Не удалось найти сотрудника." };
+  }
+  if (userMatch.kind === "many") {
+    if (!ctx) {
+      return {
+        kind: "reply",
+        message: "Нашёл несколько сотрудников. Уточните ФИО.",
+      };
+    }
+    startPendingUserSelection(
+      telegramUserId,
+      "select_user_for_mention",
+      userMatch.users.map(apiUserToCandidate),
+      {
+        intent: "mention_in_task",
+        taskTitle: parsed.taskTitle,
+        text: parsed.text,
+      },
+    );
+    await ctx.reply(formatUserCandidates(userMatch.users.map(apiUserToCandidate)));
+    return { kind: "user_selection_started" };
   }
 
   const mentionedUser = userMatch.user;

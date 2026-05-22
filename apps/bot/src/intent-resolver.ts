@@ -125,10 +125,16 @@ export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }
   | { ok: false; message: string };
 
+export type ResolveIntentOverrides = {
+  assigneeId?: string;
+  absenceUserId?: string;
+};
+
 export async function resolveIntent(
   intent: AiIntent,
   telegramUserId?: number,
   userText?: string,
+  overrides?: ResolveIntentOverrides,
 ): Promise<ResolveResult> {
   if (intent.intent === "unknown") {
     return { ok: false, message: "Не понял команду. Попробуйте переформулировать или используйте /demo." };
@@ -158,11 +164,14 @@ export async function resolveIntent(
       }
 
       const assigneeIdDefault = pickAssigneeId(users);
-      const assignee = payload.assigneeHint
-        ? findUserByHint(users, payload.assigneeHint)
-        : assigneeIdDefault
-          ? users.find((u) => u.id === assigneeIdDefault)
-          : undefined;
+      let assignee: ApiUser | undefined;
+      if (overrides?.assigneeId) {
+        assignee = users.find((u) => u.id === overrides.assigneeId);
+      } else if (payload.assigneeHint) {
+        assignee = findUserByHint(users, payload.assigneeHint, currentUser);
+      } else if (assigneeIdDefault) {
+        assignee = users.find((u) => u.id === assigneeIdDefault);
+      }
 
       return {
         ok: true,
@@ -227,20 +236,21 @@ export async function resolveIntent(
     case "create_absence": {
       let user: ApiUser | undefined;
 
-      if (intent.payload.userHint) {
+      if (overrides?.absenceUserId) {
+        user = users.find((u) => u.id === overrides.absenceUserId);
+      } else if (intent.payload.userHint) {
         const hint = intent.payload.userHint.trim();
-        const match = findUserByNameHint(users, hint);
+        const match = findUserByNameHint(users, hint, currentUser);
         if (match.kind === "none") {
           return {
             ok: false,
-            message: `Не нашёл сотрудника «${hint}». Уточните имя.`,
+            message: `Не нашёл сотрудника «${hint}». Проверьте имя.`,
           };
         }
         if (match.kind === "many") {
-          const names = match.users.map((u) => u.fullName).join(", ");
           return {
             ok: false,
-            message: `Нашёл несколько сотрудников: ${names}. Уточните ФИО.`,
+            message: "USER_SELECTION_NEEDED",
           };
         }
         user = match.user;

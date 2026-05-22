@@ -4,10 +4,11 @@ import {
   acceptTaskTransfer,
   createTaskTransfer,
   fetchUsers,
-  findUserByNameHint,
   rejectTaskTransfer,
   type UserNameMatchResult,
 } from "./api";
+import { resolveUserByHint } from "./user-hint-resolution";
+import { userNotFoundMessage } from "./user-selection-format";
 import type { ResolvedTransferTask } from "./intent-resolver";
 import { clearPendingConfirmation } from "./pending-intent";
 import { clearPendingTaskCommentDetails } from "./pending-task-comment-details";
@@ -20,6 +21,12 @@ import {
 } from "./pending-task-transfer-comment";
 import { setPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import type { TaskSelectionPayload } from "./pending-task-selection";
+import {
+  apiUserToCandidate,
+  startPendingUserSelection,
+} from "./pending-user-selection";
+import { formatUserCandidates } from "./user-selection-format";
+import type { Context } from "grammy";
 import {
   resolveResultToMessage,
   resolveTaskByTitle,
@@ -69,20 +76,13 @@ export function questionForTransferComment(taskTitle: string): string {
 export function resolveTransferTargetUser(
   users: ApiUser[],
   hint: string,
+  currentUser: ApiUser | null,
 ): UserNameMatchResult & { message?: string } {
-  const match = findUserByNameHint(users, hint);
+  const match = resolveUserByHint(users, hint, currentUser);
   if (match.kind === "none") {
     return {
       kind: "none",
-      message: `Не нашёл сотрудника «${hint}». Проверьте имя.`,
-    };
-  }
-  if (match.kind === "many") {
-    const names = match.users.map((u) => u.fullName).join(", ");
-    return {
-      kind: "many",
-      users: match.users,
-      message: `Нашёл несколько сотрудников: ${names}. Уточните ФИО.`,
+      message: userNotFoundMessage(hint),
     };
   }
   return match;
@@ -163,12 +163,14 @@ export async function lookupTaskForTransfer(
 export type SlashTransferResult =
   | { kind: "reply"; message: string }
   | { kind: "confirmation"; resolved: ResolvedTransferTask }
-  | { kind: "awaiting_text"; message: string };
+  | { kind: "awaiting_text"; message: string }
+  | { kind: "user_selection_started" };
 
 export async function handleTransferSlashCommand(
   currentUser: ApiUser,
   telegramUserId: number,
   payload: string,
+  ctx?: Context,
 ): Promise<SlashTransferResult> {
   const parsed = parseTransferSlashPayload(payload);
   if (!parsed.taskTitle || !parsed.toUserHint) {
@@ -179,9 +181,29 @@ export async function handleTransferSlashCommand(
   }
 
   const users = await fetchUsers();
-  const userMatch = resolveTransferTargetUser(users, parsed.toUserHint);
-  if (userMatch.kind === "none" || userMatch.kind === "many") {
+  const userMatch = resolveTransferTargetUser(users, parsed.toUserHint, currentUser);
+  if (userMatch.kind === "none") {
     return { kind: "reply", message: userMatch.message ?? "Не удалось найти сотрудника." };
+  }
+  if (userMatch.kind === "many") {
+    if (!ctx) {
+      return {
+        kind: "reply",
+        message: "Нашёл несколько сотрудников. Уточните ФИО.",
+      };
+    }
+    startPendingUserSelection(
+      telegramUserId,
+      "select_user_for_transfer",
+      userMatch.users.map(apiUserToCandidate),
+      {
+        intent: "transfer_task",
+        taskTitle: parsed.taskTitle,
+        comment: parsed.comment,
+      },
+    );
+    await ctx.reply(formatUserCandidates(userMatch.users.map(apiUserToCandidate)));
+    return { kind: "user_selection_started" };
   }
 
   const toUser = userMatch.user;

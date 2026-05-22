@@ -9,9 +9,12 @@ import {
   buildResolvedTransferTask,
   canTransferTask,
   requiresTransferApproval,
-  resolveTransferTargetUser,
   startPendingTaskTransferComment,
 } from "./task-transfer-flow";
+import {
+  buildUserSelectionPayload,
+  resolveUserHintWithSelection,
+} from "./user-hint-resolution";
 import { resolveResultToMessage, resolveTaskByTitle } from "./resolve-task-by-title";
 
 export async function handleTransferTaskIntent(
@@ -23,26 +26,37 @@ export async function handleTransferTaskIntent(
   if (intent.intent !== "transfer_task") return;
 
   const users = await fetchUsers();
-  const userMatch = resolveTransferTargetUser(users, intent.payload.toUserHint);
-  if (userMatch.kind === "none" || userMatch.kind === "many") {
-    await ctx.reply(userMatch.message ?? "Не удалось найти сотрудника.");
+  const userSelectionPayload = buildUserSelectionPayload(intent, linked);
+  if (!userSelectionPayload || userSelectionPayload.intent !== "transfer_task") {
+    await ctx.reply("Не удалось обработать команду.");
     return;
   }
 
-  const toUser = userMatch.user;
-  const selectionPayload: TaskSelectionPayload = {
+  const userResolution = await resolveUserHintWithSelection(
+    ctx,
+    telegramUserId,
+    users,
+    intent.payload.toUserHint,
+    linked,
+    "select_user_for_transfer",
+    userSelectionPayload,
+  );
+  if (userResolution.status !== "resolved") return;
+
+  const toUser = userResolution.user;
+  const taskSelectionPayload: TaskSelectionPayload = {
     toUserId: toUser.id,
     toUserName: toUser.fullName,
   };
   if (intent.payload.comment?.trim()) {
-    selectionPayload.transferComment = intent.payload.comment.trim();
+    taskSelectionPayload.transferComment = intent.payload.comment.trim();
   }
 
   const resolution = await resolveTaskByTitle(
     linked,
     intent.payload.taskTitle,
     "transfer",
-    { telegramUserId, selectionPayload },
+    { telegramUserId, selectionPayload: taskSelectionPayload },
   );
 
   if (resolution.kind !== "found") {
@@ -68,11 +82,11 @@ export async function handleTransferTaskIntent(
     return;
   }
 
-  if (selectionPayload.transferComment) {
+  if (taskSelectionPayload.transferComment) {
     const resolved = buildResolvedTransferTask(
       task,
       toUser,
-      selectionPayload.transferComment,
+      taskSelectionPayload.transferComment,
       linked.role,
     );
     setPendingConfirmation(telegramUserId, {

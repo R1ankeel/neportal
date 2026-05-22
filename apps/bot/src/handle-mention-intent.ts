@@ -7,9 +7,12 @@ import { setPendingConfirmation } from "./pending-intent";
 import type { TaskSelectionPayload } from "./pending-task-selection";
 import {
   buildResolvedMentionInTask,
-  resolveMentionedUser,
   startPendingTaskMentionDetails,
 } from "./task-mention-flow";
+import {
+  buildUserSelectionPayload,
+  resolveUserHintWithSelection,
+} from "./user-hint-resolution";
 import { canModifyTask } from "./task-status-flow";
 import {
   resolveResultToMessage,
@@ -26,26 +29,37 @@ export async function handleMentionInTaskIntent(
   if (intent.intent !== "mention_in_task") return;
 
   const users = await fetchUsers();
-  const userMatch = resolveMentionedUser(users, intent.payload.userHint);
-  if (userMatch.kind === "none" || userMatch.kind === "many") {
-    await ctx.reply(userMatch.message ?? "Не удалось найти сотрудника.");
+  const userSelectionPayload = buildUserSelectionPayload(intent, linked);
+  if (!userSelectionPayload || userSelectionPayload.intent !== "mention_in_task") {
+    await ctx.reply("Не удалось обработать команду.");
     return;
   }
 
-  const mentionedUser = userMatch.user;
-  const selectionPayload: TaskSelectionPayload = {
+  const userResolution = await resolveUserHintWithSelection(
+    ctx,
+    telegramUserId,
+    users,
+    intent.payload.userHint,
+    linked,
+    "select_user_for_mention",
+    userSelectionPayload,
+  );
+  if (userResolution.status !== "resolved") return;
+
+  const mentionedUser = userResolution.user;
+  const taskSelectionPayload: TaskSelectionPayload = {
     mentionedUserId: mentionedUser.id,
     mentionedUserName: mentionedUser.fullName,
   };
   if (intent.payload.text?.trim()) {
-    selectionPayload.mentionText = intent.payload.text.trim();
+    taskSelectionPayload.mentionText = intent.payload.text.trim();
   }
 
   const resolution = await resolveTaskByTitle(
     linked,
     intent.payload.taskTitle,
     "mention",
-    { telegramUserId, selectionPayload },
+    { telegramUserId, selectionPayload: taskSelectionPayload },
   );
 
   if (resolution.kind !== "found") {
@@ -59,11 +73,11 @@ export async function handleMentionInTaskIntent(
     return;
   }
 
-  if (selectionPayload.mentionText) {
+  if (taskSelectionPayload.mentionText) {
     const resolved = buildResolvedMentionInTask(
       task,
       mentionedUser,
-      selectionPayload.mentionText,
+      taskSelectionPayload.mentionText,
     );
     setPendingConfirmation(telegramUserId, {
       type: "ai_intent",

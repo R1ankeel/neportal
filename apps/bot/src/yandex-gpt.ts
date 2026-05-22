@@ -99,6 +99,10 @@ JSON Schema ответа:
 
 payload по intent:
 
+Местоимения (себе / мне / на меня):
+- Если пользователь говорит о себе («мне», «меня», «себе», «на меня», «самому себе»), в assigneeHint / toUserHint / userHint указывай строку "__self__" (не ФИО).
+- Примеры: «Поставь мне задачу…», «Передай задачу … мне», «Позови меня в задачу…».
+
 create_task.payload:
 { "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
@@ -112,6 +116,20 @@ create_task — дедлайн и формулировка:
 - title — короткое действие без даты: «Проверить склад», не «завтра проверить склад».
 - description опционален: только дополнительный контекст без дат и без дублирования дедлайна.
 - Не дублируй дедлайн в description.
+
+Пример create_task (себе):
+Input: «Поставь мне задачу проверить склад завтра»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "__self__",
+    "title": "Проверить склад",
+    "deadlineDate": "2026-05-23"
+  }
+}
 
 Пример create_task:
 Input: «Создай задачу Васе, чтоб он завтра проверил склад»
@@ -252,6 +270,20 @@ Output:
 mention_in_task.payload:
 { "userHint": string, "taskTitle": string, "text"?: string }
 
+Пример mention_in_task (себе):
+Input: «Позови меня в задачу Проверить склад, нужен мой комментарий»
+Output:
+{
+  "intent": "mention_in_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "__self__",
+    "taskTitle": "Проверить склад",
+    "text": "нужен мой комментарий"
+  }
+}
+
 mention_in_task — текст:
 - Фразы «позови», «призови», «попроси … прокомментировать» → intent mention_in_task.
 - userHint — имя/часть ФИО сотрудника (Вася, Маша, Петр).
@@ -290,6 +322,19 @@ Output:
 
 transfer_task.payload:
 { "taskTitle": string, "toUserHint": string, "comment"?: string }
+
+Пример transfer_task (себе):
+Input: «Передай задачу Проверить склад мне»
+Output:
+{
+  "intent": "transfer_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "toUserHint": "__self__"
+  }
+}
 
 transfer_task — текст:
 - Фразы «передай задачу», «передать задачу» → intent transfer_task.
