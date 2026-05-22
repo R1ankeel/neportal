@@ -242,14 +242,22 @@ export type ApiTask = {
   title: string;
   deadlineAt: string | null;
   status: string;
+  creatorId: string;
+  assigneeId: string | null;
+  creator?: { id: string; fullName: string } | null;
+  assignee?: { id: string; fullName: string } | null;
   project?: { id: string; name: string } | null;
 };
+
+export type ApiTaskStatusUpdated = ApiTaskCreated;
 
 export type TaskNotificationType =
   | "TASK_ASSIGNED"
   | "TASK_DEADLINE_TOMORROW"
   | "TASK_OVERDUE_ASSIGNEE"
-  | "TASK_OVERDUE_CREATOR";
+  | "TASK_OVERDUE_CREATOR"
+  | "TASK_COMPLETED_CREATOR"
+  | "TASK_CANCELLED_CREATOR";
 
 export type ApiTaskUserNotify = {
   id: string;
@@ -295,6 +303,25 @@ export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
 
 /** Alias for AI intent execution. */
 export const setTaskDeadline = updateTaskDeadline;
+
+export async function updateTaskStatus(
+  taskId: string,
+  status: "DONE" | "CANCELLED",
+): Promise<ApiTaskStatusUpdated> {
+  devLog("PATCH /tasks/:id/status payload", { taskId, status });
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`PATCH /tasks/${taskId}/status`, res.status, text);
+    throw new Error(`Не удалось изменить статус задачи (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskStatusUpdated>;
+}
 
 export async function updateTaskDeadline(
   taskId: string,

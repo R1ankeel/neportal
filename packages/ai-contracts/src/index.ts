@@ -6,6 +6,8 @@ export const AiIntentNameSchema = z.enum([
   "create_expense",
   "create_absence",
   "set_task_deadline",
+  "complete_task",
+  "cancel_task",
   "unknown",
 ]);
 
@@ -58,6 +60,14 @@ export const SetTaskDeadlinePayloadSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "deadlineDate must be YYYY-MM-DD"),
 });
 
+export const CompleteTaskPayloadSchema = z.object({
+  taskTitle: z.string().min(1),
+});
+
+export const CancelTaskPayloadSchema = z.object({
+  taskTitle: z.string().min(1),
+});
+
 export const UnknownPayloadSchema = z.object({
   reason: z.string().optional(),
 });
@@ -95,6 +105,16 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: SetTaskDeadlinePayloadSchema,
   }),
   z.object({
+    intent: z.literal("complete_task"),
+    ...intentFields,
+    payload: CompleteTaskPayloadSchema,
+  }),
+  z.object({
+    intent: z.literal("cancel_task"),
+    ...intentFields,
+    payload: CancelTaskPayloadSchema,
+  }),
+  z.object({
     intent: z.literal("unknown"),
     ...intentFields,
     payload: UnknownPayloadSchema,
@@ -107,6 +127,8 @@ export type CreateNotePayload = z.infer<typeof CreateNotePayloadSchema>;
 export type CreateExpensePayload = z.infer<typeof CreateExpensePayloadSchema>;
 export type CreateAbsencePayload = z.infer<typeof CreateAbsencePayloadSchema>;
 export type SetTaskDeadlinePayload = z.infer<typeof SetTaskDeadlinePayloadSchema>;
+export type CompleteTaskPayload = z.infer<typeof CompleteTaskPayloadSchema>;
+export type CancelTaskPayload = z.infer<typeof CancelTaskPayloadSchema>;
 export type UnknownPayload = z.infer<typeof UnknownPayloadSchema>;
 
 /** Removes legacy fields and coerces common model mistakes before Zod parse. */

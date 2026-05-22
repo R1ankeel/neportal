@@ -61,6 +61,12 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         .filter((line): line is string => line != null)
         .join("\n") + CONFIRM_FOOTER;
 
+    case "complete_task":
+      return `Закрыть задачу «${resolved.taskTitle}»?${CONFIRM_FOOTER}`;
+
+    case "cancel_task":
+      return `Отменить задачу «${resolved.taskTitle}»?${CONFIRM_FOOTER}`;
+
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;
   }

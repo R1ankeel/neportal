@@ -91,7 +91,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -148,6 +148,42 @@ create_absence.payload:
 
 set_task_deadline.payload:
 { "taskTitle": string, "deadlineDate": "YYYY-MM-DD" }
+
+complete_task.payload:
+{ "taskTitle": string }
+
+cancel_task.payload:
+{ "taskTitle": string }
+
+Пример complete_task:
+Input: «Закрой задачу Проверить склад»
+Output:
+{
+  "intent": "complete_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример complete_task (выполнена):
+Input: «Задача Проверить склад выполнена»
+Output:
+{
+  "intent": "complete_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример cancel_task:
+Input: «Отмени задачу Проверить склад»
+Output:
+{
+  "intent": "cancel_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
 
 unknown.payload:
 { "reason"?: string }

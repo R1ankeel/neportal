@@ -15,6 +15,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { findBudgetByHint, findProjectByHint, findTaskByTitle, findUserByHint } from "./hint-matchers";
+import { canModifyTask } from "./task-status-flow";
 import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 
@@ -61,12 +62,26 @@ export type ResolvedSetTaskDeadline = {
   projectName?: string;
 };
 
+export type ResolvedCompleteTask = {
+  intent: "complete_task";
+  taskId: string;
+  taskTitle: string;
+};
+
+export type ResolvedCancelTask = {
+  intent: "cancel_task";
+  taskId: string;
+  taskTitle: string;
+};
+
 export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
   | ResolvedCreateExpense
   | ResolvedCreateAbsence
-  | ResolvedSetTaskDeadline;
+  | ResolvedSetTaskDeadline
+  | ResolvedCompleteTask
+  | ResolvedCancelTask;
 
 export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }
@@ -238,6 +253,52 @@ export async function resolveIntent(
           taskTitle: match.task.title,
           deadlineDate: intent.payload.deadlineDate,
           projectName: match.task.project?.name,
+        },
+      };
+    }
+
+    case "complete_task":
+    case "cancel_task": {
+      const allTasks = await fetchTasks();
+      const match = findTaskByTitle(allTasks, intent.payload.taskTitle);
+
+      if (match.kind === "not_found") {
+        return { ok: false, message: "Задача не найдена." };
+      }
+      if (match.kind === "ambiguous") {
+        const names = match.tasks.map((t) => `«${t.title}»`).join(", ");
+        return { ok: false, message: `Найдено несколько задач: ${names}. Уточните название.` };
+      }
+
+      if (!canModifyTask(currentUser, match.task)) {
+        return { ok: false, message: "Вы не можете изменить эту задачу." };
+      }
+
+      const target = intent.intent === "complete_task" ? "DONE" : "CANCELLED";
+      if (target === "DONE" && match.task.status === "DONE") {
+        return { ok: false, message: `Задача уже закрыта: ${match.task.title}` };
+      }
+      if (target === "CANCELLED" && match.task.status === "CANCELLED") {
+        return { ok: false, message: `Задача уже отменена: ${match.task.title}` };
+      }
+
+      if (intent.intent === "complete_task") {
+        return {
+          ok: true,
+          resolved: {
+            intent: "complete_task",
+            taskId: match.task.id,
+            taskTitle: match.task.title,
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        resolved: {
+          intent: "cancel_task",
+          taskId: match.task.id,
+          taskTitle: match.task.title,
         },
       };
     }

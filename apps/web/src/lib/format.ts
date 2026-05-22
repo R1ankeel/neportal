@@ -47,7 +47,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 const taskStatusRu: Record<string, string> = {
   NEW: "Новая",
   IN_PROGRESS: "В работе",
-  DONE: "Готово",
+  DONE: "Выполнена",
   CANCELLED: "Отменена",
 };
 

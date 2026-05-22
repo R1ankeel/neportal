@@ -51,11 +51,11 @@ export function findTaskByTitle(tasks: ApiTask[], taskTitle: string): TaskMatchR
   const trimmed = taskTitle.trim();
   if (!trimmed) return { kind: "not_found" };
 
-  const exact = tasks.filter((t) => t.title === trimmed);
+  const q = trimmed.toLowerCase();
+  const exact = tasks.filter((t) => t.title.toLowerCase() === q);
   if (exact.length === 1) return { kind: "found", task: exact[0] };
   if (exact.length > 1) return { kind: "ambiguous", tasks: exact };
 
-  const q = trimmed.toLowerCase();
   const partial = tasks.filter((t) => t.title.toLowerCase().includes(q));
   if (partial.length === 0) return { kind: "not_found" };
   if (partial.length === 1) return { kind: "found", task: partial[0] };

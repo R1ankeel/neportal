@@ -71,6 +71,36 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
+| `/done <название>` | `PATCH /tasks/:id/status` → `DONE` |
+| `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
+
+### Закрытие и отмена задач
+
+**Slash:**
+
+| Команда | Пример |
+|---------|--------|
+| `/done` | `/done Проверить склад` |
+| `/cancel` | `/cancel Проверить склад` |
+
+**AI (после подтвержения «да»):**
+
+| Текст | Intent |
+|-------|--------|
+| Закрой задачу Проверить склад | `complete_task` |
+| Задача Проверить склад выполнена | `complete_task` |
+| Отмени задачу Проверить склад | `cancel_task` |
+
+**Поиск задачи по названию:** сначала точное совпадение `title` (без учёта регистра), затем `includes`; несколько совпадений — просьба уточнить.
+
+**Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` — любая задача. Иначе: *«Вы не можете изменить эту задачу.»*
+
+**После успешного закрытия/отмены:** постановщику с `telegramId` (если он не тот, кто выполнил действие) уходит:
+
+- DONE: *«{ФИО} закрыл задачу «{title}».»*
+- CANCELLED: *«{ФИО} отменил задачу «{title}».»*
+
+Запись в `TaskNotificationLog`: `TASK_COMPLETED_CREATOR` / `TASK_CANCELLED_CREATOR`. Повторный `/done` на уже закрытой задаче — *«Задача уже закрыта…»*, без повторного уведомления.
 
 ### Привязка Telegram (username flow)
 
@@ -127,6 +157,9 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 | Запиши заметку: клиент попросил завтра проверить статистику VK | `create_note` |
 | Потратил 1500 рублей на рекламу VK | `create_expense` |
 | Вася заболел до 25 мая, больничный 123456 | `create_absence` |
+| Закрой задачу Проверить склад | `complete_task` |
+| Задача Проверить склад выполнена | `complete_task` |
+| Отмени задачу Проверить склад | `cancel_task` |
 
 **Даты в тексте заметок:** в `payload.text` модель может вернуть ISO; бот перед сохранением заменяет `2026-05-22` → `22.05.2026` (`replaceIsoDatesInText`). Поля `deadlineDate` / `startDate` / `endDate` в JSON остаются ISO `YYYY-MM-DD`.
 
@@ -135,7 +168,7 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 - `projectHint` → проект по подстроке имени (без учёта регистра), иначе проект по умолчанию.
 - `assigneeHint` / `userHint` → пользователь по подстроке `fullName`.
 - `budgetHint` → бюджет проекта по подстроке `title`, иначе первый бюджет.
-- `taskTitle` → точное совпадение `title`, иначе `includes`; несколько совпадений → просьба уточнить.
+- `taskTitle` → точное совпадение `title` (без учёта регистра), иначе `includes`; несколько совпадений → просьба уточнить.
 
 Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход».
 
@@ -237,6 +270,7 @@ REST для scheduler (вызывает бот):
 - `fetchProjects`, `fetchBudgets`, `fetchTasks`
 - `createTask`, `createNote`, `createBudgetExpense` (alias `createExpense`), `createExpenseAttachment`, `createAbsence`
 - `updateTaskDeadline` (alias `setTaskDeadline`)
+- `updateTaskStatus`
 - `fetchDeadlineTomorrowNotifications`, `fetchOverdueNotifications`, `recordTaskNotification`
 - `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`, `findUserByNameHint`
 
@@ -259,6 +293,7 @@ REST для scheduler (вызывает бот):
 | `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
 | `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
+| `task-status-flow.ts` | `/done`, `/cancel`: поиск задачи, права, PATCH status |
 | `start-binding.ts` | Логика `/start` и подтверждение привязки |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |

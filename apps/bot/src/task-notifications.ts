@@ -1,5 +1,12 @@
 import type { Api } from "grammy";
-import { type ApiTaskCreated, type TaskNotificationType, recordTaskNotification } from "./api";
+import {
+  type ApiTaskCreated,
+  type ApiTaskStatusUpdated,
+  type ApiUser,
+  type TaskNotificationType,
+  recordTaskNotification,
+} from "./api";
+import type { TaskStatusChangeTarget } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { sendTelegramMessage } from "./send-telegram";
 
@@ -79,6 +86,27 @@ export function buildOverdueCreatorMessage(task: {
     `Задача: ${task.title}`,
     `Дедлайн был: ${formatTaskDeadline(task.deadlineAt)}`,
   ].join("\n");
+}
+
+/** Уведомление постановщику о закрытии/отмене задачи (не дублируется через TaskNotificationLog). */
+export async function notifyTaskStatusChanged(
+  api: Api,
+  task: ApiTaskStatusUpdated,
+  actor: ApiUser,
+  target: TaskStatusChangeTarget,
+): Promise<void> {
+  const creator = task.creator;
+  if (!creator?.telegramId || !creator.id) return;
+  if (task.creatorId === actor.id) return;
+
+  const logType: TaskNotificationType =
+    target === "DONE" ? "TASK_COMPLETED_CREATOR" : "TASK_CANCELLED_CREATOR";
+
+  const verb = target === "DONE" ? "закрыл" : "отменил";
+  const text = `${actor.fullName} ${verb} задачу «${task.title}».`;
+
+  await sendTelegramMessage(api, creator.telegramId, text);
+  await recordTaskNotification(task.id, creator.id, logType);
 }
 
 export async function sendAndLogNotification(

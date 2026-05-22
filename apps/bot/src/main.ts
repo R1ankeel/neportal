@@ -35,6 +35,7 @@ import { handlePlainTextMessage } from "./ai-message";
 import { handleStartBinding } from "./start-binding";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
+import { changeTaskStatusByTitle } from "./task-status-flow";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -63,6 +64,8 @@ bot.command("start", async (ctx) => {
       "/expense <сумма> <описание> — расход",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/done <название> — закрыть задачу",
+      "/cancel <название> — отменить задачу",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -82,6 +85,8 @@ bot.command("demo", async (ctx) => {
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
+      "/done Проверить склад — закрыть задачу",
+      "/cancel Проверить склад — отменить задачу",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -389,6 +394,34 @@ bot.command("sick", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] sick command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("done", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser) return;
+    const reply = await changeTaskStatusByTitle(bot.api, currentUser, payload, "DONE");
+    await ctx.reply(reply);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] done command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("cancel", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser) return;
+    const reply = await changeTaskStatusByTitle(bot.api, currentUser, payload, "CANCELLED");
+    await ctx.reply(reply);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] cancel command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

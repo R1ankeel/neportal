@@ -84,6 +84,8 @@ enum TaskNotificationType {
   TASK_DEADLINE_TOMORROW
   TASK_OVERDUE_ASSIGNEE
   TASK_OVERDUE_CREATOR
+  TASK_COMPLETED_CREATOR
+  TASK_CANCELLED_CREATOR
 }
 
 // ---------------------------------------------------------------------------

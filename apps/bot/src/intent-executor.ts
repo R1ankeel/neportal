@@ -6,12 +6,14 @@ import {
   formatMoney,
   parseAmount,
   setTaskDeadline,
+  updateTaskStatus,
 } from "./api";
+import { getLinkedUserByTelegramId } from "./current-user";
 import { formatIsoDateRu } from "./parse-ru-date";
 import type { ResolvedIntent } from "./intent-resolver";
 import { setLastExpense } from "./last-expense";
 import type { Api } from "grammy";
-import { notifyTaskAssigned } from "./task-notifications";
+import { notifyTaskAssigned, notifyTaskStatusChanged } from "./task-notifications";
 
 export async function executeResolvedIntent(
   resolved: ResolvedIntent,
@@ -105,6 +107,31 @@ export async function executeResolvedIntent(
     case "set_task_deadline": {
       await setTaskDeadline(resolved.taskId, resolved.deadlineDate);
       return `Дедлайн задачи «${resolved.taskTitle}» установлен на ${formatIsoDateRu(resolved.deadlineDate)}.`;
+    }
+
+    case "complete_task":
+    case "cancel_task": {
+      const linked =
+        telegramUserId != null ? await getLinkedUserByTelegramId(telegramUserId) : null;
+      if (!linked) {
+        return "Вы не привязаны ни к какому проекту.";
+      }
+
+      const target = resolved.intent === "complete_task" ? "DONE" : "CANCELLED";
+      const updated = await updateTaskStatus(resolved.taskId, target);
+
+      if (botApi) {
+        try {
+          await notifyTaskStatusChanged(botApi, updated, linked, target);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`[task-notifications] status notify error: ${msg}`);
+        }
+      }
+
+      return target === "DONE"
+        ? `Задача закрыта: ${updated.title}`
+        : `Задача отменена: ${updated.title}`;
     }
 
     default:

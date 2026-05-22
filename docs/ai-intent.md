@@ -30,7 +30,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -48,7 +48,35 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
+| `complete_task` | `taskTitle` |
+| `cancel_task` | `taskTitle` |
 | `unknown` | `reason?` |
+
+### Пример: закрыть задачу
+
+> Закрой задачу Проверить склад
+
+```json
+{
+  "intent": "complete_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+```
+
+### Пример: отменить задачу
+
+> Отмени задачу Проверить склад
+
+```json
+{
+  "intent": "cancel_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": { "taskTitle": "Проверить склад" }
+}
+```
 
 ### Пример: заметка
 

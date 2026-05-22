@@ -6,7 +6,7 @@ import { updateTaskStatus } from "./actions";
 const transitions: { label: string; status: string }[] = [
   { label: "Новая", status: "NEW" },
   { label: "В работе", status: "IN_PROGRESS" },
-  { label: "Готово", status: "DONE" },
+  { label: "Выполнена", status: "DONE" },
   { label: "Отмена", status: "CANCELLED" },
 ];
 

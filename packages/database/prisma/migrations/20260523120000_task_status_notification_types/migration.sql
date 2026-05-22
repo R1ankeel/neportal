@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "TaskNotificationType" ADD VALUE 'TASK_COMPLETED_CREATOR';
+ALTER TYPE "TaskNotificationType" ADD VALUE 'TASK_CANCELLED_CREATOR';

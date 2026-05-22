@@ -288,8 +288,8 @@ export class TasksService {
       where: { id },
       data,
       include: {
-        creator: { select: { id: true, fullName: true } },
-        assignee: { select: { id: true, fullName: true } },
+        creator: { select: this.taskUserNotifySelect },
+        assignee: { select: this.taskUserNotifySelect },
         project: { select: { id: true, name: true } },
       },
     });
