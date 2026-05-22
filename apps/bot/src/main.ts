@@ -44,7 +44,7 @@ import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
 import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
-import { formatMyTasksReply } from "./my-tasks-flow";
+import { replyWithTasksForHint } from "./my-tasks-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 
@@ -81,6 +81,7 @@ bot.command("start", async (ctx) => {
       "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
       "/transfer <задача> | <исполнитель> | <комментарий> — передать задачу",
       "/tasks — мои ближайшие задачи",
+      "/tasks <сотрудник> — задачи сотрудника (OWNER/MANAGER)",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -106,6 +107,7 @@ bot.command("demo", async (ctx) => {
       "/mention Вася | Проверить склад | нужны его комментарии — призвать в задачу",
       "/transfer Проверить склад | Вася | потому что он отвечает за склад — передать задачу",
       "/tasks — показать мои ближайшие задачи",
+      "/tasks Вася — задачи сотрудника (OWNER/MANAGER)",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -122,6 +124,7 @@ bot.command("demo", async (ctx) => {
       "- Позови Васю в задачу Проверить склад, нужны его комментарии",
       "- Передай задачу Проверить склад Васе, потому что он отвечает за склад",
       "- покажи мои задачи",
+      "- Какие задачи у Васи? (OWNER/MANAGER)",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -209,9 +212,16 @@ bot.command("tasks", async (ctx) => {
   const user = await requireLinkedUser(ctx);
   if (!user) return;
 
+  const telegramUserId = ctx.from?.id;
+  if (!telegramUserId) {
+    await ctx.reply("Не удалось определить Telegram ID.");
+    return;
+  }
+
+  const hint = typeof ctx.match === "string" ? ctx.match.trim() : "";
+
   try {
-    const reply = await formatMyTasksReply(user.id, 5);
-    await ctx.reply(reply);
+    await replyWithTasksForHint(ctx, user, telegramUserId, hint, 5);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] tasks command error: ${msg}`);

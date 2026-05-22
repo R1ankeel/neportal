@@ -95,7 +95,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -494,6 +494,14 @@ Output:
 list_my_tasks.payload:
 {} (пустой объект)
 
+list_user_tasks.payload:
+{ "userHint": string }
+
+Задачи — list_my_tasks vs list_user_tasks:
+- «мои задачи», «что мне нужно сделать», «покажи мои задачи», «какие у меня задачи», «что у меня по задачам» → list_my_tasks, payload {}.
+- Задачи конкретного сотрудника: «Какие задачи у Васи?», «Покажи задачи Ивана», «Что по задачам у Пети?», «Список задач Марии» → list_user_tasks, userHint = имя (не __self__).
+- userHint = "__self__" или «мне» в list_user_tasks → трактуй как list_my_tasks.
+
 Пример list_my_tasks:
 Input: «покажи мои задачи»
 Output:
@@ -524,6 +532,46 @@ Output:
   "payload": {}
 }
 
+Пример list_user_tasks:
+Input: «Какие задачи у Васи?»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Вася" }
+}
+
+Пример list_user_tasks (покажи):
+Input: «Покажи задачи Ивана»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Иван" }
+}
+
+Пример list_user_tasks (что по задачам):
+Input: «Что по задачам у Пети?»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Петя" }
+}
+
+Пример list_user_tasks (список):
+Input: «Список задач Марии»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Мария" }
+}
+
 unknown.payload:
 { "reason"?: string }
 
@@ -543,8 +591,8 @@ unknown.payload:
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
 - Если команда непонятна: intent unknown, низкая confidence.
-- list_my_tasks: показать активные задачи текущего пользователя («мои задачи», «что мне сделать», «список задач») — requiresConfirmation: false, payload {}.
-- requiresConfirmation: true для остальных известных intent (кроме list_my_tasks).`;
+- list_my_tasks / list_user_tasks: requiresConfirmation: false.
+- requiresConfirmation: true для остальных известных intent (кроме list_my_tasks и list_user_tasks).`;
 
 /** Dev-only logs (отключить: BOT_DEV_LOG=0). */
 function yandexGptDevLog(message: string, data?: Record<string, unknown>): void {

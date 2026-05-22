@@ -15,6 +15,7 @@ export type PendingUserSelectionType =
   | "select_user_for_mention"
   | "select_user_for_absence"
   | "select_user_for_link"
+  | "select_user_for_task_list"
   | "select_user_for_other";
 
 export type UserCandidate = {
@@ -61,12 +62,18 @@ export type LinkUserSelectionPayload = {
   intent: "link_telegram";
 };
 
+export type TaskListUserSelectionPayload = {
+  intent: "task_list";
+  limit?: number;
+};
+
 export type UserSelectionPayload =
   | CreateTaskUserSelectionPayload
   | TransferUserSelectionPayload
   | MentionUserSelectionPayload
   | AbsenceUserSelectionPayload
-  | LinkUserSelectionPayload;
+  | LinkUserSelectionPayload
+  | TaskListUserSelectionPayload;
 
 export type PendingUserSelection = {
   type: PendingUserSelectionType;

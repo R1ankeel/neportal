@@ -76,13 +76,21 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
 | `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
 | `/transfer <задача> \| <исполнитель> \| <комментарий>` | `POST /tasks/:id/transfers` |
-| `/tasks` | `GET /tasks/my?userId=…&limit=5` — ближайшие активные задачи исполнителя |
+| `/tasks` | `GET /tasks/my?userId=…&limit=5` — мои задачи |
+| `/tasks <сотрудник>` | то же API; только **OWNER** / **MANAGER** |
 
-### Список моих задач
+### Список задач
 
-**Slash:** `/tasks` — до 5 активных задач (`NEW`, `IN_PROGRESS`), сортировка по дедлайну.
+**Права:** `canViewOtherUsersTasks` — `true` для OWNER и MANAGER. Остальные видят только свои задачи; при запросе чужих: *«Вы можете смотреть только свои задачи.»*
 
-**AI** (без confirmation, `requiresConfirmation: false`):
+**Slash:**
+
+| Команда | Поведение |
+|---------|-----------|
+| `/tasks` | до 5 своих активных задач |
+| `/tasks Вася` | задачи Васи (OWNER/MANAGER); неоднозначное имя → User Selection (`select_user_for_task_list`) |
+
+**AI** (без confirmation):
 
 | Текст | intent |
 |-------|--------|
@@ -90,8 +98,18 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | какие у меня задачи | `list_my_tasks` |
 | что у меня по задачам | `list_my_tasks` |
 | что мне нужно сделать | `list_my_tasks` |
+| Какие задачи у Васи? | `list_user_tasks` + `userHint` |
+| Покажи задачи Ивана | `list_user_tasks` |
+| Что по задачам у Пети? | `list_user_tasks` |
 
-Формат ответа: нумерованный список с проектом, дедлайном (сегодня / завтра / DD.MM.YYYY / не указан), статусом (Новая / В работе). Пустой список: *«У вас нет активных задач.»*
+`list_user_tasks` с `userHint` = `__self__` или «мне» → как `list_my_tasks`.
+
+**Формат ответа:**
+
+- Свои: заголовок *«Ваши ближайшие задачи:»*; пусто: *«У вас нет активных задач.»*
+- Чужие (OWNER/MANAGER): *«Ближайшие задачи сотрудника {ФИО}:»*; пусто: *«У сотрудника {ФИО} нет активных задач.»*
+
+В списке: проект, дедлайн (сегодня / завтра / DD.MM.YYYY / не указан), статус (Новая / В работе).
 
 ### Комментарии к задачам
 

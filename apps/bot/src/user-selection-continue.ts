@@ -21,6 +21,11 @@ import { todayIsoDate } from "./parse-ru-date";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { linkTelegramUser } from "./api";
+import {
+  canViewOtherUsersTasks,
+  ONLY_OWN_TASKS_MESSAGE,
+  replyWithTasksForUser,
+} from "./my-tasks-flow";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -170,5 +175,14 @@ export async function continueAfterUserSelection(
       },
     };
     await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (payload.intent === "task_list") {
+    if (!canViewOtherUsersTasks(linked)) {
+      await ctx.reply(ONLY_OWN_TASKS_MESSAGE);
+      return;
+    }
+    await replyWithTasksForUser(ctx, selectedUser, false, payload.limit ?? 5);
   }
 }

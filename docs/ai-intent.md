@@ -61,7 +61,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -85,6 +85,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `mention_in_task` | `userHint`, `taskTitle`, `text?` |
 | `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
 | `list_my_tasks` | `{}` (пустой) |
+| `list_user_tasks` | `userHint` (имя сотрудника; `__self__` → свои задачи) |
 | `unknown` | `reason?` |
 
 ### Пример: закрыть задачу (без результата в фразе)
@@ -245,6 +246,21 @@ OWNER/MANAGER: задача передаётся сразу после «да».
 ```
 
 Бот сразу вызывает `GET /tasks/my?userId=<linked>&limit=5` и отправляет список (без «да/нет»).
+
+### Пример: задачи сотрудника (OWNER/MANAGER)
+
+> Какие задачи у Васи?
+
+```json
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Вася" }
+}
+```
+
+Бот проверяет роль (OWNER/MANAGER), разрешает `userHint` через User Resolution; при нескольких совпадениях — `select_user_for_task_list`, затем `GET /tasks/my?userId=<выбранный>&limit=5`. EMPLOYEE при запросе чужих задач получает отказ.
 
 ### Пример: заметка
 
