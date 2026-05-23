@@ -86,7 +86,14 @@ export async function routeParsedAiIntent(
 
   if (intent.intent === "list_user_tasks") {
     try {
-      await replyWithTasksForHint(ctx, linked, telegramUserId, intent.payload.userHint, 5);
+      await replyWithTasksForHint(
+        ctx,
+        linked,
+        telegramUserId,
+        intent.payload.userHint,
+        5,
+        intent.payload.userId,
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[bot] list_user_tasks error: ${msg}`);

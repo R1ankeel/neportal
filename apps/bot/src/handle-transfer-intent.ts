@@ -40,6 +40,7 @@ export async function handleTransferTaskIntent(
     linked,
     "select_user_for_transfer",
     userSelectionPayload,
+    intent.payload.toUserId,
   );
   if (userResolution.status !== "resolved") return;
 

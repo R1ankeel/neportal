@@ -13,6 +13,7 @@ import {
   sanitizeAiUserHint,
 } from "./fix-ai-intent-absence-user";
 import { isSelfHint, resolveUsersByHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 
 function isAssigneeSelfHint(hint: string): boolean {
   const t = hint.trim();
@@ -42,11 +43,17 @@ export async function resolveUserHintWithSelection(
   currentUser: ApiUser,
   selectionType: PendingUserSelectionType,
   payload: UserSelectionPayload,
+  userId?: string,
 ): Promise<UserHintResolution> {
   const trimmed = hint.trim();
-  if (!trimmed) return { status: "no_hint" };
+  if (!trimmed && !userId) return { status: "no_hint" };
 
-  const match = resolveUsersByHint(users, trimmed, currentUser);
+  const match = resolveUserFromAiPayload({
+    users,
+    userId,
+    hint: trimmed || undefined,
+    currentUser,
+  });
   if (match.kind === "one") {
     return { status: "resolved", user: match.user };
   }

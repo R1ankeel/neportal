@@ -144,6 +144,7 @@ model User {
   email            String?
   phone      String?
   fullName   String
+  systemAliases String?
   role       UserRole
   status     EntityStatus @default(ACTIVE)
 

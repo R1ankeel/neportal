@@ -46,6 +46,7 @@ export async function handleReassignTaskIntent(
       linked,
       "select_user_for_reassign_from",
       fromPayload,
+      intent.payload.fromUserId,
     );
     if (fromResolution.status !== "resolved") return;
     fromUser = fromResolution.user;
@@ -69,6 +70,7 @@ export async function handleReassignTaskIntent(
     linked,
     "select_user_for_reassign_to",
     toPayload,
+    intent.payload.toUserId,
   );
   if (toResolution.status !== "resolved") return;
 

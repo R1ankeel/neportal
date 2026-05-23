@@ -1,7 +1,7 @@
 export const CREATE_TASK_PROMPT = `Разрешённые intent: create_task.
 
 create_task.payload:
-{ "projectHint"?: string, "assigneeHint"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
+{ "projectHint"?: string, "assigneeHint"?: string, "assigneeUserId"?: string, "title": string, "description"?: string, "deadlineDate"?: "YYYY-MM-DD" }
 
 Правила assignee и title:
 - assigneeHint — только исполнитель; «мне»/«себе» → "__self__".
@@ -42,6 +42,10 @@ Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"pa
 Пример:
 Input: «заведи задачу ивану иванову подготовить отчет»
 Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Ивану Иванову","title":"Подготовить отчет"}}
+
+Пример:
+Input: «Поставь Тохе задачу проверить склад»
+Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Тохе","assigneeUserId":"<id из Сотрудники>","title":"Проверить склад"}}
 
 Пример:
 Input: «Поставь мне задачу проверить склад завтра»

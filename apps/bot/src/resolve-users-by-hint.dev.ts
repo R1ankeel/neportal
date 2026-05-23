@@ -1,12 +1,22 @@
 import type { ApiUser } from "./api";
 import { devLog } from "./dev-log";
+import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
 
+function withAliases(fullName: string, role: string, id: string): ApiUser {
+  return {
+    id,
+    fullName,
+    role,
+    systemAliases: systemAliasesToString(generateSystemAliases(fullName)),
+  };
+}
+
 const TEST_USERS: ApiUser[] = [
-  { id: "1", fullName: "Вася Пупкин", role: "EMPLOYEE" },
-  { id: "2", fullName: "Иван Иванов", role: "EMPLOYEE" },
-  { id: "3", fullName: "Иван Петров", role: "EMPLOYEE" },
-  { id: "4", fullName: "Мария Соколова", role: "EMPLOYEE" },
+  withAliases("Вася Пупкин", "EMPLOYEE", "1"),
+  withAliases("Иван Иванов", "EMPLOYEE", "2"),
+  withAliases("Иван Петров", "EMPLOYEE", "3"),
+  withAliases("Мария Соколова", "EMPLOYEE", "4"),
 ];
 
 type Expected =
@@ -64,8 +74,8 @@ export function devLogResolveUsersByHintChecks(): void {
   }
 
   const ambiguousUsers: ApiUser[] = [
-    { id: "1", fullName: "Вася Пупкин", role: "EMPLOYEE" },
-    { id: "5", fullName: "Василий Иванов", role: "EMPLOYEE" },
+    withAliases("Вася Пупкин", "EMPLOYEE", "1"),
+    withAliases("Василий Иванов", "EMPLOYEE", "5"),
   ];
   for (const { hint, expected } of AMBIGUOUS_VASYA_CASES) {
     const result = resolveUsersByHint(ambiguousUsers, hint, null);

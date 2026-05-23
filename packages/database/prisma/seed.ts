@@ -6,8 +6,13 @@ import {
   TaskStatus,
   BudgetStatus,
 } from "@prisma/client";
+import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
 
 const prisma = new PrismaClient();
+
+function aliasesFor(fullName: string): string {
+  return systemAliasesToString(generateSystemAliases(fullName));
+}
 
 const DEMO_CONTRACT_TASK_TITLE = "Подписать договор с подрядчиком";
 
@@ -86,6 +91,7 @@ async function main() {
     data: {
       organizationId: org.id,
       fullName: "Иван Иванов",
+      systemAliases: aliasesFor("Иван Иванов"),
       role: UserRole.OWNER,
       status: EntityStatus.ACTIVE,
       telegramUsername: "demo_ivan",
@@ -97,6 +103,7 @@ async function main() {
     data: {
       organizationId: org.id,
       fullName: "Вася Пупкин",
+      systemAliases: aliasesFor("Вася Пупкин"),
       role: UserRole.EMPLOYEE,
       status: EntityStatus.ACTIVE,
       telegramUsername: "demo_vasya",
@@ -107,6 +114,7 @@ async function main() {
     data: {
       organizationId: org.id,
       fullName: "Петр Петров",
+      systemAliases: aliasesFor("Петр Петров"),
       role: UserRole.EMPLOYEE,
       status: EntityStatus.ACTIVE,
       telegramId: "seed-demo-petr",
@@ -117,9 +125,32 @@ async function main() {
     data: {
       organizationId: org.id,
       fullName: "Мария Соколова",
+      systemAliases: aliasesFor("Мария Соколова"),
       role: UserRole.ACCOUNTANT,
       status: EntityStatus.ACTIVE,
       telegramId: "seed-demo-maria",
+    },
+  });
+
+  const anton = await prisma.user.create({
+    data: {
+      organizationId: org.id,
+      fullName: "Антон Антонов",
+      systemAliases: aliasesFor("Антон Антонов"),
+      role: UserRole.EMPLOYEE,
+      status: EntityStatus.ACTIVE,
+      telegramUsername: "demo_anton",
+    },
+  });
+
+  const sabir = await prisma.user.create({
+    data: {
+      organizationId: org.id,
+      fullName: "Сабир Махмудов",
+      systemAliases: aliasesFor("Сабир Махмудов"),
+      role: UserRole.EMPLOYEE,
+      status: EntityStatus.ACTIVE,
+      telegramUsername: "demo_sabir",
     },
   });
 
@@ -139,6 +170,8 @@ async function main() {
       { projectId: project.id, userId: vasya.id, role: ProjectRole.MEMBER },
       { projectId: project.id, userId: petr.id, role: ProjectRole.MEMBER },
       { projectId: project.id, userId: maria.id, role: ProjectRole.VIEWER },
+      { projectId: project.id, userId: anton.id, role: ProjectRole.MEMBER },
+      { projectId: project.id, userId: sabir.id, role: ProjectRole.MEMBER },
     ],
   });
 

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { EntityStatus, PrismaService, UserRole } from "@neportal/database";
+import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { TelegramNotifyService } from "../telegram/telegram-notify.service";
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -105,6 +106,7 @@ export class UsersService {
     const data: {
       organizationId: string;
       fullName: string;
+      systemAliases: string;
       role: CreateUserDto["role"];
       status: EntityStatus;
       email?: string;
@@ -113,6 +115,7 @@ export class UsersService {
     } = {
       organizationId: this.orgId(),
       fullName: dto.fullName.trim(),
+      systemAliases: systemAliasesToString(generateSystemAliases(dto.fullName.trim())),
       role: dto.role,
       status: EntityStatus.ACTIVE,
       email: dto.email,
@@ -138,6 +141,7 @@ export class UsersService {
 
     const data: {
       fullName?: string;
+      systemAliases?: string;
       role?: UpdateUserDto["role"];
       email?: string | null;
       phone?: string | null;
@@ -145,7 +149,13 @@ export class UsersService {
       telegramUsername?: string | null;
     } = {};
 
-    if (dto.fullName !== undefined) data.fullName = dto.fullName.trim();
+    if (dto.fullName !== undefined) {
+      const trimmed = dto.fullName.trim();
+      data.fullName = trimmed;
+      if (trimmed !== existing.fullName) {
+        data.systemAliases = systemAliasesToString(generateSystemAliases(trimmed));
+      }
+    }
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.phone !== undefined) data.phone = dto.phone;

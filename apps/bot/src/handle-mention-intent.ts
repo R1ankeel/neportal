@@ -43,6 +43,7 @@ export async function handleMentionInTaskIntent(
     linked,
     "select_user_for_mention",
     userSelectionPayload,
+    intent.payload.mentionedUserId,
   );
   if (userResolution.status !== "resolved") return;
 

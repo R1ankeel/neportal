@@ -3,7 +3,6 @@ import {
   fetchBudgets,
   fetchProjects,
   fetchUsers,
-  findUserByNameHint,
   type ApiBudget,
   type ApiProject,
   type ApiUser,
@@ -13,7 +12,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { resolveBudgetForExpense } from "./budget-resolver";
-import { findProjectByHint, findUserByHint } from "./hint-matchers";
+import { findProjectByHint } from "./hint-matchers";
 import {
   isResolvableNamedUserHint,
   sanitizeAiUserHint,
@@ -21,6 +20,7 @@ import {
 import { normalizeCreateTaskPayload } from "./normalize-create-task";
 import { replaceIsoDatesInText, todayIsoDate } from "./parse-ru-date";
 import { isSelfHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 
 export type ResolvedCreateTask = {
   intent: "create_task";
@@ -219,8 +219,14 @@ export async function resolveIntent(
       let assignee: ApiUser | undefined;
       if (overrides?.assigneeId) {
         assignee = users.find((u) => u.id === overrides.assigneeId);
-      } else if (payload.assigneeHint) {
-        assignee = findUserByHint(users, payload.assigneeHint, currentUser);
+      } else if (payload.assigneeUserId || payload.assigneeHint) {
+        const match = resolveUserFromAiPayload({
+          users,
+          userId: payload.assigneeUserId,
+          hint: payload.assigneeHint,
+          currentUser,
+        });
+        if (match.kind === "one") assignee = match.user;
       }
 
       return {
@@ -328,7 +334,12 @@ export async function resolveIntent(
         if (useSelf) {
           user = currentUser;
         } else {
-          const match = findUserByNameHint(users, rawHint, currentUser);
+          const match = resolveUserFromAiPayload({
+            users,
+            userId: intent.payload.userId,
+            hint: rawHint ?? undefined,
+            currentUser,
+          });
           if (match.kind === "none") {
             return {
               ok: false,

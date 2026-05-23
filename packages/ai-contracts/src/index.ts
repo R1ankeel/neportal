@@ -46,6 +46,7 @@ const intentBase = {
 export const CreateTaskPayloadSchema = z.object({
   projectHint: optionalAiString,
   assigneeHint: optionalAiString,
+  assigneeUserId: optionalAiString,
   title: z.string().min(1),
   description: optionalAiString,
   deadlineDate: optionalAiDeadlineDate,
@@ -73,6 +74,7 @@ export const CreateBudgetPayloadSchema = z.object({
 
 export const CreateAbsencePayloadSchema = z.object({
   userHint: optionalAiString,
+  userId: optionalAiString,
   type: AbsenceTypeSchema,
   startDate: optionalAiString,
   endDate: z.string(),
@@ -82,6 +84,7 @@ export const CreateAbsencePayloadSchema = z.object({
 
 export const CancelAbsencePayloadSchema = z.object({
   userHint: optionalAiString,
+  userId: optionalAiString,
   type: AbsenceTypeSchema.optional(),
   cancellationReason: optionalAiString,
 });
@@ -114,6 +117,7 @@ export const AddTaskCommentPayloadSchema = z.object({
 
 export const MentionInTaskPayloadSchema = z.object({
   userHint: z.string().min(1),
+  mentionedUserId: optionalAiString,
   taskTitle: z.string().min(1),
   text: optionalAiStringMin1,
 });
@@ -121,13 +125,16 @@ export const MentionInTaskPayloadSchema = z.object({
 export const TransferTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
   toUserHint: z.string().min(1),
+  toUserId: optionalAiString,
   comment: optionalAiStringMin1,
 });
 
 export const ReassignTaskPayloadSchema = z.object({
   taskTitle: z.string().min(1),
   fromUserHint: optionalAiStringMin1,
+  fromUserId: optionalAiString,
   toUserHint: z.string().min(1),
+  toUserId: optionalAiString,
   comment: optionalAiStringMin1,
 });
 
@@ -135,6 +142,7 @@ export const ListMyTasksPayloadSchema = z.object({});
 
 export const ListUserTasksPayloadSchema = z.object({
   userHint: z.string().min(1),
+  userId: optionalAiString,
 });
 
 export const ListPendingExpensesPayloadSchema = z.object({});

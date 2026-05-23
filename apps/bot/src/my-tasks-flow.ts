@@ -7,7 +7,7 @@ import {
 } from "./pending-user-selection";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { SELF_HINT_MARKER, isSelfHint } from "./resolve-users-by-hint";
-import { resolveUserByHint } from "./user-hint-resolution";
+import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 
 export const ONLY_OWN_TASKS_MESSAGE = "Вы можете смотреть только свои задачи.";
@@ -130,14 +130,15 @@ export async function replyWithTasksForHint(
   telegramUserId: number,
   hint: string,
   limit = 5,
+  userId?: string,
 ): Promise<void> {
   const trimmed = hint.trim();
-  if (!trimmed) {
+  if (!trimmed && !userId) {
     await replyWithTasksForUser(ctx, currentUser, true, limit);
     return;
   }
 
-  if (isSelfUserHint(trimmed)) {
+  if (trimmed && isSelfUserHint(trimmed)) {
     await replyWithTasksForUser(ctx, currentUser, true, limit);
     return;
   }
@@ -148,7 +149,12 @@ export async function replyWithTasksForHint(
   }
 
   const users = await fetchUsers();
-  const match = resolveUserByHint(users, trimmed, currentUser);
+  const match = resolveUserFromAiPayload({
+    users,
+    userId,
+    hint: trimmed || undefined,
+    currentUser,
+  });
   if (match.kind === "none") {
     await ctx.reply(userNotFoundMessage(trimmed));
     return;

@@ -16,7 +16,8 @@ import {
   type AbsenceCandidate,
   startPendingAbsenceSelection,
 } from "./pending-absence-selection";
-import { isSelfHint, resolveUsersByHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import { isSelfHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 import {
   apiUserToCandidate,
   startPendingUserSelection,
@@ -205,7 +206,12 @@ export async function handleCancelAbsenceIntent(
   }
 
   const users = await fetchUsers();
-  const match = resolveUsersByHint(users, rawHint!, linked);
+  const match = resolveUserFromAiPayload({
+    users,
+    userId: payload.userId as string | undefined,
+    hint: rawHint ?? undefined,
+    currentUser: linked,
+  });
   if (match.kind === "none") {
     await ctx.reply(userNotFoundMessage(rawHint!));
     return;

@@ -13,6 +13,7 @@ export type ApiUser = {
   id: string;
   fullName: string;
   role: string;
+  systemAliases?: string | null;
   telegramId?: string | null;
   telegramUsername?: string | null;
 };

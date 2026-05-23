@@ -8,9 +8,12 @@ import {
   type ApiUser,
 } from "./api";
 import type { PromptGroup } from "./ai/prompt-group-router";
+import { pickPromptAliases } from "@neportal/shared";
 import { todayIsoDate } from "./parse-ru-date";
 
 const MAX_TASKS_IN_CONTEXT = 20;
+const MAX_EMPLOYEES_WITH_ALIASES = 30;
+const MAX_ALIASES_PER_EMPLOYEE = 8;
 
 export type IntentPromptContext = {
   currentDate: string;
@@ -142,7 +145,7 @@ export function formatPromptContextForModel(
     group === "classifier";
 
   if (includeUsers && ctx.users.length > 0) {
-    lines.push("", "Пользователи:", ...ctx.users.map((u) => `- ${u.fullName}`));
+    lines.push("", "Сотрудники:", ...formatEmployeesForPrompt(ctx.users));
   }
 
   if (group === "expense") {
@@ -167,4 +170,26 @@ export function formatPromptContextForModel(
   }
 
   return lines.join("\n");
+}
+
+function formatEmployeesForPrompt(users: ApiUser[]): string[] {
+  const includeAliases = users.length <= MAX_EMPLOYEES_WITH_ALIASES;
+
+  return users.map((user) => {
+    const username = user.telegramUsername
+      ? `@${user.telegramUsername.replace(/^@+/, "")}`
+      : "";
+    const parts = [
+      `id=${user.id}`,
+      `name="${user.fullName}"`,
+    ];
+    if (username) parts.push(`username="${username}"`);
+    if (includeAliases) {
+      const aliases = pickPromptAliases(user.systemAliases, MAX_ALIASES_PER_EMPLOYEE);
+      if (aliases.length > 0) {
+        parts.push(`aliases="${aliases.join(", ")}"`);
+      }
+    }
+    return `- ${parts.join("; ")}`;
+  });
 }
