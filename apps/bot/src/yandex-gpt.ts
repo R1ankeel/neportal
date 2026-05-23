@@ -2,6 +2,7 @@ import { assertAiContractsSchemaLoaded, safeParseAiIntent, type AiIntent } from 
 import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
 import {
   warnLongCreateTaskTitleWithoutDescription,
+  warnLongInputWithoutDescription,
   warnPossibleLostDetailsInDescription,
 } from "./normalize-create-task";
 import {
@@ -104,6 +105,17 @@ JSON Schema ответа:
   "requiresConfirmation": boolean,
   "payload": object
 }
+
+Обработка речевого шума и голосовых сообщений (для всех intent, особенно create_task, add_task_comment, create_note, create_expense, transfer_task, mention_in_task):
+- Убирай слова-паразиты и речевой мусор, если они не несут смысла: «ну», «это», «короче», «типа», «как бы», «в общем», «значит», «там», «вот», «наверное», «получается», «эээ», «ммм», «к этому», «как его», «я не помню» и похожие.
+- Исправляй устную речь в короткий деловой текст.
+- Сохраняй все важные факты: имена людей, адреса, даты, сроки, суммы, названия компаний, объекты, товары, причины, условия.
+- Не выдумывай новые факты. Не удаляй неопределённость, если она важна (например «улица Автомобилистов или склад поставщика» — сохрани как альтернативу, не выбирай сам).
+- Не выдумывай точный адрес, если пользователь его не знает. Если сказано «не помню, где склад» — сохрани как «уточнить место склада» или аналог, если это важно для задачи.
+- Сомнения и причины переноси в description (create_task) или text (комментарии, заметки): например «есть сомнения по качеству».
+- Не добавляй в title мусорные слова; title — короткое главное действие.
+- create_task: title = главное действие; description = очищенные детали, доп. действия, условия, причины, ожидаемый результат.
+- create_note / add_task_comment / mention_in_task / transfer_task (comment): text = очищенный смысл без речевого мусора, факты сохранены.
 
 payload по intent:
 
@@ -382,6 +394,21 @@ Output:
   }
 }
 
+Пример create_task — речевой шум / голос (текущая дата 2026-05-22, послезавтра → 2026-05-24):
+Input: «Нужно чтоб Вася послезавтра после обеда поехал на улицу автомобилистов или где у них там склад, а не помню, ну, к этому, как его, ашоту, который нам блоки поставляет. И провел там контроль качества. А то у меня сомнения возникли.»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Провести контроль качества блоков",
+    "description": "1. Послезавтра после обеда поехать на улицу Автомобилистов или на склад поставщика.\\n2. Связаться с Ашотом, который поставляет блоки.\\n3. Проверить качество блоков, так как есть сомнения.",
+    "deadlineDate": "2026-05-24"
+  }
+}
+
 create_note.payload:
 { "projectHint"?: string, "text": string } — в text даты пиши DD.MM.YYYY, не YYYY-MM-DD
 
@@ -562,6 +589,19 @@ Output:
   "confidence": 0.85,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Проверить склад" }
+}
+
+Пример add_task_comment — речевой шум (текущая дата 2026-05-22):
+Input: «Напиши комментарий к задаче Проверить склад, ну я там был, короче склад закрыт, охранник сказал завтра после обеда можно приехать»
+Output:
+{
+  "intent": "add_task_comment",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "Проверить склад",
+    "text": "Склад закрыт. Охранник сказал, что завтра после обеда можно приехать."
+  }
 }
 
 mention_in_task.payload:
@@ -856,6 +896,8 @@ unknown.payload:
 { "reason"?: string }
 
 Пример create_note:
+Input: «клиент попросил 22.05.2026 проверить статистику VK»
+Output:
 {
   "intent": "create_note",
   "confidence": 0.9,
@@ -863,9 +905,22 @@ unknown.payload:
   "payload": { "text": "клиент попросил 22.05.2026 проверить статистику VK" }
 }
 
+Пример create_note — речевой шум:
+Input: «Запиши заметку, ну короче клиент вроде как сомневается по цене, надо будет потом вернуться к этому вопросу»
+Output:
+{
+  "intent": "create_note",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "text": "Клиент сомневается по цене. Нужно вернуться к этому вопросу позже."
+  }
+}
+
 Правила:
 - Поля deadlineDate, startDate, endDate — только реальный YYYY-MM-DD (вычисли дату сам); если год не указан — 2026. Никогда не пиши <…>, YYYY-MM-DD как текст или пояснения вместо даты.
 - В payload.text заметок даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
+- Очищай речевой шум по правилам выше; в confirmation пользователь увидит уже очищенные title, description, text.
 - В create_task: короткий title + description со всеми доп. действиями/условиями (столько пунктов, сколько в тексте; не обрезай до двух); description без дат; дедлайн только в deadlineDate; не теряй смысл из сообщения.
 - «Завтра» в тексте заметки (create_note) — DD.MM.YYYY от текущей даты из контекста.
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
@@ -978,6 +1033,7 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
   const intent = validated.data;
   if (intent.intent === "create_task") {
     const userTextTrimmed = userText.trim();
+    warnLongInputWithoutDescription(userTextTrimmed, intent.payload.description);
     warnLongCreateTaskTitleWithoutDescription(
       intent.payload.title,
       intent.payload.description,

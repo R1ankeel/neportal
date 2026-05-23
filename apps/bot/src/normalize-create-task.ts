@@ -73,6 +73,17 @@ function countNumberedDescriptionItems(description: string): number {
   return (description.match(/^\s*\d+\./gm) ?? []).length;
 }
 
+/** Dev-предупреждение: длинный исходный текст без description в ответе модели. */
+export function warnLongInputWithoutDescription(
+  originalText: string,
+  description?: string,
+): void {
+  if (description?.trim()) return;
+  const original = originalText.trim();
+  if (original.length <= 180) return;
+  devLog("[create_task] long input without description", { originalLength: original.length });
+}
+
 /** Dev-предупреждение, если модель свалила всё в title без description. */
 export function warnLongCreateTaskTitleWithoutDescription(
   title: string,
