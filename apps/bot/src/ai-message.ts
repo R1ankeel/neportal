@@ -49,6 +49,7 @@ import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import { parseExpenseQuery } from "./parse-expense-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
@@ -226,6 +227,12 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       console.error(`[bot] list_user_tasks (deterministic) error: ${msg}`);
       await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
     }
+    return;
+  }
+
+  const expenseIntent = parseExpenseQuery(text);
+  if (expenseIntent) {
+    await beginCreateExpenseFromAiIntent(ctx, telegramUserId, linked, expenseIntent);
     return;
   }
 

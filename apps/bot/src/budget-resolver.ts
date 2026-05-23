@@ -74,6 +74,8 @@ const WORD_ALIASES: Record<string, string> = {
   тетрадей: "тетради",
   папку: "папки",
   папок: "папки",
+  печати: "печать",
+  печатью: "печать",
 };
 
 const CATEGORY_ALIASES: Record<BudgetCategory, string[]> = {
@@ -100,6 +102,9 @@ const CATEGORY_ALIASES: Record<BudgetCategory, string[]> = {
     "скрепки",
     "файлы",
     "папки",
+    "печать",
+    "печати",
+    "марки",
   ],
   vk_ads: [
     "реклама vk",
@@ -168,6 +173,14 @@ export function isSimilarRussianWord(a: string, b: string): boolean {
 
 function stripStopWordsFromText(text: string): string {
   return tokenizeBudgetText(text, true).join(" ");
+}
+
+/** Категория бюджета → budgetHint для AI/детерминированного парсера */
+export function inferBudgetHintFromText(text: string): string | undefined {
+  const categories = detectCategoriesInText(text);
+  if (categories.has("stationery")) return "канцелярия";
+  if (categories.has("vk_ads")) return "реклама VK";
+  return undefined;
 }
 
 function detectCategoriesInText(text: string): Set<BudgetCategory> {

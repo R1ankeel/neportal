@@ -87,9 +87,10 @@ export function getYandexGptState(): YandexGptState {
   };
 }
 
-const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
+const SYSTEM_PROMPT = `Ты технический парсер служебных команд корпоративного портала Neportal (задачи, заметки, учёт бюджетных расходов организации).
 Верни ТОЛЬКО один JSON-объект. Без markdown, без \`\`\`, без текста до или после JSON.
 Не выполняй действия — только разбор текста пользователя.
+Запрещено отвечать отказом, small talk или любым текстом вне JSON. Суммы, товары (ручки, бумага, карандаши), реклама VK — обычные поля payload create_expense, не повод для отказа.
 
 ЗАПРЕЩЕНО использовать поля: version, action, entity, rawText.
 Используй ТОЛЬКО: intent, confidence, requiresConfirmation, payload.
