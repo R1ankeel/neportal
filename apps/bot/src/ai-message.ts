@@ -47,6 +47,7 @@ import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import { parseTaskListQuery } from "./parse-task-list-query";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
 
@@ -196,6 +197,29 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   }
 
   if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  const taskListQuery = parseTaskListQuery(text);
+  if (taskListQuery?.type === "my") {
+    try {
+      const reply = await formatMyTasksReply(linked.id, 5);
+      await ctx.reply(reply);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_my_tasks (deterministic) error: ${msg}`);
+      await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+    }
+    return;
+  }
+  if (taskListQuery?.type === "user") {
+    try {
+      await replyWithTasksForHint(ctx, linked, telegramUserId, taskListQuery.userHint, 5);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_user_tasks (deterministic) error: ${msg}`);
+      await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+    }
     return;
   }
 

@@ -871,9 +871,31 @@ list_user_tasks.payload:
 { "userHint": string }
 
 Задачи — list_my_tasks vs list_user_tasks:
-- «мои задачи», «что мне нужно сделать», «покажи мои задачи», «какие у меня задачи», «что у меня по задачам» → list_my_tasks, payload {}.
-- Задачи конкретного сотрудника: «Какие задачи у Васи?», «Покажи задачи Ивана», «Что по задачам у Пети?», «Список задач Марии» → list_user_tasks, userHint = имя (не __self__).
-- userHint = "__self__" или «мне» в list_user_tasks → трактуй как list_my_tasks.
+Если пользователь спрашивает задачи конкретного сотрудника → intent list_user_tasks.
+Фразы-маркеры list_user_tasks (userHint = имя сотрудника в той форме, как сказал пользователь; не обязательно именительный падеж):
+- «какие задачи у {user}»
+- «какие сейчас задачи у {user}»
+- «что у {user} по задачам»
+- «что сейчас у {user} по задачам»
+- «покажи задачи {user}»
+- «покажи список задач {user}»
+- «список задач {user}»
+- «задачи {user}»
+- «что делает {user}»
+- «чем занят {user}»
+- «что по {user}»
+- «что там у {user}»
+- «какие дела у {user}»
+
+list_my_tasks (payload {}):
+- «мои задачи», «покажи мои задачи», «что у меня по задачам», «какие у меня задачи»
+- «что мне нужно сделать», «что мне делать», «что мне сделать»
+- «задачи у меня»
+- userHint = "__self__" или «мне»/«меня» в list_user_tasks → list_my_tasks
+
+list_user_tasks:
+- userHint — имя сотрудника как в сообщении (Васи, Вани, Петр…); resolver сам сопоставит падежи и alias.
+- Если в вопросе есть имя другого сотрудника (не «я»/«меня») → list_user_tasks.
 
 Пример list_my_tasks:
 Input: «покажи мои задачи»
@@ -905,44 +927,74 @@ Output:
   "payload": {}
 }
 
+Пример list_my_tasks (по задачам):
+Input: «Что у меня по задачам?»
+Output:
+{
+  "intent": "list_my_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
 Пример list_user_tasks:
-Input: «Какие задачи у Васи?»
+Input: «Какие сейчас задачи у Васи?»
 Output:
 {
   "intent": "list_user_tasks",
   "confidence": 0.9,
   "requiresConfirmation": false,
-  "payload": { "userHint": "Вася" }
+  "payload": { "userHint": "Васи" }
 }
 
-Пример list_user_tasks (покажи):
+Пример list_user_tasks (список):
+Input: «Покажи список задач Васи»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Васи" }
+}
+
+Пример list_user_tasks (что по задачам):
+Input: «Что у Вани по задачам?»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Вани" }
+}
+
+Пример list_user_tasks (чем занят):
+Input: «Чем занят Петр?»
+Output:
+{
+  "intent": "list_user_tasks",
+  "confidence": 0.85,
+  "requiresConfirmation": false,
+  "payload": { "userHint": "Петр" }
+}
+
+Пример list_user_tasks (покажи задачи):
 Input: «Покажи задачи Ивана»
 Output:
 {
   "intent": "list_user_tasks",
   "confidence": 0.9,
   "requiresConfirmation": false,
-  "payload": { "userHint": "Иван" }
+  "payload": { "userHint": "Ивана" }
 }
 
-Пример list_user_tasks (что по задачам):
-Input: «Что по задачам у Пети?»
-Output:
-{
-  "intent": "list_user_tasks",
-  "confidence": 0.9,
-  "requiresConfirmation": false,
-  "payload": { "userHint": "Петя" }
-}
-
-Пример list_user_tasks (список):
+Пример list_user_tasks (список Марии):
 Input: «Список задач Марии»
 Output:
 {
   "intent": "list_user_tasks",
   "confidence": 0.9,
   "requiresConfirmation": false,
-  "payload": { "userHint": "Мария" }
+  "payload": { "userHint": "Марии" }
 }
 
 unknown.payload:
