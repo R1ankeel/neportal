@@ -23,6 +23,13 @@ import {
   saveYandexGptPromptLog,
   type YandexPromptLogReason,
 } from "./yandex-gpt-prompt-log";
+import {
+  addTokenUsage,
+  logYandexGptTokenUsage,
+  logYandexGptTokenUsageTotal,
+  parseYandexGptUsage,
+  type YandexGptTokenUsage,
+} from "./yandex-gpt-usage";
 
 export type { PromptGroup };
 export type ParseTextIntentOptions = LoadIntentPromptContextOptions;
@@ -134,7 +141,17 @@ type YandexCompletionResponse = {
       message?: { text?: string };
       status?: string;
     }>;
+    usage?: {
+      inputTextTokens?: number | string;
+      completionTokens?: number | string;
+      totalTokens?: number | string;
+    };
   };
+};
+
+type YandexGptCallResult = {
+  text: string;
+  usage: YandexGptTokenUsage | null;
 };
 
 export type ParseTextIntentResult =
@@ -142,14 +159,14 @@ export type ParseTextIntentResult =
   | { ok: false; kind: "disabled" | "api_error" | "invalid_json" | "invalid_schema" };
 
 type GptCallResult =
-  | { ok: true; responseText: string; parsed: unknown }
+  | { ok: true; responseText: string; parsed: unknown; usage: YandexGptTokenUsage | null }
   | { ok: false; kind: "invalid_json" | "invalid_schema" };
 
 async function callYandexGpt(
   config: YandexGptConfig,
   systemPrompt: string,
   userPrompt: string,
-): Promise<string> {
+): Promise<YandexGptCallResult> {
   const res = await fetch(YANDEX_COMPLETION_URL, {
     method: "POST",
     headers: {
@@ -183,7 +200,10 @@ async function callYandexGpt(
     throw new Error("YandexGPT returned empty completion");
   }
 
-  return text;
+  return {
+    text,
+    usage: parseYandexGptUsage(data.result?.usage),
+  };
 }
 
 function buildUserPrompt(context: IntentPromptContext, group: PromptGroup, userText: string): string {
@@ -216,12 +236,15 @@ async function runGptJsonCall(params: {
   const promptChars = systemPrompt.length + userPrompt.length;
   yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars}`);
 
-  let responseText: string;
+  let callResult: YandexGptCallResult;
   try {
-    responseText = await callYandexGpt(config, systemPrompt, userPrompt);
+    callResult = await callYandexGpt(config, systemPrompt, userPrompt);
   } catch (e) {
     throw e;
   }
+
+  logYandexGptTokenUsage(promptGroup, callResult.usage);
+  const responseText = callResult.text;
 
   const jsonText = extractJsonText(responseText);
   let parsed: unknown;
@@ -238,7 +261,7 @@ async function runGptJsonCall(params: {
       userPrompt,
       modelResponse: responseText,
       modelUri: config.modelUri,
-      extra: { promptGroup, jsonPreview: jsonText.slice(0, 500) },
+      extra: { promptGroup, usage: callResult.usage, jsonPreview: jsonText.slice(0, 500) },
     });
     yandexGptDevLog(
       reason === "api_refusal" ? "model refusal/non-json" : "model returned non-JSON text",
@@ -255,7 +278,7 @@ async function runGptJsonCall(params: {
       userPrompt,
       modelResponse: responseText,
       modelUri: config.modelUri,
-      extra: { promptGroup, parsed },
+      extra: { promptGroup, usage: callResult.usage, parsed },
     });
     yandexGptDevLog("validation error", {
       promptGroup,
@@ -265,7 +288,7 @@ async function runGptJsonCall(params: {
     return { ok: false, kind: "invalid_schema", systemPrompt, userPrompt };
   }
 
-  return { ok: true, responseText, parsed, systemPrompt, userPrompt };
+  return { ok: true, responseText, parsed, usage: callResult.usage, systemPrompt, userPrompt };
 }
 
 async function runClassifier(
@@ -273,8 +296,8 @@ async function runClassifier(
   userText: string,
   options?: ParseTextIntentOptions,
 ): Promise<
-  | { ok: true; extractorGroup: ExtractorPromptGroup }
-  | { ok: true; intent: AiIntent }
+  | { ok: true; extractorGroup: ExtractorPromptGroup; usage: YandexGptTokenUsage | null }
+  | { ok: true; intent: AiIntent; usage: YandexGptTokenUsage | null }
   | { ok: false; kind: "invalid_json" | "invalid_schema" | "api_error" }
 > {
   const promptGroup: PromptGroup = "classifier";
@@ -316,16 +339,16 @@ async function runClassifier(
   });
 
   if (classified.intent === "unknown") {
-    return { ok: true, intent: unknownIntent(classified.confidence) };
+    return { ok: true, intent: unknownIntent(classified.confidence), usage: gptResult.usage };
   }
 
   const extractorGroup = intentToExtractorGroup(classified.intent);
   if (!extractorGroup) {
-    return { ok: true, intent: unknownIntent(classified.confidence) };
+    return { ok: true, intent: unknownIntent(classified.confidence), usage: gptResult.usage };
   }
 
   yandexGptDevLog(`extractor promptGroup=${extractorGroup}`);
-  return { ok: true, extractorGroup };
+  return { ok: true, extractorGroup, usage: gptResult.usage };
 }
 
 async function runExtractor(
@@ -334,7 +357,7 @@ async function runExtractor(
   userText: string,
   options?: ParseTextIntentOptions,
 ): Promise<
-  | { ok: true; parsed: unknown; context: IntentPromptContext }
+  | { ok: true; parsed: unknown; context: IntentPromptContext; usage: YandexGptTokenUsage | null }
   | { ok: false; kind: "invalid_json" | "invalid_schema" | "api_error" }
 > {
   let context: IntentPromptContext;
@@ -373,7 +396,7 @@ async function runExtractor(
     parsed: gptResult.parsed,
   });
 
-  return { ok: true, parsed: gptResult.parsed, context };
+  return { ok: true, parsed: gptResult.parsed, context, usage: gptResult.usage };
 }
 
 export async function parseTextIntent(
@@ -389,6 +412,7 @@ export async function parseTextIntent(
 
   const routeGroup = resolvePromptGroup(userText);
   let extractorGroup: ExtractorPromptGroup;
+  let totalUsage: YandexGptTokenUsage | null = null;
 
   if (routeGroup !== "classifier") {
     extractorGroup = routeGroup;
@@ -397,13 +421,16 @@ export async function parseTextIntent(
     if (!classified.ok) {
       return { ok: false, kind: classified.kind };
     }
+    totalUsage = addTokenUsage(totalUsage, classified.usage);
     if ("intent" in classified) {
+      logYandexGptTokenUsageTotal(totalUsage);
       return { ok: true, intent: classified.intent };
     }
     extractorGroup = classified.extractorGroup;
   }
 
   const extracted = await runExtractor(state.config, extractorGroup, userText, options);
+  totalUsage = addTokenUsage(totalUsage, extracted.ok ? extracted.usage : null);
   if (!extracted.ok) {
     return { ok: false, kind: extracted.kind };
   }
@@ -455,6 +482,8 @@ export async function parseTextIntent(
       intent.payload.description,
     );
   }
+
+  logYandexGptTokenUsageTotal(totalUsage);
 
   yandexGptDevLog("parsed intent", {
     promptGroup: extractorGroup,
