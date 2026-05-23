@@ -42,6 +42,7 @@ import {
   tryHandleAmbiguousUserHintBeforeResolve,
 } from "./user-hint-resolution";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
+import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
 
 type ParsedEdit = { key: string; value: string };
 
@@ -124,6 +125,7 @@ export function getConfirmationEditHint(intent: AiIntent): string {
         "название: новое название",
         "сумма: 50000",
         "чек: да / нет",
+        "или: чек да, нужен чек, без чека",
       ].join("\n");
     case "create_absence":
       return [
@@ -323,18 +325,15 @@ function applyEditToIntent(intent: AiIntent, parsed: ParsedEdit): ApplyEditResul
         return { ok: true, intent: { ...intent, payload: { ...intent.payload, amount } } };
       }
       if (key === "чек") {
-        const v = value.toLowerCase();
-        const requiresReceipt =
-          v === "да" || v === "yes" || v === "true" || v.includes("обязател");
-        const notRequired = v === "нет" || v === "no" || v === "false" || v.includes("не");
-        if (!requiresReceipt && !notRequired) {
+        const receipt = parseBudgetReceiptEdit(value) ?? parseBudgetReceiptEdit(`чек ${value}`);
+        if (receipt === null) {
           return { ok: false, message: "Укажите «да» или «нет», например: чек: да" };
         }
         return {
           ok: true,
           intent: {
             ...intent,
-            payload: { ...intent.payload, requiresReceipt: requiresReceipt && !notRequired },
+            payload: { ...intent.payload, requiresReceipt: receipt },
           },
         };
       }
@@ -559,6 +558,23 @@ export async function handlePendingConfirmationEditMessage(
   if (isConfirmationEdit(text)) {
     await ctx.reply(getConfirmationEditHint(editPending.originalConfirmation.intent));
     return true;
+  }
+
+  if (editPending.originalConfirmation.intent.intent === "create_budget") {
+    const receiptEdit = parseBudgetReceiptEdit(text);
+    if (receiptEdit !== null) {
+      const updatedIntent: AiIntent = {
+        ...editPending.originalConfirmation.intent,
+        payload: {
+          ...editPending.originalConfirmation.intent.payload,
+          requiresReceipt: receiptEdit,
+        },
+      };
+      editPending.originalConfirmation.intent = updatedIntent;
+      const ok = await reconfirmAfterEdit(ctx, telegramUserId, updatedIntent);
+      if (ok) clearPendingConfirmationEdit(telegramUserId);
+      return true;
+    }
   }
 
   const parsed = parseKeyValueEdit(text);

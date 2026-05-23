@@ -4,6 +4,10 @@ import {
   resolveDeadlineFromUserMessage,
   stripDeadlineMarkersFromText,
 } from "./parse-ru-date";
+import {
+  shouldTreatFirstWordAsAssignee,
+  splitCreateTaskActionText,
+} from "./create-task-assignee-extract";
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
 const NOTE_PREFIX = /^(?:создай|добавь|запиши)(?:те)?\s+заметк/iu;
@@ -19,6 +23,20 @@ const CREATE_TASK_PATTERNS: Array<{
   re: RegExp;
   pick: (m: RegExpMatchArray) => PatternMatch | null;
 }> = [
+  {
+    re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+(\p{L}+)\s+(\p{L}+)\s+(.+)$/iu,
+    pick: (m) =>
+      shouldTreatFirstWordAsAssignee(m[1]!) && shouldTreatFirstWordAsAssignee(m[2]!)
+        ? { assigneeNorm: `${m[1]} ${m[2]}`, titleNorm: m[3]! }
+        : null,
+  },
+  {
+    re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+(\p{L}+)\s+(.+)$/iu,
+    pick: (m) =>
+      shouldTreatFirstWordAsAssignee(m[1]!)
+        ? { assigneeNorm: m[1]!, titleNorm: m[2]! }
+        : null,
+  },
   {
     re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+для\s+(\p{L}+)\s+(.+)$/iu,
     pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
@@ -131,6 +149,9 @@ export function parseCreateTaskQuery(
     payload.assigneeHint = SELF_HINT_MARKER;
   } else if (matched.assigneeNorm) {
     payload.assigneeHint = extractPreservingCase(trimmed, matched.assigneeNorm);
+    const split = splitCreateTaskActionText(trimmed, stripTitleFillers(matched.titleNorm));
+    payload.title = split.title;
+    if (split.description) payload.description = split.description;
   }
 
   return {

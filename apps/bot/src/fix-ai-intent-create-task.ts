@@ -1,3 +1,5 @@
+import { looksLikeAssigneeHintWord, splitCreateTaskActionText } from "./create-task-assignee-extract";
+
 const FOR_USER_TITLE_RE = /^для\s+(\p{L}+)\s+(.+)$/iu;
 const ON_USER_TITLE_RE = /^на\s+(\p{L}+)\s+(.+)$/iu;
 
@@ -45,19 +47,40 @@ export function applyCreateTaskPayloadCompatibilityFix(
   const userFromTitle = forMatch?.[1] ?? onMatch?.[1];
   const restTitle = forMatch?.[2] ?? onMatch?.[2];
 
-  if (!userFromTitle || !restTitle?.trim()) return changed;
+  if (userFromTitle && restTitle?.trim()) {
+    const assignee =
+      typeof payload.assigneeHint === "string" ? payload.assigneeHint.trim() : "";
 
-  const assignee =
-    typeof payload.assigneeHint === "string" ? payload.assigneeHint.trim() : "";
-
-  if (!assignee || namesRoughlyMatch(assignee, userFromTitle)) {
-    if (!assignee) {
-      payload.assigneeHint = capitalizeFirst(userFromTitle);
-      changed = true;
+    if (!assignee || namesRoughlyMatch(assignee, userFromTitle)) {
+      if (!assignee) {
+        payload.assigneeHint = capitalizeFirst(userFromTitle);
+        changed = true;
+      }
+      const cleaned = capitalizeFirst(restTitle.trim());
+      if (cleaned && cleaned !== title) {
+        payload.title = cleaned;
+        changed = true;
+      }
     }
-    const cleaned = capitalizeFirst(restTitle.trim());
-    if (cleaned && cleaned !== title) {
-      payload.title = cleaned;
+  }
+
+  if (!payload.assigneeHint && typeof payload.title === "string") {
+    const words = payload.title.trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 3 && looksLikeAssigneeHintWord(words[0]!) && looksLikeAssigneeHintWord(words[1]!)) {
+      const hint = `${words[0]} ${words[1]}`;
+      const remainder = words.slice(2).join(" ");
+      const split = splitCreateTaskActionText(payload.title, remainder.toLowerCase().replace(/ё/g, "е"));
+      payload.assigneeHint = capitalizeFirst(hint);
+      payload.title = split.title;
+      if (split.description) payload.description = split.description;
+      changed = true;
+    } else if (words.length >= 2 && looksLikeAssigneeHintWord(words[0]!)) {
+      const hint = words[0]!;
+      const remainder = words.slice(1).join(" ");
+      const split = splitCreateTaskActionText(payload.title, remainder.toLowerCase().replace(/ё/g, "е"));
+      payload.assigneeHint = capitalizeFirst(hint);
+      payload.title = split.title;
+      if (split.description) payload.description = split.description;
       changed = true;
     }
   }

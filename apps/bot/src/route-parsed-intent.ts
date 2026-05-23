@@ -4,6 +4,7 @@ import type { ApiUser } from "./api";
 import { fetchProjects, fetchUsers } from "./api";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { beginCreateExpenseFromAiIntent } from "./create-expense-flow";
+import { refineCreateTaskIntent } from "./create-task-assignee-extract";
 import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
@@ -29,7 +30,9 @@ export async function routeParsedAiIntent(
   text: string,
   intent: AiIntent,
 ): Promise<void> {
-  if (intent.intent === "unknown" || intent.confidence < CONFIDENCE_THRESHOLD) {
+  let activeIntent = intent;
+
+  if (activeIntent.intent === "unknown" || activeIntent.confidence < CONFIDENCE_THRESHOLD) {
     await ctx.reply("Не понял команду. Попробуйте переформулировать или используйте /demo.");
     return;
   }
@@ -110,30 +113,37 @@ export async function routeParsedAiIntent(
     return;
   }
 
-  if (intent.intent === "create_task" && !intent.payload.assigneeHint?.trim()) {
+  if (activeIntent.intent === "create_task") {
+    const usersForRefine = await fetchUsers();
+    activeIntent = refineCreateTaskIntent(activeIntent, usersForRefine, linked, text);
+  }
+
+  if (activeIntent.intent === "create_task" && !activeIntent.payload.assigneeHint?.trim()) {
     const projects = await fetchProjects();
-    const project = findProjectByHint(projects, intent.payload.projectHint);
+    const project = findProjectByHint(projects, activeIntent.payload.projectHint);
     if (!project) {
       await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
       return;
     }
     startPendingCreateTaskAssignee(telegramUserId, {
-      projectHint: intent.payload.projectHint,
-      title: intent.payload.title,
-      description: intent.payload.description,
-      deadlineDate: intent.payload.deadlineDate,
+      projectHint: activeIntent.payload.projectHint,
+      title: activeIntent.payload.title,
+      description: activeIntent.payload.description,
+      deadlineDate: activeIntent.payload.deadlineDate,
       creatorId: linked.id,
     });
-    await ctx.reply(questionForCreateTaskAssignee(intent.payload.title));
+    await ctx.reply(questionForCreateTaskAssignee(activeIntent.payload.title));
     return;
   }
 
   const users = await fetchUsers();
-  if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {
+  if (
+    await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, activeIntent, users)
+  ) {
     return;
   }
 
-  const resolvedResult = await resolveIntent(intent, telegramUserId, text);
+  const resolvedResult = await resolveIntent(activeIntent, telegramUserId, text);
   if (!resolvedResult.ok) {
     await ctx.reply(resolvedResult.message);
     return;
@@ -141,7 +151,7 @@ export async function routeParsedAiIntent(
 
   setPendingConfirmation(telegramUserId, {
     type: "ai_intent",
-    intent,
+    intent: activeIntent,
     resolved: resolvedResult.resolved,
   });
   await ctx.reply(buildIntentPreview(resolvedResult.resolved));

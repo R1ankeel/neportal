@@ -7,8 +7,9 @@ create_task.payload:
 - assigneeHint — только исполнитель; «мне»/«себе» → "__self__".
 - Конструкции с исполнителем (НЕ в title):
   «задачу для Васи …», «задача для Васи …», «заведи задачу на Васю …»,
-  «поставь задачу на Васю …», «нужно завести задачу на Васю …», «создай задачу для Васи …»
-  → assigneeHint = имя («Вася»), title = действие ПОСЛЕ имени.
+  «поставь задачу на Васю …», «нужно завести задачу на Васю …», «создай задачу для Васи …»,
+  «создай задачу Маше …», «поставь задачу Васе …», «заведи задачу Ивану …»
+  → assigneeHint = имя в дательном падеже («Маше», «Васе»), title = действие ПОСЛЕ имени.
 - «для Васи» / «на Васю» НЕ включать в title.
 - Имена внутри действия («позвонить Ивану») — title/description, НЕ assigneeHint.
 - title — короткое главное действие без даты; description — остальные шаги.
@@ -29,6 +30,18 @@ Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"pa
 Пример:
 Input: «Поручи Ивану позвонить Васе завтра»
 Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Иван","title":"Позвонить Васе","deadlineDate":"2026-05-23"}}
+
+Пример:
+Input: «создай задачу маше поехать в архив и собрать документацию по подрядчику»
+Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Маше","title":"Поехать в архив","description":"Собрать документацию по подрядчику."}}
+
+Пример:
+Input: «поставь задачу васе проверить склад»
+Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Васе","title":"Проверить склад"}}
+
+Пример:
+Input: «заведи задачу ивану иванову подготовить отчет»
+Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Ивану Иванову","title":"Подготовить отчет"}}
 
 Пример:
 Input: «Поставь мне задачу проверить склад завтра»

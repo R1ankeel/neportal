@@ -7,6 +7,9 @@ import {
   removeLeadingUserHintPrepositions,
   resolveUsersByHint,
 } from "./resolve-users-by-hint";
+import { extractLeadingAssigneeFromCreateTaskMessage } from "./create-task-assignee-extract";
+import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
+import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { scoreTaskTitleMatch } from "./task-search-text";
 
 const USER_HINT_TEST_USERS: ApiUser[] = [
@@ -125,8 +128,37 @@ function devCheckTransferParser(): void {
   devLog(`transfer parser from/to ${fromOk ? "OK" : "FAIL"}`, { withFrom });
 }
 
+function devCheckBudgetReceiptEdit(): void {
+  const trueCases = ["чек да", "нужен чек", "отчетность обязательна", "чек: да"];
+  const falseCases = ["чек нет", "без чека", "отчетность не обязательна"];
+
+  for (const t of trueCases) {
+    const ok = parseBudgetReceiptEdit(t) === true;
+    devLog(`budget receipt edit true ${ok ? "OK" : "FAIL"}`, { input: t, got: parseBudgetReceiptEdit(t) });
+  }
+  for (const t of falseCases) {
+    const ok = parseBudgetReceiptEdit(t) === false;
+    devLog(`budget receipt edit false ${ok ? "OK" : "FAIL"}`, { input: t, got: parseBudgetReceiptEdit(t) });
+  }
+}
+
+function devCheckCreateTaskAssignee(): void {
+  const text =
+    "создай задачу маше поехать в архив и собрать документацию по подрядчику";
+  const parsed = parseCreateTaskQuery(text);
+  const ok =
+    parsed?.payload.assigneeHint?.toLowerCase().startsWith("маш") &&
+    parsed.payload.title.toLowerCase().includes("архив");
+  devLog(`create_task assignee parse ${ok ? "OK" : "FAIL"}`, { parsed });
+
+  const leading = extractLeadingAssigneeFromCreateTaskMessage(text);
+  devLog(`create_task leading extract ${leading ? "OK" : "FAIL"}`, { leading });
+}
+
 export function devLogNaturalLanguageSelfChecks(): void {
   devCheckUserHintCleanup();
   devCheckTaskMatching();
   devCheckTransferParser();
+  devCheckBudgetReceiptEdit();
+  devCheckCreateTaskAssignee();
 }
