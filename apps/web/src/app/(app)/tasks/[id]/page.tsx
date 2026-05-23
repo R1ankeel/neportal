@@ -88,7 +88,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         {task.description ? (
           <div className="mt-6">
             <h2 className="text-sm font-medium text-zinc-500">Описание</h2>
-            <p className="mt-2 whitespace-pre-wrap text-lg text-zinc-700 dark:text-zinc-300">{task.description}</p>
+            <p className="mt-2 whitespace-pre-line text-lg text-zinc-700 dark:text-zinc-300">{task.description}</p>
           </div>
         ) : null}
 

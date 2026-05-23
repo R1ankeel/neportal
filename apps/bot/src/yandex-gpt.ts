@@ -1,6 +1,9 @@
 import { assertAiContractsSchemaLoaded, safeParseAiIntent, type AiIntent } from "./ai-contracts";
 import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
-import { warnLongCreateTaskTitleWithoutDescription } from "./normalize-create-task";
+import {
+  warnLongCreateTaskTitleWithoutDescription,
+  warnPossibleLostDetailsInDescription,
+} from "./normalize-create-task";
 import {
   formatPromptContextForModel,
   loadIntentPromptContext,
@@ -118,16 +121,16 @@ create_task — семантические роли (исполнитель vs �
 - Исполнитель обычно у глаголов назначения: «поставь Васе задачу», «назначь Пете», «дай Маше задачу», «поручи Ивану», «пусть Вася …».
 - Не ставь assigneeHint по имени из середины title.
 
-create_task — title и description (разделяй всегда при нескольких действиях или предложениях):
-- title — короткое главное действие (одно ключевое действие), без даты.
-- description — все дополнительные действия, детали, условия и контекст из исходного сообщения. Нельзя терять информацию из текста пользователя.
-- Несколько действий в одной фразе: первое главное → title; остальные → description.
-- Несколько предложений: первое ключевое действие → title; остальные предложения → description.
-- Связки «и», «а также», «потом», «после этого», «попробовать», «нужно ещё», «заодно» — часть после связки обычно в description (если это не исполнитель и не дедлайн).
-- Если дополнительных действий несколько — description списком: «1. ...\\n2. ...» (предпочтительно).
-- Не дублируй title в description без необходимости.
+create_task — title и description:
+- title — короткое главное действие задачи, без даты.
+- description — все дополнительные действия, условия, детали, ограничения и ожидаемый результат из исходного сообщения.
+- Главное: не теряй ни одну смысловую часть исходного текста. Не ограничивай description двумя пунктами — пунктов столько, сколько дополнительных действий/условий в тексте (1 → один пункт или обычный текст; 3 → три пункта; 5 → пять).
+- Первое ключевое действие → title; всё остальное смысловое → description.
+- Связки «и», «а также», «потом», «после этого», «плюс», «ещё», «далее», «заодно», «попробовать», «нужно ещё», «с отчётом», «отчитаться», «вернуться с отчётом» — отдельные детали/действия в description (не исполнитель, не дедлайн).
+- Список «1. ...\\n2. ...» — когда в тексте явно несколько отдельных действий; длинный контекст без перечисления — обычным текстом, без принудительного списка.
+- Не добавляй пункты, которых нет в исходном тексте. Не дублируй title в description.
 - В description НЕ клади: дедлайн, исполнителя (assigneeHint), проект (projectHint).
-- description опционален только если в сообщении одно короткое действие без доп. деталей.
+- description опционален только при одном коротком действии без доп. деталей (например «проверить склад завтра»).
 
 create_task — дедлайн:
 - Слова и фразы «сегодня», «завтра», «послезавтра», «до <дата>», «к <дата>», «на <дата>», «в <дата>», «завтра в 13:00» — это deadlineDate (и при необходимости время), НЕ description.
@@ -319,6 +322,63 @@ Output:
     "title": "Созвониться с клиентом",
     "description": "1. Уточнить бюджет.\\n2. Договориться о следующей встрече.",
     "deadlineDate": "2026-05-23"
+  }
+}
+
+Пример create_task — три доп. действия + «потом с отчётом» (текущая дата 2026-05-22):
+Input: «Нужно, чтоб Вася завтра поехал к строителям на объект, согласовал сметы и оформил закупку материалов, потом ко мне с отчетом.»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Поехать к строителям на объект",
+    "description": "1. Согласовать сметы.\\n2. Оформить закупку материалов.\\n3. Вернуться с отчетом.",
+    "deadlineDate": "2026-05-23"
+  }
+}
+
+Пример create_task — условие + итог:
+Input: «Поставь Васе задачу проверить документы по поставщику, если не хватает актов, запросить у бухгалтерии, потом написать мне итог»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Вася",
+    "title": "Проверить документы по поставщику",
+    "description": "1. Если не хватает актов, запросить у бухгалтерии.\\n2. Написать итог."
+  }
+}
+
+Пример create_task — три вопроса после двоеточия:
+Input: «Поставь Маше задачу разобраться с рекламной кампанией: почему вырос бюджет, какие объявления дают заявки и что отключить»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Маша",
+    "title": "Разобраться с рекламной кампанией",
+    "description": "1. Проверить, почему вырос бюджет.\\n2. Определить, какие объявления дают заявки.\\n3. Предложить, что отключить."
+  }
+}
+
+Пример create_task — контекст без списка:
+Input: «Создай задачу Пете описать проблему с оплатой клиента подробно, чтобы юрист понял контекст»
+Output:
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeHint": "Петя",
+    "title": "Описать проблему с оплатой клиента",
+    "description": "Подробно описать контекст так, чтобы юрист понял ситуацию."
   }
 }
 
@@ -806,7 +866,7 @@ unknown.payload:
 Правила:
 - Поля deadlineDate, startDate, endDate — только реальный YYYY-MM-DD (вычисли дату сам); если год не указан — 2026. Никогда не пиши <…>, YYYY-MM-DD как текст или пояснения вместо даты.
 - В payload.text заметок даты пиши DD.MM.YYYY (например 22.05.2026), не ISO.
-- В create_task: короткий title + опциональный description со всеми доп. действиями; description без дат, дедлайн только в deadlineDate; не теряй детали из сообщения пользователя.
+- В create_task: короткий title + description со всеми доп. действиями/условиями (столько пунктов, сколько в тексте; не обрезай до двух); description без дат; дедлайн только в deadlineDate; не теряй смысл из сообщения.
 - «Завтра» в тексте заметки (create_note) — DD.MM.YYYY от текущей даты из контекста.
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
@@ -917,8 +977,13 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
 
   const intent = validated.data;
   if (intent.intent === "create_task") {
+    const userTextTrimmed = userText.trim();
     warnLongCreateTaskTitleWithoutDescription(
       intent.payload.title,
+      intent.payload.description,
+    );
+    warnPossibleLostDetailsInDescription(
+      userTextTrimmed,
       intent.payload.description,
     );
   }
