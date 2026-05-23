@@ -55,6 +55,7 @@ export type ResolveCreateExpenseResult =
       project: ApiProject;
       candidates: BudgetCandidate[];
       notFoundHint?: string;
+      ambiguous?: boolean;
     }
   | { kind: "error"; message: string };
 
@@ -92,6 +93,7 @@ export async function resolveCreateExpense(
       project,
       candidates: budgetResult.candidates.map(apiBudgetToCandidate),
       notFoundHint: budgetResult.notFoundHint,
+      ambiguous: budgetResult.ambiguous,
     };
   }
 
@@ -143,7 +145,10 @@ export async function beginCreateExpenseFlow(
       },
     });
     await ctx.reply(
-      formatBudgetSelectionMessage(result.candidates, { notFoundHint: result.notFoundHint }),
+      formatBudgetSelectionMessage(result.candidates, {
+        notFoundHint: result.notFoundHint,
+        ambiguous: result.ambiguous,
+      }),
     );
     return { kind: "selection_started" };
   }

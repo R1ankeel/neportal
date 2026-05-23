@@ -416,13 +416,41 @@ create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
 
 create_expense — бюджет и описание:
-- budgetHint — название или подсказка бюджета, если пользователь сказал, на что потратил (не проект).
-- «на рекламу VK» → budgetHint: "реклама VK"
-- «на канцелярию» → budgetHint: "канцелярия"
-- description — очищенное описание расхода без слов «потратил», «рублей», суммы; можно совпадать с budgetHint.
-- Если сумма есть, а цель траты неясна — не выдумывай budgetHint.
+- budgetHint — категория или подсказка бюджета (не обязательно точное название), если понятно, на что потратили (не проект).
+- description — конкретный расход: товар, услуга, краткая суть (без «потратил», «рублей», суммы).
+- Для канцелярских товаров (ручки, карандаши, бумага, канцтовары и т.п.) → budgetHint: "канцелярия", description — что купили («ручки», «карандаши»).
+- Для рекламы VK/ВК → budgetHint: "реклама VK", description — «реклама VK» или как сказал пользователь.
+- Если сумма есть, а цель траты неясна — не выдумывай budgetHint и description.
 
-Пример create_expense (реклама):
+Пример create_expense (ручки):
+Input: «Потратил 100 рублей на ручки»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 100,
+    "budgetHint": "канцелярия",
+    "description": "ручки"
+  }
+}
+
+Пример create_expense (карандаши):
+Input: «Потратил 100 на карандаши»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 100,
+    "budgetHint": "канцелярия",
+    "description": "карандаши"
+  }
+}
+
+Пример create_expense (реклама VK):
 Input: «Потратил 1500 рублей на рекламу VK»
 Output:
 {
@@ -433,6 +461,20 @@ Output:
     "amount": 1500,
     "budgetHint": "реклама VK",
     "description": "реклама VK"
+  }
+}
+
+Пример create_expense (реклама вк):
+Input: «Потратил 1500 на рекламу вк»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 1500,
+    "budgetHint": "реклама VK",
+    "description": "реклама вк"
   }
 }
 
