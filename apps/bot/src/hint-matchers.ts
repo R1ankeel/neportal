@@ -1,6 +1,12 @@
 import type { ApiProject, ApiTask, ApiUser } from "./api";
 import { pickDefaultProject } from "./api";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
+import {
+  scoreTaskTitleMatch,
+  TASK_MATCH_CLEAR_WIN_SCORE,
+  TASK_MATCH_MIN_SCORE,
+  TASK_MATCH_SCORE_GAP,
+} from "./task-search-text";
 
 export function findProjectByHint(projects: ApiProject[], hint?: string): ApiProject | null {
   if (projects.length === 0) return null;
@@ -34,7 +40,7 @@ export type TaskMatchResult =
   | { kind: "not_found" }
   | { kind: "ambiguous"; tasks: ApiTask[] };
 
-export function findTaskByTitle(tasks: ApiTask[], taskTitle: string): TaskMatchResult {
+function findTaskByTitleLegacy(tasks: ApiTask[], taskTitle: string): TaskMatchResult {
   const trimmed = taskTitle.trim();
   if (!trimmed) return { kind: "not_found" };
 
@@ -47,4 +53,36 @@ export function findTaskByTitle(tasks: ApiTask[], taskTitle: string): TaskMatchR
   if (partial.length === 0) return { kind: "not_found" };
   if (partial.length === 1) return { kind: "found", task: partial[0] };
   return { kind: "ambiguous", tasks: partial };
+}
+
+export function findTaskByTitle(tasks: ApiTask[], taskTitle: string): TaskMatchResult {
+  const trimmed = taskTitle.trim();
+  if (!trimmed) return { kind: "not_found" };
+
+  const scored = tasks
+    .map((task) => ({ task, score: scoreTaskTitleMatch(task.title, trimmed) }))
+    .filter((entry) => entry.score >= TASK_MATCH_MIN_SCORE)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) {
+    return findTaskByTitleLegacy(tasks, trimmed);
+  }
+
+  const top = scored[0]!;
+  const close = scored.filter(
+    (entry) => top.score - entry.score < TASK_MATCH_SCORE_GAP,
+  );
+
+  if (
+    top.score >= TASK_MATCH_CLEAR_WIN_SCORE &&
+    (close.length === 1 || top.score - close[1]!.score >= TASK_MATCH_SCORE_GAP)
+  ) {
+    return { kind: "found", task: top.task };
+  }
+
+  if (close.length === 1) {
+    return { kind: "found", task: top.task };
+  }
+
+  return { kind: "ambiguous", tasks: close.map((entry) => entry.task) };
 }

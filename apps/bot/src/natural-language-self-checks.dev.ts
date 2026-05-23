@@ -1,0 +1,132 @@
+import type { ApiTask, ApiUser } from "./api";
+import { devLog } from "./dev-log";
+import { findTaskByTitle } from "./hint-matchers";
+import { parseTaskTransferLikeQuery } from "./parse-task-transfer-query";
+import { parseTaskListQuery } from "./parse-task-list-query";
+import {
+  removeLeadingUserHintPrepositions,
+  resolveUsersByHint,
+} from "./resolve-users-by-hint";
+import { scoreTaskTitleMatch } from "./task-search-text";
+
+const USER_HINT_TEST_USERS: ApiUser[] = [
+  { id: "1", fullName: "Вася Пупкин", role: "EMPLOYEE" },
+  { id: "2", fullName: "Иван Иванов", role: "EMPLOYEE" },
+  { id: "3", fullName: "Иван Петров", role: "EMPLOYEE" },
+];
+
+const TASK_MATCH_FIXTURES: ApiTask[] = [
+  {
+    id: "t1",
+    title: "Поехать в офис к поставщикам",
+    deadlineAt: null,
+    status: "IN_PROGRESS",
+    creatorId: "c1",
+    assigneeId: "1",
+  },
+  {
+    id: "t2",
+    title: "Подготовить отчет",
+    deadlineAt: null,
+    status: "NEW",
+    creatorId: "c1",
+    assigneeId: "1",
+  },
+];
+
+function devCheckUserHintCleanup(): void {
+  const cases: Array<{ raw: string; expected: string }> = [
+    { raw: "у васи", expected: "васи" },
+    { raw: "для васи", expected: "васи" },
+    { raw: "к ивану", expected: "ивану" },
+    { raw: "на машу", expected: "машу" },
+    { raw: "с пети", expected: "пети" },
+  ];
+
+  for (const { raw, expected } of cases) {
+    const cleaned = removeLeadingUserHintPrepositions(raw);
+    const ok = cleaned.toLowerCase() === expected;
+    devLog(`user-hint cleanup ${ok ? "OK" : "FAIL"}`, { raw, expected, got: cleaned });
+  }
+
+  const resolveCases: Array<{
+    hint: string;
+    expected: "one" | "many";
+    fullName?: string;
+  }> = [
+    { hint: "у васи", expected: "one", fullName: "Вася Пупкин" },
+    { hint: "для васи", expected: "one", fullName: "Вася Пупкин" },
+    { hint: "к ивану", expected: "many" },
+  ];
+
+  for (const { hint, expected, fullName } of resolveCases) {
+    const result = resolveUsersByHint(USER_HINT_TEST_USERS, hint, null);
+    const ok =
+      expected === "one"
+        ? result.kind === "one" && result.user.fullName === fullName
+        : result.kind === "many" && result.users.length >= 2;
+    const got =
+      result.kind === "none"
+        ? "none"
+        : result.kind === "one"
+          ? result.user.fullName
+          : result.users.map((u) => u.fullName).join(", ");
+    devLog(`resolve user hint ${ok ? "OK" : "FAIL"}`, { hint, expected, fullName, got });
+  }
+
+  const listQuery = parseTaskListQuery("покажи задачи у васи");
+  const listOk =
+    listQuery?.type === "user" &&
+    removeLeadingUserHintPrepositions(listQuery.userHint.toLowerCase()) === "васи";
+  devLog(`parseTaskListQuery у васи ${listOk ? "OK" : "FAIL"}`, { listQuery });
+}
+
+function devCheckTaskMatching(): void {
+  const queries: Array<{ query: string; expectedTitle: string }> = [
+    { query: "поехать к поставщикам", expectedTitle: "Поехать в офис к поставщикам" },
+    { query: "поехать в офис поставщикам", expectedTitle: "Поехать в офис к поставщикам" },
+    { query: "подготовить отчет", expectedTitle: "Подготовить отчет" },
+  ];
+
+  for (const { query, expectedTitle } of queries) {
+    const score = scoreTaskTitleMatch(expectedTitle, query);
+    const match = findTaskByTitle(TASK_MATCH_FIXTURES, query);
+    const ok = match.kind === "found" && match.task.title === expectedTitle;
+    devLog(`task match ${ok ? "OK" : "FAIL"}`, {
+      query,
+      expectedTitle,
+      score,
+      got: match.kind === "found" ? match.task.title : match.kind,
+    });
+  }
+}
+
+function devCheckTransferParser(): void {
+  const parsed = parseTaskTransferLikeQuery(
+    "перекинь задачу поехать к поставщикам на Ивана",
+    { preferReassign: true },
+  );
+  const ok =
+    parsed?.intent === "reassign_task" &&
+    parsed.payload.taskTitle.toLowerCase().includes("поехать") &&
+    parsed.payload.taskTitle.toLowerCase().includes("поставщик") &&
+    parsed.payload.toUserHint.toLowerCase().startsWith("иван");
+
+  devLog(`transfer parser ${ok ? "OK" : "FAIL"}`, { parsed });
+
+  const withFrom = parseTaskTransferLikeQuery(
+    "перекинь задачу поехать к поставщикам с Васи на Ивана",
+    { preferReassign: true },
+  );
+  const fromOk =
+    withFrom?.intent === "reassign_task" &&
+    withFrom.payload.fromUserHint?.toLowerCase().startsWith("вас") &&
+    withFrom.payload.toUserHint.toLowerCase().startsWith("иван");
+  devLog(`transfer parser from/to ${fromOk ? "OK" : "FAIL"}`, { withFrom });
+}
+
+export function devLogNaturalLanguageSelfChecks(): void {
+  devCheckUserHintCleanup();
+  devCheckTaskMatching();
+  devCheckTransferParser();
+}

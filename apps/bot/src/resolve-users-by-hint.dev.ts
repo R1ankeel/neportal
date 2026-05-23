@@ -20,6 +20,9 @@ const RESOLVE_USER_HINT_DEV_CASES: Array<{ hint: string; expected: Expected }> =
   { hint: "васю", expected: { kind: "one", fullName: "Вася Пупкин" } },
   { hint: "василия", expected: { kind: "one", fullName: "Вася Пупкин" } },
   { hint: "васе пупкину", expected: { kind: "one", fullName: "Вася Пупкин" } },
+  { hint: "у васи", expected: { kind: "one", fullName: "Вася Пупкин" } },
+  { hint: "для васи", expected: { kind: "one", fullName: "Вася Пупкин" } },
+  { hint: "к ивану", expected: { kind: "many", fullNames: ["Иван Иванов", "Иван Петров"] } },
   {
     hint: "ивану",
     expected: { kind: "many", fullNames: ["Иван Иванов", "Иван Петров"] },

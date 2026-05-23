@@ -8,6 +8,8 @@ reassign_task.payload: { "taskTitle": string, "fromUserHint"?: string, "toUserHi
 Правила:
 - transfer_task — один новый исполнитель («передай задачу X Васе», «мне» → "__self__").
 - reassign_task — «с X на Y», «перекинь с Васи на Машу», «переназначь».
+- «перекинь задачу {task} на {user}» — toUserHint = {user}, taskTitle = {task} (не включай «на {user}» в taskTitle).
+- taskTitle может быть неполным; resolver найдёт похожую задачу.
 - add_task_comment — текст после «:» или «, что …»; без текста — только taskTitle.
 - mention_in_task — «позови», «призови» + userHint + taskTitle.
 

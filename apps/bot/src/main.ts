@@ -22,6 +22,7 @@ import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
 import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user";
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
+import { devLogNaturalLanguageSelfChecks } from "./natural-language-self-checks.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
@@ -876,6 +877,7 @@ async function main() {
     devLogCreateTaskAssigneeSelfChecks();
     devLogCreateAbsenceUserSelfChecks();
     devLogResolveUsersByHintChecks();
+    devLogNaturalLanguageSelfChecks();
   }
   startTaskNotificationScheduler(bot);
 

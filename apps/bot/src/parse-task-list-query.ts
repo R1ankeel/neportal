@@ -1,3 +1,5 @@
+import { removeLeadingUserHintPrepositions } from "./resolve-users-by-hint";
+
 export type TaskListQueryResult =
   | { type: "my" }
   | { type: "user"; userHint: string };
@@ -79,7 +81,8 @@ export function parseTaskListQuery(text: string): TaskListQueryResult | null {
       return { type: "my" };
     }
 
-    const userHint = extractHintPreservingCase(trimmed, captured);
+    let userHint = extractHintPreservingCase(trimmed, captured);
+    userHint = removeLeadingUserHintPrepositions(userHint);
     if (!userHint) continue;
 
     return { type: "user", userHint };

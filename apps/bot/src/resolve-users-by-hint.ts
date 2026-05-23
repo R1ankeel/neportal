@@ -158,6 +158,28 @@ export function normalizeUserHint(hint: string): string {
   return normalizeName(hint);
 }
 
+const LEADING_USER_HINT_PREP_RE =
+  /^(?:у|для|по|про|от|к|ко|на|с|со)\s+/iu;
+
+/**
+ * Убирает ведущий предлог из подсказки имени («у васи» → «васи»).
+ * Не трогает «с Васи на Машу» — такие фразы парсятся до resolver.
+ */
+export function removeLeadingUserHintPrepositions(hint: string): string {
+  let s = hint.trim();
+  if (!s) return s;
+
+  let prev = "";
+  while (s !== prev) {
+    prev = s;
+    const m = s.match(LEADING_USER_HINT_PREP_RE);
+    if (m) {
+      s = s.slice(m[0].length).trim();
+    }
+  }
+  return s;
+}
+
 export function isSelfHint(hint: string): boolean {
   const normalized = normalizeName(hint);
   if (!normalized) return false;
@@ -285,7 +307,7 @@ export function resolveUsersByHint(
   hint: string,
   currentUser: ApiUser | null,
 ): UserNameMatchResult {
-  const raw = hint?.trim() ?? "";
+  const raw = removeLeadingUserHintPrepositions(hint?.trim() ?? "");
   if (!raw) return { kind: "none" };
 
   if (raw === SELF_HINT_MARKER || isSelfHint(raw)) {
