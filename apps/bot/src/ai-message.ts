@@ -42,6 +42,10 @@ import { parseExpenseQuery } from "./parse-expense-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
 import { routeParsedAiIntent } from "./route-parsed-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-expense-receipt-selection";
+import { handlePendingExpenseReceiptUploadMessage } from "./handle-pending-expense-receipt-upload";
+import { parsePendingExpensesQuery } from "./parse-pending-expenses-query";
+import { showPendingExpenses } from "./pending-expenses-flow";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
 
@@ -51,6 +55,14 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   if (!text || !telegramUserId) return;
 
   if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (await handlePendingExpenseReceiptUploadMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (await handlePendingExpenseReceiptSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
 
@@ -222,6 +234,19 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   }
 
   if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
+  if (parsePendingExpensesQuery(text)) {
+    try {
+      await showPendingExpenses(ctx, linked, telegramUserId, 10);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_pending_expenses (deterministic) error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /budget-expenses/pending") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
+    }
     return;
   }
 

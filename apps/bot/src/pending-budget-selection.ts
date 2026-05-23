@@ -11,6 +11,8 @@ import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
+import { clearPendingExpenseReceiptSelection } from "./pending-expense-receipt-selection";
+import { clearPendingExpenseReceiptUpload } from "./pending-expense-receipt-upload";
 import type { BudgetCandidate } from "./budget-resolver";
 
 export type PendingBudgetSelection = {
@@ -52,6 +54,8 @@ export function startPendingBudgetSelection(
   clearPendingCreateTaskAssignee(telegramUserId);
   clearPendingAbsenceSelection(telegramUserId);
   clearPendingAbsenceDelegation(telegramUserId);
+  clearPendingExpenseReceiptSelection(telegramUserId);
+  clearPendingExpenseReceiptUpload(telegramUserId);
 
   pendingByTelegramUserId.set(telegramUserId, {
     type: "select_budget_for_expense",

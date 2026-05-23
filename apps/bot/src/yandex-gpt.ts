@@ -107,7 +107,7 @@ const SYSTEM_PROMPT = `Ты технический парсер служебны
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "list_pending_expenses" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -960,6 +960,36 @@ list_my_tasks.payload:
 list_user_tasks.payload:
 { "userHint": string }
 
+list_pending_expenses.payload:
+{} (пустой объект)
+
+Расходы без чеков — list_pending_expenses (payload {}):
+- «мои неподтвержденные расходы», «мои неподтверждённые расходы»
+- «покажи расходы без чеков», «расходы без чеков»
+- «какие чеки я должен загрузить»
+- «где я не приложил чеки», «что у меня без чеков»
+- «чеки к расходам»
+
+Пример list_pending_expenses:
+Input: «мои неподтвержденные расходы»
+Output:
+{
+  "intent": "list_pending_expenses",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
+Пример list_pending_expenses (без чеков):
+Input: «покажи расходы без чеков»
+Output:
+{
+  "intent": "list_pending_expenses",
+  "confidence": 0.9,
+  "requiresConfirmation": false,
+  "payload": {}
+}
+
 Задачи — list_my_tasks vs list_user_tasks:
 Если пользователь спрашивает задачи конкретного сотрудника → intent list_user_tasks.
 Фразы-маркеры list_user_tasks (userHint = имя сотрудника в той форме, как сказал пользователь; не обязательно именительный падеж):
@@ -1121,8 +1151,8 @@ Output:
 - hints сопоставляй со списками проектов/пользователей/бюджетов/задач из контекста.
 - Больничный: type SICK_LEAVE; отпуск: VACATION.
 - Если команда непонятна: intent unknown, низкая confidence.
-- list_my_tasks / list_user_tasks: requiresConfirmation: false.
-- requiresConfirmation: true для остальных известных intent (кроме list_my_tasks и list_user_tasks).`;
+- list_my_tasks / list_user_tasks / list_pending_expenses: requiresConfirmation: false.
+- requiresConfirmation: true для остальных известных intent (кроме list_my_tasks, list_user_tasks и list_pending_expenses).`;
 
 /** Dev-only logs (отключить: BOT_DEV_LOG=0). */
 function yandexGptDevLog(message: string, data?: Record<string, unknown>): void {

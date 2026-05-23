@@ -5,11 +5,12 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { BudgetExpensesService } from "./budget-expenses.service";
 import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-attachment.dto";
 
@@ -17,6 +18,19 @@ import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-at
 @Controller("budget-expenses")
 export class BudgetExpensesController {
   constructor(private readonly budgetExpensesService: BudgetExpensesService) {}
+
+  @Get("pending")
+  @ApiOperation({ summary: "Неподтверждённые расходы пользователя (ожидают чек)" })
+  @ApiQuery({ name: "userId", required: true })
+  @ApiQuery({ name: "limit", required: false, description: "default 10, max 20" })
+  listPending(@Query("userId") userId: string, @Query("limit") limit?: string) {
+    if (!userId?.trim()) {
+      throw new BadRequestException("userId is required");
+    }
+    const parsedLimit = limit != null && limit !== "" ? Number(limit) : 10;
+    const effectiveLimit = Number.isFinite(parsedLimit) ? parsedLimit : 10;
+    return this.budgetExpensesService.listPending(userId.trim(), effectiveLimit);
+  }
 
   @Post(":expenseId/receipt")
   @UseInterceptors(

@@ -6,7 +6,6 @@ import {
   handleVacationSlashCommand,
 } from "./absence-slash-flow";
 import {
-  createExpenseAttachment,
   createNote,
   createTask,
   fetchProjects,
@@ -27,6 +26,13 @@ import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
 import { getLastExpense } from "./last-expense";
+import {
+  clearPendingExpenseReceiptUpload,
+  getPendingExpenseReceiptUpload,
+  isPendingExpenseReceiptUploadExpired,
+} from "./pending-expense-receipt-upload";
+import { showPendingExpenses } from "./pending-expenses-flow";
+import { attachTelegramReceiptToExpense } from "./receipt-attachment";
 import { handlePlainTextMessage } from "./ai-message";
 import {
   apiUserToCandidate,
@@ -87,6 +93,7 @@ bot.command("start", async (ctx) => {
       "/reassign <задача> | <старый?> | <новый> | <комментарий> — переназначить (OWNER/MANAGER)",
       "/tasks — мои ближайшие задачи",
       "/tasks <сотрудник> — задачи сотрудника (OWNER/MANAGER)",
+      "/pending-expenses — расходы без чеков",
       "/me — статус привязки",
       "/demo — справка",
     ].join("\n"),
@@ -118,6 +125,7 @@ bot.command("demo", async (ctx) => {
       "/reassign Проверить склад | Вася | Маша | из-за больничного — переназначить задачу",
       "/tasks — показать мои ближайшие задачи",
       "/tasks Вася — задачи сотрудника (OWNER/MANAGER)",
+      "/pending-expenses — расходы без чеков",
       "/link Вася Пупкин — привязка по ФИО (dev)",
       "/me — статус привязки",
       "",
@@ -142,6 +150,8 @@ bot.command("demo", async (ctx) => {
       "- Перекинь задачу Проверить склад с Васи на Машу (OWNER/MANAGER)",
       "- покажи мои задачи",
       "- Какие задачи у Васи? (OWNER/MANAGER)",
+      "- мои неподтвержденные расходы",
+      "- покажи расходы без чеков",
       "",
       "Пример с чеком:",
       "/expense 1500 реклама VK",
@@ -764,23 +774,50 @@ async function handleReceiptAttachment(
   if (!telegramUserId) return;
 
   const lastExpense = getLastExpense(telegramUserId);
+  if (lastExpense?.pendingReceipt) {
+    try {
+      await attachTelegramReceiptToExpense(lastExpense.expenseId, lastExpense.uploadedById, file);
+      await ctx.reply("Чек прикреплён. Расход подтверждён.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(msg);
+      await ctx.reply(`Ошибка API: ${msg}`);
+    }
+    return;
+  }
+
+  const pendingUpload = getPendingExpenseReceiptUpload(telegramUserId);
+  if (pendingUpload) {
+    if (isPendingExpenseReceiptUploadExpired(pendingUpload)) {
+      clearPendingExpenseReceiptUpload(telegramUserId);
+      await ctx.reply("Время ожидания истекло. Повторите команду.");
+      return;
+    }
+    try {
+      await attachTelegramReceiptToExpense(
+        pendingUpload.expenseId,
+        pendingUpload.uploadedById,
+        file,
+      );
+      clearPendingExpenseReceiptUpload(telegramUserId);
+      await ctx.reply("Чек прикреплён. Расход подтверждён.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(msg);
+      await ctx.reply(`Ошибка API: ${msg}`);
+    }
+    return;
+  }
+
   if (!lastExpense) {
     await ctx.reply("Не нашёл недавний расход. Сначала создайте расход командой /expense.");
     return;
   }
 
   try {
-    await createExpenseAttachment(lastExpense.expenseId, {
-      telegramFileId: file.telegramFileId,
-      originalFilename: file.originalFilename,
-      mimeType: file.mimeType,
-      uploadedById: lastExpense.uploadedById,
-    });
-
+    await attachTelegramReceiptToExpense(lastExpense.expenseId, lastExpense.uploadedById, file);
     await ctx.reply(
-      lastExpense.pendingReceipt
-        ? "Чек прикреплён. Расход подтверждён."
-        : `Чек прикреплён к расходу ${formatMoney(lastExpense.amount)} по бюджету «${lastExpense.budgetTitle}».`,
+      `Чек прикреплён к расходу ${formatMoney(lastExpense.amount)} по бюджету «${lastExpense.budgetTitle}».`,
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -788,6 +825,22 @@ async function handleReceiptAttachment(
     await ctx.reply(`Ошибка API: ${msg}`);
   }
 }
+
+bot.command("pending-expenses", async (ctx) => {
+  try {
+    const linked = await requireLinkedUser(ctx);
+    if (!linked) return;
+
+    const telegramUserId = ctx.from?.id;
+    if (!telegramUserId) return;
+
+    await showPendingExpenses(ctx, linked, telegramUserId, 10);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] pending-expenses command error: ${msg}`);
+    await ctx.reply(msg.startsWith("GET /budget-expenses/pending") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+  }
+});
 
 bot.on("message:photo", async (ctx) => {
   const photos = ctx.message.photo;

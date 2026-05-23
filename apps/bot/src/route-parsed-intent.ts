@@ -14,6 +14,7 @@ import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { findProjectByHint } from "./hint-matchers";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import { showPendingExpenses } from "./pending-expenses-flow";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { setPendingConfirmation } from "./pending-intent";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
@@ -87,6 +88,19 @@ export async function routeParsedAiIntent(
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[bot] list_user_tasks error: ${msg}`);
       await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+    }
+    return;
+  }
+
+  if (intent.intent === "list_pending_expenses") {
+    try {
+      await showPendingExpenses(ctx, linked, telegramUserId, 10);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_pending_expenses error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /budget-expenses/pending") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
     }
     return;
   }

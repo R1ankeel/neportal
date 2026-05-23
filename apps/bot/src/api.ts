@@ -285,6 +285,36 @@ export function budgetTotalsOrFallback(budget: ApiBudget): ApiBudgetTotals {
   };
 }
 
+export type ApiPendingExpense = {
+  id: string;
+  amount: string | number;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  budget: {
+    id: string;
+    name: string;
+    status: string;
+    requiresReceipt: boolean;
+    project: { id: string; name: string } | null;
+  };
+};
+
+export async function fetchPendingExpenses(
+  userId: string,
+  limit = 10,
+): Promise<ApiPendingExpense[]> {
+  const url = new URL(`${getApiBaseUrl()}/budget-expenses/pending`);
+  url.searchParams.set("userId", userId);
+  url.searchParams.set("limit", String(limit));
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /budget-expenses/pending → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiPendingExpense[]>;
+}
+
 export async function createExpenseAttachment(
   expenseId: string,
   body: {
@@ -305,6 +335,9 @@ export async function createExpenseAttachment(
   }
   return res.json() as Promise<{ id: string }>;
 }
+
+/** Alias: прикрепить чек Telegram к существующему расходу. */
+export const attachReceiptToExpense = createExpenseAttachment;
 
 export type ApiTask = {
   id: string;

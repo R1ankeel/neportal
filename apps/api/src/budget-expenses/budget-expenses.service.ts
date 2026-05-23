@@ -6,7 +6,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { BudgetStatus, PrismaService } from "@neportal/database";
+import { BudgetExpenseStatus, BudgetStatus, PrismaService, UserRole } from "@neportal/database";
 import { BudgetsService } from "../budgets/budgets.service";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-attachment.dto";
@@ -45,6 +45,73 @@ export class BudgetExpensesService {
 
   private orgId() {
     return this.organization.getOrganizationId();
+  }
+
+  private isManagerRole(role: UserRole): boolean {
+    return role === UserRole.OWNER || role === UserRole.MANAGER;
+  }
+
+  async listPending(userId: string, limit = 10) {
+    const org = this.orgId();
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId: org },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with id "${userId}" not found in this organization`);
+    }
+
+    const take = Math.min(Math.max(1, limit), 20);
+
+    const expenses = await this.prisma.budgetExpense.findMany({
+      where: {
+        organizationId: org,
+        userId,
+        status: BudgetExpenseStatus.PENDING_RECEIPT,
+        budget: { status: BudgetStatus.ACTIVE },
+      },
+      orderBy: { createdAt: "desc" },
+      take,
+      include: {
+        attachments: {
+          orderBy: { createdAt: "desc" },
+          include: { uploadedBy: { select: { id: true, fullName: true } } },
+        },
+        budget: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            requiresReceipt: true,
+            project: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    return expenses.map((e) => ({
+      id: e.id,
+      amount: Number(e.amount),
+      description: e.description,
+      status: e.status,
+      createdAt: e.createdAt.toISOString(),
+      budget: {
+        id: e.budget.id,
+        name: e.budget.title,
+        status: e.budget.status,
+        requiresReceipt: e.budget.requiresReceipt,
+        project: e.budget.project
+          ? { id: e.budget.project.id, name: e.budget.project.name }
+          : null,
+      },
+      attachments: e.attachments.map((a) => ({
+        id: a.id,
+        mimeType: a.mimeType,
+        originalFilename: a.originalFilename,
+        telegramFileId: a.telegramFileId,
+        createdAt: a.createdAt.toISOString(),
+        uploadedBy: a.uploadedBy,
+      })),
+    }));
   }
 
   async listAttachments(expenseId: string) {
@@ -112,6 +179,13 @@ export class BudgetExpensesService {
     });
     if (!uploader) {
       throw new NotFoundException(`User with id "${dto.uploadedById}" not found in this organization`);
+    }
+
+    const isAuthor = expense.userId === dto.uploadedById;
+    if (!isAuthor && !this.isManagerRole(uploader.role)) {
+      throw new ForbiddenException(
+        "Only the expense author or OWNER/MANAGER can attach a receipt to this expense",
+      );
     }
 
     const attachment = await this.prisma.budgetExpenseAttachment.create({

@@ -215,9 +215,10 @@
 
 ## Budget expenses (вложения)
 
-| Метод | Путь | Описание |
-|-------|------|----------|
-| GET | `/budget-expenses/:expenseId/attachments` | Список вложений расхода |
+| Метод | Путь | Query | Описание |
+|-------|------|-------|----------|
+| GET | `/budget-expenses/pending` | `userId` (обяз.), `limit?` (default 10, max 20) | Неподтверждённые расходы пользователя (`PENDING_RECEIPT`, бюджет `ACTIVE`) |
+| GET | `/budget-expenses/:expenseId/attachments` | — | Список вложений расхода |
 | POST | `/budget-expenses/:expenseId/attachments` | Прикрепить чек (метаданные Telegram) |
 | POST | `/budget-expenses/:expenseId/receipt` | Загрузить чек из Web (`multipart/form-data`) |
 | GET | `/budget-expense-attachments/:id/preview` | Предпросмотр чека (Telegram или локальный файл) |
@@ -233,6 +234,28 @@
 
 Переменная окружения: `UPLOAD_DIR` (опционально, абсолютный или относительный путь от cwd API).
 
+**GET /budget-expenses/pending** — элемент ответа:
+
+```json
+{
+  "id": "cuid",
+  "amount": 1500,
+  "description": "карандаши",
+  "status": "PENDING_RECEIPT",
+  "createdAt": "2026-05-23T10:00:00.000Z",
+  "budget": {
+    "id": "cuid",
+    "name": "Закупка канцелярии",
+    "status": "ACTIVE",
+    "requiresReceipt": true,
+    "project": { "id": "cuid", "name": "Реклама VK" }
+  },
+  "attachments": []
+}
+```
+
+Фильтры: `organizationId` из контекста; `userId` в org; `expense.userId = userId`; `status = PENDING_RECEIPT`; `budget.status = ACTIVE`; сортировка `createdAt desc`.
+
 **POST attachment** — пример для бота:
 
 ```json
@@ -245,6 +268,8 @@
 ```
 
 `storageKey` в S3 опционален; для MVP достаточно `telegramFileId`.
+
+Права на `POST .../attachments`: автор расхода (`expense.userId`) или **OWNER** / **MANAGER**; бюджет не в архиве. Для `PENDING_RECEIPT` статус → `APPROVED` и увеличивается `spentAmount`.
 
 **Preview / download** — backend вызывает Telegram `getFile`, скачивает файл и отдаёт клиенту. `TELEGRAM_BOT_TOKEN` используется только на сервере API (тот же `.env`, что у бота). Web показывает чек в модальном окне через `/preview`, скачивание — через `/download`.
 
