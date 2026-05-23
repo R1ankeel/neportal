@@ -17,7 +17,8 @@
     "lint": "echo \"No linter configured for @neportal/database\"",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "aliases:backfill": "tsx scripts/backfill-user-aliases.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

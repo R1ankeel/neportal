@@ -1,5 +1,19 @@
-import { PrismaClient } from "@neportal/database";
-import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
+import { PrismaClient } from "@prisma/client";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const require = createRequire(import.meta.url);
+const { loadRootEnv, generateSystemAliases, systemAliasesToString }: typeof import("@neportal/shared") =
+  require("@neportal/shared");
+
+loadRootEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+
+if (typeof generateSystemAliases !== "function") {
+  throw new Error(
+    "generateSystemAliases is missing. Run: pnpm --filter @neportal/shared build",
+  );
+}
 
 const prisma = new PrismaClient();
 
