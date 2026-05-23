@@ -1,5 +1,15 @@
 import type { Context } from "grammy";
-import { isConfirmationNo, isConfirmationYes } from "./confirmation";
+import {
+  CONFIRM_WAIT_MESSAGE,
+  isConfirmationEdit,
+  isConfirmationNo,
+  isConfirmationYes,
+} from "./confirmation";
+import {
+  enterConfirmationEditMode,
+  getConfirmationEditHint,
+  handlePendingConfirmationEditMessage,
+} from "./confirmation-edit";
 import {
   getLinkedUserByTelegramId,
   NOT_LINKED_MESSAGE,
@@ -46,6 +56,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   const telegramUserId = ctx.from?.id;
   if (!text || !telegramUserId) return;
 
+  if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   const pending = getPendingConfirmation(telegramUserId);
   if (pending) {
     if (pending.type === "confirm_link_by_username") {
@@ -86,7 +100,13 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
         }
         return;
       }
-      await ctx.reply("Ожидаю подтверждение. Ответьте: да / нет");
+      await ctx.reply(CONFIRM_WAIT_MESSAGE);
+      return;
+    }
+
+    if (pending.type === "ai_intent" && isConfirmationEdit(text)) {
+      enterConfirmationEditMode(telegramUserId, pending);
+      await ctx.reply(getConfirmationEditHint(pending.intent));
       return;
     }
 
@@ -120,7 +140,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       return;
     }
 
-    await ctx.reply("Ожидаю подтверждение. Ответьте: да / нет");
+    await ctx.reply(CONFIRM_WAIT_MESSAGE);
     return;
   }
 

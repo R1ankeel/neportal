@@ -245,17 +245,18 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Порядок обработки обычного текста** (`ai-message.ts`):
 
-1. Pending confirmation (да/нет)
-2. Pending details (результат/причина) — **не** отправляется в YandexGPT
-3. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
-4. Pending mention details (текст призыва) — **не** отправляется в YandexGPT
-5. Pending transfer comment — **не** отправляется в YandexGPT
-6. Pending transfer rejection reason — **не** отправляется в YandexGPT
-7. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
-8. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-9. Pending create task assignee (имя или «мне») — **не** отправляется в YandexGPT
-10. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
-11. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+1. Pending confirmation edit (правка полей) — **не** отправляется в YandexGPT
+2. Pending confirmation (да / нет / изменить)
+3. Pending details (результат/причина) — **не** отправляется в YandexGPT
+4. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
+5. Pending mention details (текст призыва) — **не** отправляется в YandexGPT
+6. Pending transfer comment — **не** отправляется в YandexGPT
+7. Pending transfer rejection reason — **не** отправляется в YandexGPT
+8. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
+9. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
+10. Pending create task assignee (имя или «мне») — **не** отправляется в YandexGPT
+11. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
+12. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
 
 ### Поиск сотрудника (User Resolution Flow v1)
 
@@ -356,9 +357,22 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 1. Текст → YandexGPT → JSON intent (см. `@neportal/ai-contracts`).
 2. Валидация Zod; `confidence < 0.7` или `intent: unknown` → «Не понял команду…».
 3. Сопоставление hints с проектами/пользователями/бюджетами/задачами из API (`intent-resolver.ts`).
-4. Preview и вопрос: *«Ответьте: да / нет»*.
+4. Preview и вопрос: *«Ответьте: да / нет / изменить»*.
 5. Ответ `да` / `+` / `yes` (регистр не важен) → выполнение через те же REST-обёртки, что и slash-команды.
 6. `нет` / `-` / `no` → отмена; pending сбрасывается.
+7. `изменить` / `исправить` / `редактировать` / `поменять` → режим правки (TTL 30 мин, `pending-confirmation-edit.ts`): бот спрашивает, что изменить; ответ в формате `поле: значение` (например `задача: Подписать договор с ССК`) → обновлённый preview с тем же вопросом. Отмена правки: *отмена* / *отмени* / *стоп* — снова preview. Невалидная правка не сбрасывает pending.
+
+**Пример правки (create_task):**
+
+| Шаг | Сообщение |
+|-----|-----------|
+| Пользователь | создай задачу подписать договор с ССК |
+| Бот | Создать задачу? … Задача: Подписать договор с ЭсЭсКа … Ответьте: да / нет / изменить |
+| Пользователь | изменить |
+| Бот | Что изменить? … задача: … |
+| Пользователь | задача: Подписать договор с ССК |
+| Бот | Создать задачу? … Задача: Подписать договор с ССК … Ответьте: да / нет / изменить |
+| Пользователь | да | → `POST /tasks` |
 
 **Примеры фраз:**
 
@@ -444,7 +458,7 @@ AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence
 
 **Права:** OWNER/MANAGER — любое отсутствие; сотрудник — только своё. Иначе: «Вы не можете удалить это отсутствие.»
 
-**Pending order** (текстовые сообщения): confirmation → absence selection → absence delegation → task selection → …
+**Pending order** (текстовые сообщения): confirmation edit → confirmation → absence selection → absence delegation → task selection → …
 
 Файлы: `absence-cancel-flow.ts`, `absence-cancel-slash-flow.ts`, `pending-absence-selection.ts`, `handle-pending-absence-selection.ts`, `fix-ai-intent-cancel-absence-user.ts`.
 
@@ -533,9 +547,11 @@ REST для scheduler (вызывает бот):
 | `ai-message.ts` | Текст без `/`, confirmation, порог confidence |
 | `intent-context.ts` | Контекст для prompt: дата, проекты, пользователи, бюджеты, задачи |
 | `intent-resolver.ts` | hints → ID сущностей |
-| `intent-preview.ts` | Текст «Создать задачу? … Ответьте: да / нет» |
+| `intent-preview.ts` | Текст «Создать задачу? … Ответьте: да / нет / изменить» |
 | `intent-executor.ts` | Вызов API после подтверждения |
-| `confirmation.ts` | Распознавание да/нет |
+| `confirmation.ts` | Распознавание да / нет / изменить |
+| `confirmation-edit.ts` | Подсказки и парсинг правок перед повторным preview |
+| `pending-confirmation-edit.ts` | In-memory режим правки confirmation (TTL 30 мин) |
 | `pending-intent.ts` | In-memory pending: AI intent или привязка по username |
 | `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |

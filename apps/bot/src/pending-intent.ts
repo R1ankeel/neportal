@@ -52,4 +52,6 @@ export function setPendingConfirmation(
 
 export function clearPendingConfirmation(telegramUserId: number): void {
   pendingByTelegramUserId.delete(telegramUserId);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("./pending-confirmation-edit").clearPendingConfirmationEdit(telegramUserId);
 }

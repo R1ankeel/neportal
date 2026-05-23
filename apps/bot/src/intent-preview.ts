@@ -3,7 +3,9 @@ import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
 import { transferPreviewNote } from "./task-transfer-flow";
 
-const CONFIRM_FOOTER = "\n\nОтветьте: да / нет";
+import { CONFIRM_REPLY_PROMPT } from "./confirmation";
+
+const CONFIRM_FOOTER = `\n\n${CONFIRM_REPLY_PROMPT}`;
 
 export function buildIntentPreview(resolved: ResolvedIntent): string {
   switch (resolved.intent) {
