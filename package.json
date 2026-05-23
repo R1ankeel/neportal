@@ -6,11 +6,12 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write .",
-    "db:generate": "dotenv -e .env -- pnpm --filter @neportal/database exec prisma generate",
-    "db:push": "dotenv -e .env -- pnpm --filter @neportal/database exec prisma db push",
-    "db:migrate": "dotenv -e .env -- pnpm --filter @neportal/database exec prisma migrate dev",
-    "db:seed": "dotenv -e .env -- pnpm --filter @neportal/database exec prisma db seed",
-    "db:studio": "dotenv -e .env -- pnpm --filter @neportal/database exec prisma studio"
+    "db:generate": "node scripts/prisma-with-root-env.mjs generate",
+    "db:push": "node scripts/prisma-with-root-env.mjs db push",
+    "db:migrate": "node scripts/prisma-with-root-env.mjs migrate dev",
+    "db:migrate:deploy": "node scripts/prisma-with-root-env.mjs migrate deploy",
+    "db:seed": "node scripts/prisma-with-root-env.mjs db seed",
+    "db:studio": "node scripts/prisma-with-root-env.mjs studio"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",

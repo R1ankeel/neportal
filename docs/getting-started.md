@@ -86,7 +86,7 @@ pnpm --filter @neportal/bot dev
 
 | Симптом | Решение |
 |---------|---------|
-| `Environment variable not found: DATABASE_URL` | Файл `.env` в корне; команды `pnpm db:*` и API запускать из корня клона |
+| `Environment variable not found: DATABASE_URL` | Файл `.env` в корне; команды `pnpm db:*` из корня клона (скрипт `scripts/prisma-with-root-env.mjs`, работает в cmd.exe). В cmd: `set DATABASE_URL=postgresql://...` затем prisma — только для одной сессии |
 | `Set TELEGRAM_BOT_TOKEN in the root .env file` | Задать токен в корневом `.env`, не `change_me` |
 | Пути вроде `C:\Windows\System32` в ошибках | `cd` в каталог с корневым `package.json` |
 | `Organization slug "neportal-demo" not found` | Выполнить `pnpm db:seed` |
