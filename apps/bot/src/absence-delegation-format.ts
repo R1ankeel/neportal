@@ -1,6 +1,12 @@
 import type { ApiAbsenceAffectedTask } from "./api";
 import { formatTaskDeadline } from "./task-notifications";
-import type { AbsenceDelegationTaskItem } from "./pending-absence-delegation";
+import type {
+  AbsenceDelegationAssignment,
+  AbsenceDelegationTaskItem,
+} from "./pending-absence-delegation";
+export function absenceTypeLabelRu(type: "SICK_LEAVE" | "VACATION"): string {
+  return type === "SICK_LEAVE" ? "больничный" : "отпуск";
+}
 
 export function taskStatusLabelRu(status: string): string {
   switch (status) {
@@ -47,57 +53,80 @@ export function formatAbsenceDelegationTaskList(tasks: AbsenceDelegationTaskItem
     .join("\n\n");
 }
 
-export function formatAbsenceDelegationTaskListCompact(
+export function formatAbsenceImpactIntroMessage(
+  type: "SICK_LEAVE" | "VACATION",
   tasks: AbsenceDelegationTaskItem[],
 ): string {
-  return tasks
-    .map((t, i) => {
-      const deadline = formatTaskDeadline(t.deadlineAt);
-      const status = taskStatusLabelRu(t.status);
-      return `${i + 1}. ${t.title} — ${deadline} — ${status}`;
-    })
-    .join("\n");
+  const typeLabel = absenceTypeLabelRu(type);
+  const count = tasks.length;
+  return [
+    `У вас на период ${typeLabel} ${count} ${taskCountWord(count)}:`,
+    "",
+    formatAbsenceDelegationTaskList(tasks),
+    "",
+    "Хотите оставить задачи за собой или перераспределить?",
+    "Ответьте: оставить / распределить",
+  ].join("\n");
 }
 
-/** Парсит «1», «1,3», «1 3», «1 и 3»; «все»/«всё» → all; иначе null. */
-export function parseAbsenceTaskSelectionNumbers(
-  text: string,
-  taskCount: number,
-): number[] | "all" | null {
-  const normalized = text.trim().toLowerCase().replace(/\s+/g, " ");
-  if (normalized === "все" || normalized === "всё") return "all";
-
-  const nums = new Set<number>();
-  const parts = normalized.split(/[,;]|\s+и\s+|\s+/u).filter(Boolean);
-  for (const part of parts) {
-    const n = Number.parseInt(part, 10);
-    if (Number.isInteger(n) && n >= 1 && n <= taskCount) {
-      nums.add(n);
-    }
-  }
-
-  if (nums.size === 0) return null;
-  return [...nums].sort((a, b) => a - b);
-}
-
-export function buildDelegationResultMessage(
-  fullName: string,
-  results: Array<{ status: "PENDING" | "ACCEPTED" }>,
+export function formatItemAssigneeQuestion(
+  task: AbsenceDelegationTaskItem,
+  index: number,
+  total: number,
 ): string {
-  const count = results.length;
-  const pendingCount = results.filter((r) => r.status === "PENDING").length;
-  const acceptedCount = results.filter((r) => r.status === "ACCEPTED").length;
-
-  if (pendingCount === count) {
-    return `Запросы на передачу ${count} ${taskWord(count)} отправлены сотруднику ${fullName}.`;
-  }
-  if (acceptedCount === count) {
-    return `${count} ${taskWord(count)} переданы сотруднику ${fullName}.`;
-  }
-  return `Готово: ${acceptedCount} ${taskWord(acceptedCount)} переданы, ${pendingCount} ${requestWord(pendingCount)} отправлены сотруднику ${fullName}.`;
+  return [
+    `Задача ${index + 1} из ${total}:`,
+    `«${task.title}»`,
+    `Дедлайн: ${formatTaskDeadline(task.deadlineAt)}`,
+    "",
+    "Кому назначить?",
+    "Напишите «мне» / «оставить» или имя сотрудника.",
+  ].join("\n");
 }
 
-function taskWord(n: number): string {
+export function formatDistributionSummary(
+  tasks: AbsenceDelegationTaskItem[],
+  assignments: AbsenceDelegationAssignment[],
+): string {
+  const lines = tasks.map((task, i) => {
+    const a = assignments.find((x) => x.taskId === task.id);
+    if (!a || a.action === "KEEP") {
+      return `${i + 1}. ${task.title} → оставить за собой`;
+    }
+    return `${i + 1}. ${task.title} → ${a.toUserName ?? "сотрудник"}`;
+  });
+
+  return [
+    "Проверьте распределение задач:",
+    "",
+    ...lines,
+    "",
+    "Подтвердить?",
+    "Ответьте: да / нет",
+  ].join("\n");
+}
+
+export function buildDistributionResultMessage(
+  statuses: Array<{ status: "PENDING" | "ACCEPTED" }>,
+): string {
+  const transferCount = statuses.length;
+  if (transferCount === 0) {
+    return "Ок, задачи остаются за вами.";
+  }
+
+  const pendingCount = statuses.filter((s) => s.status === "PENDING").length;
+  const acceptedCount = statuses.filter((s) => s.status === "ACCEPTED").length;
+
+  if (pendingCount === transferCount) {
+    return `Запросы на передачу ${transferCount} ${taskCountWord(transferCount)} отправлены.`;
+  }
+  if (acceptedCount === transferCount) {
+    return `${transferCount} ${taskCountWord(transferCount)} переданы новым исполнителям.`;
+  }
+  return `Готово: ${acceptedCount} ${taskCountWord(acceptedCount)} переданы, ${pendingCount} ${requestWord(pendingCount)} отправлены.`;
+}
+
+function taskCountWord(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return "задача";

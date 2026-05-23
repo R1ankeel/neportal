@@ -441,17 +441,17 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 После `/sick`, `/vacation` или AI `create_absence` (после «да»), если есть affected tasks:
 
-1. Отсутствующему — нумерованный список (title, дедлайн, статус, проект при нескольких проектах): «Какие задачи передать? 1, 3 / все / нет».
+1. Отсутствующему — список задач (title, проект, дедлайн, статус): «оставить / распределить».
 2. Постановщикам с `telegramId` — предупреждение по каждой задаче.
-3. Выбор номеров → «Кому передать выбранные задачи?» → User Resolution (`Вася`, `Ваня`, @username) → при нескольких — `select_user_for_absence_delegation`.
-4. Confirmation (`confirm_absence_delegation` в `pending-intent`) → для каждой **выбранной** задачи `POST /tasks/:id/transfers` с `requestedById` = **absence.userId** (не текущий OWNER в Telegram), `absenceId` в теле.
-5. EMPLOYEE → transfer `PENDING`, уведомление «хочет передать… да/нет»; OWNER/MANAGER → `ACCEPTED` сразу, уведомление «Вам передали задачу».
-6. Итоговое сообщение по фактическим статусам: «запросы отправлены» / «переданы» / смешанный вариант.
+3. **Распределить** — по каждой задаче: «мне» / «оставить» или имя сотрудника (User Resolution, `select_user_for_absence_delegation_item` при неоднозначности). Разные задачи можно отдать разным людям.
+4. Summary confirmation (`confirm_absence_delegation_distribution`) → `POST /tasks/:id/transfers` только для `TRANSFER`, `requestedById` = **absence.userId**, `absenceId` в теле.
+5. Передача на себя или «мне» = KEEP (transfer не создаётся). Без `telegramId` у получателя — остаёмся на текущей задаче.
+6. Итог: «запросы отправлены» / «переданы» / смешанный вариант по фактическим статусам transfer.
 7. После accept — постановщик получает уведомление о новом исполнителе.
 
-Pending (plain text, до AI): `awaiting_absence_delegation_task_selection` → `awaiting_absence_delegation_assignee`.
+Pending (plain text, до AI): `awaiting_absence_delegation_mode` → `awaiting_absence_delegation_item_assignee`.
 
-**Проверка (сид):** задача «Подписать договор с подрядчиком» — исполнитель **Вася**, постановщик **Иван**; `/sick до 25.05.2026`; «1, 3» → «Маше» → «да» → Маша принимает задачи.
+**Проверка (сид):** 3 affected tasks у Васи; «распределить» → задача 1 → Маша, 2 → «мне», 3 → Петя → «да» → transfers только для 1 и 3.
 
 ### Уведомления по задачам (Telegram)
 

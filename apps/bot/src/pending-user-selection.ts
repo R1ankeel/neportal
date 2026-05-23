@@ -15,7 +15,7 @@ export type PendingUserSelectionType =
   | "select_user_for_transfer"
   | "select_user_for_mention"
   | "select_user_for_absence"
-  | "select_user_for_absence_delegation"
+  | "select_user_for_absence_delegation_item"
   | "select_user_for_link"
   | "select_user_for_task_list"
   | "select_user_for_other";
@@ -60,16 +60,17 @@ export type AbsenceUserSelectionPayload = {
   comment?: string;
 };
 
-export type AbsenceDelegationUserSelectionPayload = {
-  intent: "absence_delegation";
+export type AbsenceDelegationItemUserSelectionPayload = {
+  intent: "absence_delegation_item";
   absenceId: string;
   absenceUserId: string;
   absenceUserName: string;
   absenceType: "SICK_LEAVE" | "VACATION";
   startDate: string;
   endDate: string;
-  selectedTaskIds: string[];
-  selectedTasks: import("./pending-absence-delegation").AbsenceDelegationTaskItem[];
+  tasks: import("./pending-absence-delegation").AbsenceDelegationTaskItem[];
+  index: number;
+  assignments: import("./pending-absence-delegation").AbsenceDelegationAssignment[];
 };
 
 export type LinkUserSelectionPayload = {
@@ -86,7 +87,7 @@ export type UserSelectionPayload =
   | TransferUserSelectionPayload
   | MentionUserSelectionPayload
   | AbsenceUserSelectionPayload
-  | AbsenceDelegationUserSelectionPayload
+  | AbsenceDelegationItemUserSelectionPayload
   | LinkUserSelectionPayload
   | TaskListUserSelectionPayload;
 

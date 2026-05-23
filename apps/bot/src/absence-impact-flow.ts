@@ -9,8 +9,9 @@ import {
   type ApiUser,
 } from "./api";
 import {
-  buildDelegationResultMessage,
-  formatAbsenceDelegationTaskList,
+  absenceTypeLabelRu,
+  buildDistributionResultMessage,
+  formatAbsenceImpactIntroMessage,
   toAbsenceDelegationTasks,
 } from "./absence-delegation-format";
 import { formatIsoDateRu } from "./parse-ru-date";
@@ -18,14 +19,15 @@ import { sendTelegramMessage } from "./send-telegram";
 import { formatTaskDeadline } from "./task-notifications";
 import { setPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import { notifyTransferImmediate, notifyTransferPending } from "./task-notifications";
-import { startPendingAbsenceDelegationTaskSelection } from "./pending-absence-delegation";
-import type { AbsenceDelegationTaskItem } from "./pending-absence-delegation";
+import { startPendingAbsenceDelegationMode } from "./pending-absence-delegation";
+import type {
+  AbsenceDelegationAssignment,
+  AbsenceDelegationTaskItem,
+} from "./pending-absence-delegation";
 
 const ABSENCE_TRANSFER_COMMENT_PREFIX = "Передача из-за отсутствия";
 
-export function absenceTypeLabelRu(type: "SICK_LEAVE" | "VACATION"): string {
-  return type === "SICK_LEAVE" ? "больничный" : "отпуск";
-}
+export { absenceTypeLabelRu };
 
 export function buildAbsenceTransferComment(
   type: "SICK_LEAVE" | "VACATION",
@@ -64,20 +66,15 @@ export async function handleAbsenceImpact(
   const delegationTasks = toAbsenceDelegationTasks(affectedTasks);
 
   if (absenceUser.telegramId) {
-    const lines = [
-      "У вас есть задачи с дедлайном на период отсутствия:",
-      "",
-      formatAbsenceDelegationTaskList(delegationTasks),
-      "",
-      "Какие задачи хотите передать?",
-      "Напишите номера через запятую, например: 1, 3.",
-      "Можно написать: все / нет.",
-    ];
-    await sendTelegramMessage(api, absenceUser.telegramId, lines.join("\n"));
+    await sendTelegramMessage(
+      api,
+      absenceUser.telegramId,
+      formatAbsenceImpactIntroMessage(absence.type, delegationTasks),
+    );
 
     const telegramNumeric = Number(absenceUser.telegramId);
     if (Number.isFinite(telegramNumeric)) {
-      startPendingAbsenceDelegationTaskSelection(telegramNumeric, {
+      startPendingAbsenceDelegationMode(telegramNumeric, {
         absenceId: absence.id,
         absenceUserId: absenceUser.id,
         absenceUserName: absenceUser.fullName,
@@ -131,7 +128,7 @@ export async function handleAbsenceImpact(
   }
 }
 
-export async function executeAbsenceDelegationTransfers(
+export async function executeAbsenceDelegationDistribution(
   api: Api,
   params: {
     absenceId: string;
@@ -139,14 +136,10 @@ export async function executeAbsenceDelegationTransfers(
     absenceType: "SICK_LEAVE" | "VACATION";
     startDate: string;
     endDate: string;
-    toUser: ApiUser;
-    selectedTasks: AbsenceDelegationTaskItem[];
+    tasks: AbsenceDelegationTaskItem[];
+    assignments: AbsenceDelegationAssignment[];
   },
 ): Promise<string> {
-  if (!params.toUser.telegramId) {
-    return `Нельзя передать задачи: Telegram у сотрудника ${params.toUser.fullName} не привязан.`;
-  }
-
   const comment = buildAbsenceTransferComment(
     params.absenceType,
     params.startDate,
@@ -162,11 +155,25 @@ export async function executeAbsenceDelegationTransfers(
   };
 
   const statuses: Array<{ status: "PENDING" | "ACCEPTED" }> = [];
+  const users = await fetchUsers();
+  const userById = new Map(users.map((u) => [u.id, u]));
 
-  for (const task of params.selectedTasks) {
+  for (const assignment of params.assignments) {
+    if (assignment.action !== "TRANSFER" || !assignment.toUserId) continue;
+
+    const task = params.tasks.find((t) => t.id === assignment.taskId);
+    if (!task) continue;
+
+    const toUserId = assignment.toUserId;
+    if (toUserId === params.absenceUser.id) continue;
+
+    const toUser = userById.get(toUserId);
+    const toUserName = assignment.toUserName ?? toUser?.fullName ?? "сотрудник";
+    const toUserTelegramId = toUser?.telegramId ?? null;
+
     const result = await createTaskTransfer(task.id, {
       requestedById: params.absenceUser.id,
-      toUserId: params.toUser.id,
+      toUserId,
       comment,
       absenceId: params.absenceId,
     });
@@ -178,21 +185,23 @@ export async function executeAbsenceDelegationTransfers(
     }
 
     if (transfer.status === "ACCEPTED") {
-      try {
-        await notifyTransferImmediate(api, {
-          taskTitle: updatedTask.title,
-          projectName: task.projectName,
-          comment,
-          author,
-          toUser: {
-            id: params.toUser.id,
-            fullName: params.toUser.fullName,
-            telegramId: params.toUser.telegramId,
-          },
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[absence-impact] transfer immediate notify error: ${msg}`);
+      if (toUserTelegramId) {
+        try {
+          await notifyTransferImmediate(api, {
+            taskTitle: updatedTask.title,
+            projectName: task.projectName,
+            comment,
+            author,
+            toUser: {
+              id: toUserId,
+              fullName: toUserName,
+              telegramId: toUserTelegramId,
+            },
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`[absence-impact] transfer immediate notify error: ${msg}`);
+        }
       }
 
       try {
@@ -202,7 +211,7 @@ export async function executeAbsenceDelegationTransfers(
           taskTitle: updatedTask.title,
           creatorId: task.creatorId,
           fromUserName: params.absenceUser.fullName,
-          toUserName: params.toUser.fullName,
+          toUserName,
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -211,7 +220,12 @@ export async function executeAbsenceDelegationTransfers(
       continue;
     }
 
-    const toTelegramNumeric = Number(params.toUser.telegramId);
+    if (!toUserTelegramId) {
+      console.error(`[absence-impact] transfer pending without telegram for ${toUserId}`);
+      continue;
+    }
+
+    const toTelegramNumeric = Number(toUserTelegramId);
     if (Number.isFinite(toTelegramNumeric)) {
       setPendingTaskTransferDecision(toTelegramNumeric, {
         type: "pending_task_transfer_decision",
@@ -220,7 +234,7 @@ export async function executeAbsenceDelegationTransfers(
         taskTitle: updatedTask.title,
         requestedById: params.absenceUser.id,
         requestedByName: params.absenceUser.fullName,
-        toUserId: params.toUser.id,
+        toUserId,
         comment,
         projectName: task.projectName ?? undefined,
         createdAt: Date.now(),
@@ -234,9 +248,9 @@ export async function executeAbsenceDelegationTransfers(
         comment,
         author,
         toUser: {
-          id: params.toUser.id,
-          fullName: params.toUser.fullName,
-          telegramId: params.toUser.telegramId,
+          id: toUserId,
+          fullName: toUserName,
+          telegramId: toUserTelegramId,
         },
       });
     } catch (e) {
@@ -245,7 +259,7 @@ export async function executeAbsenceDelegationTransfers(
     }
   }
 
-  return buildDelegationResultMessage(params.toUser.fullName, statuses);
+  return buildDistributionResultMessage(statuses);
 }
 
 /** Уведомление постановщика о новом исполнителе после accept transfer из-за отсутствия. */

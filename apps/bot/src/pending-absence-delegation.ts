@@ -19,8 +19,14 @@ export type AbsenceDelegationTaskItem = {
   creatorName: string;
 };
 
-export type PendingAbsenceDelegationTaskSelection = {
-  type: "awaiting_absence_delegation_task_selection";
+export type AbsenceDelegationAssignment = {
+  taskId: string;
+  action: "KEEP" | "TRANSFER";
+  toUserId?: string;
+  toUserName?: string;
+};
+
+export type AbsenceDelegationContext = {
   absenceId: string;
   absenceUserId: string;
   absenceUserName: string;
@@ -28,25 +34,23 @@ export type PendingAbsenceDelegationTaskSelection = {
   startDate: string;
   endDate: string;
   tasks: AbsenceDelegationTaskItem[];
+};
+
+export type PendingAbsenceDelegationMode = AbsenceDelegationContext & {
+  type: "awaiting_absence_delegation_mode";
   createdAt: number;
 };
 
-export type PendingAbsenceDelegationAssignee = {
-  type: "awaiting_absence_delegation_assignee";
-  absenceId: string;
-  absenceUserId: string;
-  absenceUserName: string;
-  absenceType: "SICK_LEAVE" | "VACATION";
-  startDate: string;
-  endDate: string;
-  selectedTaskIds: string[];
-  selectedTasks: AbsenceDelegationTaskItem[];
+export type PendingAbsenceDelegationItemAssignee = AbsenceDelegationContext & {
+  type: "awaiting_absence_delegation_item_assignee";
+  index: number;
+  assignments: AbsenceDelegationAssignment[];
   createdAt: number;
 };
 
 export type PendingAbsenceDelegation =
-  | PendingAbsenceDelegationTaskSelection
-  | PendingAbsenceDelegationAssignee;
+  | PendingAbsenceDelegationMode
+  | PendingAbsenceDelegationItemAssignee;
 
 const pendingByTelegramUserId = new Map<number, PendingAbsenceDelegation>();
 
@@ -90,25 +94,25 @@ function clearOtherPendings(telegramUserId: number): void {
   clearPendingUserSelection(telegramUserId);
 }
 
-export function startPendingAbsenceDelegationTaskSelection(
+export function startPendingAbsenceDelegationMode(
   telegramUserId: number,
-  pending: Omit<PendingAbsenceDelegationTaskSelection, "type" | "createdAt">,
+  pending: Omit<PendingAbsenceDelegationMode, "type" | "createdAt">,
 ): void {
   clearOtherPendings(telegramUserId);
   setPendingAbsenceDelegation(telegramUserId, {
-    type: "awaiting_absence_delegation_task_selection",
+    type: "awaiting_absence_delegation_mode",
     ...pending,
     createdAt: Date.now(),
   });
 }
 
-export function startPendingAbsenceDelegationAssignee(
+export function startPendingAbsenceDelegationItemAssignee(
   telegramUserId: number,
-  pending: Omit<PendingAbsenceDelegationAssignee, "type" | "createdAt">,
+  pending: Omit<PendingAbsenceDelegationItemAssignee, "type" | "createdAt">,
 ): void {
   clearOtherPendings(telegramUserId);
   setPendingAbsenceDelegation(telegramUserId, {
-    type: "awaiting_absence_delegation_assignee",
+    type: "awaiting_absence_delegation_item_assignee",
     ...pending,
     createdAt: Date.now(),
   });

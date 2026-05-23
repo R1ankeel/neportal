@@ -7,7 +7,7 @@ import {
 import { executeResolvedIntent } from "./intent-executor";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
-import { executeAbsenceDelegationTransfers } from "./absence-impact-flow";
+import { executeAbsenceDelegationDistribution } from "./absence-impact-flow";
 import {
   clearPendingConfirmation,
   getPendingConfirmation,
@@ -51,7 +51,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       return;
     }
 
-    if (pending.type === "confirm_absence_delegation") {
+    if (pending.type === "confirm_absence_delegation_distribution") {
       if (isConfirmationNo(text)) {
         clearPendingConfirmation(telegramUserId);
         await ctx.reply("Ок, задачи остаются за вами.");
@@ -66,22 +66,16 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
         }
         const users = await fetchUsers();
         const absenceUser = users.find((u) => u.id === pending.absenceUserId) ?? linked;
-        const toUser = users.find((u) => u.id === pending.toUserId);
-        if (!toUser) {
-          clearPendingConfirmation(telegramUserId);
-          await ctx.reply("Сотрудник не найден. Повторите команду.");
-          return;
-        }
         clearPendingConfirmation(telegramUserId);
         try {
-          const reply = await executeAbsenceDelegationTransfers(ctx.api, {
+          const reply = await executeAbsenceDelegationDistribution(ctx.api, {
             absenceId: pending.absenceId,
             absenceUser,
             absenceType: pending.absenceType,
             startDate: pending.startDate,
             endDate: pending.endDate,
-            toUser,
-            selectedTasks: pending.selectedTasks,
+            tasks: pending.tasks,
+            assignments: pending.assignments,
           });
           await ctx.reply(reply);
         } catch (e) {

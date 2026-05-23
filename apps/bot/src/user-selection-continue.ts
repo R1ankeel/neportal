@@ -22,6 +22,15 @@ import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { linkTelegramUser } from "./api";
 import {
+  advanceAfterAssignment,
+  assignmentKeep,
+  assignmentTransfer,
+} from "./absence-delegation-state";
+import {
+  startPendingAbsenceDelegationItemAssignee,
+  type PendingAbsenceDelegationItemAssignee,
+} from "./pending-absence-delegation";
+import {
   canViewOtherUsersTasks,
   ONLY_OWN_TASKS_MESSAGE,
   replyWithTasksForUser,
@@ -178,30 +187,61 @@ export async function continueAfterUserSelection(
     return;
   }
 
-  if (payload.intent === "absence_delegation") {
-    const taskLines = payload.selectedTasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
-    setPendingConfirmation(telegramUserId, {
-      type: "confirm_absence_delegation",
+  if (payload.intent === "absence_delegation_item") {
+    const users = await fetchUsers();
+    const fullUser = users.find((u) => u.id === selectedUser.id) ?? selectedUser;
+    const pendingItem: PendingAbsenceDelegationItemAssignee = {
+      type: "awaiting_absence_delegation_item_assignee",
       absenceId: payload.absenceId,
       absenceUserId: payload.absenceUserId,
       absenceUserName: payload.absenceUserName,
       absenceType: payload.absenceType,
       startDate: payload.startDate,
       endDate: payload.endDate,
-      selectedTaskIds: payload.selectedTaskIds,
-      selectedTasks: payload.selectedTasks,
-      toUserId: selectedUser.id,
-      toUserName: selectedUser.fullName,
-      toUserTelegramId: selectedUser.telegramId ?? null,
-    });
-    await ctx.reply(
-      [
-        `Передать задачи сотруднику ${selectedUser.fullName}?`,
-        "",
-        taskLines,
-        "",
-        "Ответьте: да / нет",
-      ].join("\n"),
+      tasks: payload.tasks,
+      index: payload.index,
+      assignments: payload.assignments,
+      createdAt: Date.now(),
+    };
+    const currentTask = payload.tasks[payload.index];
+    if (!currentTask) {
+      await ctx.reply("Ошибка распределения. Повторите команду.");
+      return;
+    }
+
+    if (fullUser.id === payload.absenceUserId) {
+      await advanceAfterAssignment(
+        ctx,
+        telegramUserId,
+        pendingItem,
+        assignmentKeep(currentTask.id),
+      );
+      return;
+    }
+
+    if (!fullUser.telegramId) {
+      await ctx.reply(
+        `У сотрудника ${fullUser.fullName} не привязан Telegram. Выберите другого сотрудника или напишите «оставить».`,
+      );
+      startPendingAbsenceDelegationItemAssignee(telegramUserId, {
+        absenceId: payload.absenceId,
+        absenceUserId: payload.absenceUserId,
+        absenceUserName: payload.absenceUserName,
+        absenceType: payload.absenceType,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        tasks: payload.tasks,
+        index: payload.index,
+        assignments: payload.assignments,
+      });
+      return;
+    }
+
+    await advanceAfterAssignment(
+      ctx,
+      telegramUserId,
+      pendingItem,
+      assignmentTransfer(currentTask.id, fullUser),
     );
     return;
   }

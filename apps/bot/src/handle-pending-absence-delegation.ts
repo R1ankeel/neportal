@@ -1,47 +1,25 @@
 import type { Context } from "grammy";
+import { formatItemAssigneeQuestion } from "./absence-delegation-format";
+import {
+  advanceAfterAssignment,
+  assignmentKeep,
+  assignmentTransfer,
+  isDelegationDistributeMode,
+  isDelegationKeepAllMode,
+  isDelegationKeepItemAnswer,
+  startItemDistribution,
+} from "./absence-delegation-state";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
-import { parseAbsenceTaskSelectionNumbers } from "./absence-delegation-format";
 import {
   clearPendingAbsenceDelegation,
   getPendingAbsenceDelegation,
   isPendingAbsenceDelegationExpired,
-  startPendingAbsenceDelegationAssignee,
-  type AbsenceDelegationTaskItem,
 } from "./pending-absence-delegation";
 import { isPendingDetailsCancel } from "./pending-task-status-details";
-import { isConfirmationNo } from "./confirmation";
 import { fetchUsers } from "./api";
 import { resolveUserHintWithSelection } from "./user-hint-resolution";
-import { setPendingConfirmation } from "./pending-intent";
 
-const TASK_SELECTION_HINT =
-  "Напишите номера задач из списка, например: 1, 3. Или «все» / «нет».";
-
-function selectTasksByNumbers(
-  tasks: AbsenceDelegationTaskItem[],
-  numbers: number[],
-): AbsenceDelegationTaskItem[] {
-  return numbers.map((n) => tasks[n - 1]).filter(Boolean);
-}
-
-function startAssigneeStep(
-  telegramUserId: number,
-  pending: {
-    absenceId: string;
-    absenceUserId: string;
-    absenceUserName: string;
-    absenceType: "SICK_LEAVE" | "VACATION";
-    startDate: string;
-    endDate: string;
-  },
-  selectedTasks: AbsenceDelegationTaskItem[],
-): void {
-  startPendingAbsenceDelegationAssignee(telegramUserId, {
-    ...pending,
-    selectedTaskIds: selectedTasks.map((t) => t.id),
-    selectedTasks,
-  });
-}
+const MODE_HINT = "Ответьте: оставить / распределить";
 
 export async function handlePendingAbsenceDelegationMessage(
   ctx: Context,
@@ -57,47 +35,48 @@ export async function handlePendingAbsenceDelegationMessage(
     return true;
   }
 
-  const baseMeta = {
-    absenceId: pending.absenceId,
-    absenceUserId: pending.absenceUserId,
-    absenceUserName: pending.absenceUserName,
-    absenceType: pending.absenceType,
-    startDate: pending.startDate,
-    endDate: pending.endDate,
-  };
-
-  if (pending.type === "awaiting_absence_delegation_task_selection") {
-    if (isPendingDetailsCancel(text) || isConfirmationNo(text)) {
+  if (pending.type === "awaiting_absence_delegation_mode") {
+    if (isPendingDetailsCancel(text) || isDelegationKeepAllMode(text)) {
       clearPendingAbsenceDelegation(telegramUserId);
       await ctx.reply("Ок, задачи остаются за вами.");
       return true;
     }
 
-    const parsed = parseAbsenceTaskSelectionNumbers(text, pending.tasks.length);
-    if (parsed === null) {
-      await ctx.reply(TASK_SELECTION_HINT);
+    if (isDelegationDistributeMode(text)) {
+      const linked = await getLinkedUserByTelegramId(telegramUserId);
+      if (!linked) {
+        clearPendingAbsenceDelegation(telegramUserId);
+        await ctx.reply(NOT_LINKED_MESSAGE);
+        return true;
+      }
+      if (linked.id !== pending.absenceUserId) {
+        await ctx.reply("Распределение задач может оформить только отсутствующий сотрудник.");
+        return true;
+      }
+
+      const ctxBase = {
+        absenceId: pending.absenceId,
+        absenceUserId: pending.absenceUserId,
+        absenceUserName: pending.absenceUserName,
+        absenceType: pending.absenceType,
+        startDate: pending.startDate,
+        endDate: pending.endDate,
+        tasks: pending.tasks,
+      };
+      startItemDistribution(telegramUserId, ctxBase);
+      const first = pending.tasks[0];
+      await ctx.reply(formatItemAssigneeQuestion(first, 0, pending.tasks.length));
       return true;
     }
 
-    const selectedTasks =
-      parsed === "all"
-        ? pending.tasks
-        : selectTasksByNumbers(pending.tasks, parsed);
-
-    if (selectedTasks.length === 0) {
-      await ctx.reply(TASK_SELECTION_HINT);
-      return true;
-    }
-
-    startAssigneeStep(telegramUserId, baseMeta, selectedTasks);
-    await ctx.reply("Кому передать выбранные задачи?");
+    await ctx.reply(MODE_HINT);
     return true;
   }
 
-  if (pending.type === "awaiting_absence_delegation_assignee") {
+  if (pending.type === "awaiting_absence_delegation_item_assignee") {
     if (isPendingDetailsCancel(text)) {
       clearPendingAbsenceDelegation(telegramUserId);
-      await ctx.reply("Ок, задачи остаются за вами.");
+      await ctx.reply("Ок, распределение отменено. Задачи остаются за вами.");
       return true;
     }
 
@@ -109,7 +88,24 @@ export async function handlePendingAbsenceDelegationMessage(
     }
 
     if (linked.id !== pending.absenceUserId) {
-      await ctx.reply("Передачу задач из-за отсутствия может оформить только отсутствующий сотрудник.");
+      await ctx.reply("Распределение задач может оформить только отсутствующий сотрудник.");
+      return true;
+    }
+
+    const currentTask = pending.tasks[pending.index];
+    if (!currentTask) {
+      clearPendingAbsenceDelegation(telegramUserId);
+      await ctx.reply("Ошибка распределения. Повторите команду.");
+      return true;
+    }
+
+    if (isDelegationKeepItemAnswer(text)) {
+      await advanceAfterAssignment(
+        ctx,
+        telegramUserId,
+        pending,
+        assignmentKeep(currentTask.id),
+      );
       return true;
     }
 
@@ -122,17 +118,18 @@ export async function handlePendingAbsenceDelegationMessage(
       users,
       text,
       absenceUser,
-      "select_user_for_absence_delegation",
+      "select_user_for_absence_delegation_item",
       {
-        intent: "absence_delegation",
+        intent: "absence_delegation_item",
         absenceId: pending.absenceId,
         absenceUserId: pending.absenceUserId,
         absenceUserName: pending.absenceUserName,
         absenceType: pending.absenceType,
         startDate: pending.startDate,
         endDate: pending.endDate,
-        selectedTaskIds: pending.selectedTaskIds,
-        selectedTasks: pending.selectedTasks,
+        tasks: pending.tasks,
+        index: pending.index,
+        assignments: pending.assignments,
       },
     );
 
@@ -141,32 +138,33 @@ export async function handlePendingAbsenceDelegationMessage(
     }
 
     if (resolved.status === "resolved") {
-      const selected = resolved.user;
-      clearPendingAbsenceDelegation(telegramUserId);
+      if (resolved.user.id === pending.absenceUserId) {
+        await advanceAfterAssignment(
+          ctx,
+          telegramUserId,
+          pending,
+          assignmentKeep(currentTask.id),
+        );
+        return true;
+      }
 
-      const taskLines = pending.selectedTasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
-      setPendingConfirmation(telegramUserId, {
-        type: "confirm_absence_delegation",
-        ...baseMeta,
-        selectedTaskIds: pending.selectedTaskIds,
-        selectedTasks: pending.selectedTasks,
-        toUserId: selected.id,
-        toUserName: selected.fullName,
-        toUserTelegramId: selected.telegramId ?? null,
-      });
-      await ctx.reply(
-        [
-          `Передать задачи сотруднику ${selected.fullName}?`,
-          "",
-          taskLines,
-          "",
-          "Ответьте: да / нет",
-        ].join("\n"),
+      if (!resolved.user.telegramId) {
+        await ctx.reply(
+          `У сотрудника ${resolved.user.fullName} не привязан Telegram. Выберите другого сотрудника или напишите «оставить».`,
+        );
+        return true;
+      }
+
+      await advanceAfterAssignment(
+        ctx,
+        telegramUserId,
+        pending,
+        assignmentTransfer(currentTask.id, resolved.user),
       );
       return true;
     }
 
-    await ctx.reply("Напишите имя сотрудника.");
+    await ctx.reply("Напишите «мне» / «оставить» или имя сотрудника.");
     return true;
   }
 
