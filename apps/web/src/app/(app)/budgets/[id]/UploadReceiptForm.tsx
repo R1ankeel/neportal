@@ -1,42 +1,92 @@
 "use client";
 
-import { useActionState } from "react";
-import { uploadExpenseReceipt, type UploadReceiptState } from "./actions";
+import { getApiBaseUrl } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export function UploadReceiptForm({
   expenseId,
-  budgetId,
   uploadedById,
 }: {
   expenseId: string;
-  budgetId: string;
   uploadedById: string;
 }) {
-  const [state, formAction, pending] = useActionState<UploadReceiptState | undefined, FormData>(
-    uploadExpenseReceipt,
-    undefined,
-  );
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    setPending(true);
+
+    const form = e.currentTarget;
+    const file = new FormData(form).get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      setError("Выберите файл");
+      setPending(false);
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setError("Файл слишком большой (максимум 10 МБ)");
+      setPending(false);
+      return;
+    }
+
+    const body = new FormData();
+    body.append("file", file);
+    body.append("uploadedById", uploadedById);
+
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/budget-expenses/${expenseId}/receipt`, {
+        method: "POST",
+        body,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        setError(parseApiError(text, res.status));
+        return;
+      }
+
+      setSuccess(true);
+      form.reset();
+      router.refresh();
+    } catch {
+      setError(
+        "Не удалось отправить файл. Убедитесь, что API запущен (порт 4000) и задан NEXT_PUBLIC_API_URL.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <form action={formAction} className="mt-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20">
-      <input type="hidden" name="expenseId" value={expenseId} />
-      <input type="hidden" name="budgetId" value={budgetId} />
-      <input type="hidden" name="uploadedById" value={uploadedById} />
-
+    <form
+      onSubmit={onSubmit}
+      className="mt-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20"
+    >
       <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Ожидает чек</p>
 
-      {state?.ok === false && state.message ? (
+      {error ? (
         <p className="mt-2 text-sm text-red-700 dark:text-red-300" role="alert">
-          {state.message}
+          {error}
         </p>
       ) : null}
-      {state?.ok === true ? (
+      {success ? (
         <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-200">Чек загружен, расход подтверждён</p>
       ) : null}
 
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="block flex-1">
-          <span className="mb-1 block text-sm text-zinc-600 dark:text-zinc-400">Файл чека (JPEG, PNG, WebP, PDF)</span>
+          <span className="mb-1 block text-sm text-zinc-600 dark:text-zinc-400">
+            Файл чека (JPEG, PNG, WebP, PDF, до 10 МБ)
+          </span>
           <input
             type="file"
             name="file"
@@ -55,4 +105,16 @@ export function UploadReceiptForm({
       </div>
     </form>
   );
+}
+
+function parseApiError(text: string, status: number): string {
+  if (!text) return `Ошибка ${status}`;
+  try {
+    const json = JSON.parse(text) as { message?: string | string[] };
+    if (Array.isArray(json.message)) return json.message.join(", ");
+    if (typeof json.message === "string") return json.message;
+  } catch {
+    /* plain text */
+  }
+  return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }

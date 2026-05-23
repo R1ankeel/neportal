@@ -134,7 +134,7 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">{e.user?.fullName ?? "—"}</p>
                     {e.status === "PENDING_RECEIPT" && !isArchived && uploaderId ? (
-                      <UploadReceiptForm expenseId={e.id} budgetId={id} uploadedById={uploaderId} />
+                      <UploadReceiptForm expenseId={e.id} uploadedById={uploaderId} />
                     ) : (
                       <ExpenseAttachments attachments={attachments} />
                     )}
