@@ -297,7 +297,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const parsed = await parseTextIntent(text);
+  const parsed = await parseTextIntent(text, { linkedUserId: linked.id });
   if (!parsed.ok) {
     if (parsed.kind === "disabled") {
       await ctx.reply("AI-парсер пока не настроен. Используйте команды /demo.");
