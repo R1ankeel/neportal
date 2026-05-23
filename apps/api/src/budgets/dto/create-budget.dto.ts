@@ -27,6 +27,14 @@ export class CreateBudgetDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({
+    description: "Ключевые слова для распознавания расходов в боте (через запятую)",
+    example: "реклама, вк, vk, таргет",
+  })
+  @IsOptional()
+  @IsString()
+  matchingKeywords?: string;
+
   @ApiProperty({ example: 50_000 })
   @Type(() => Number)
   @IsNumber()

@@ -90,6 +90,7 @@ export type ApiBudget = {
   id: string;
   title: string;
   description: string | null;
+  matchingKeywords?: string | null;
   initialAmount: string | number;
   spentAmount: string | number;
   currency: string;

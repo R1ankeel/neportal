@@ -1,10 +1,13 @@
 import type { Context } from "grammy";
 import {
   CONFIRM_WAIT_MESSAGE,
+  CREATE_EXPENSE_CONFIRM_WAIT_MESSAGE,
+  isConfirmationCancel,
   isConfirmationEdit,
   isConfirmationNo,
   isConfirmationYes,
 } from "./confirmation";
+import { startBudgetSelectionFromExpenseConfirmation } from "./create-expense-confirmation";
 import {
   enterConfirmationEditMode,
   getConfirmationEditHint,
@@ -100,6 +103,14 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       return;
     }
 
+    if (isConfirmationCancel(text)) {
+      clearPendingConfirmation(telegramUserId);
+      const cancelledExpense =
+        pending.type === "ai_intent" && pending.resolved.intent === "create_expense";
+      await ctx.reply(cancelledExpense ? "Ок, расход отменён." : "Отменено.");
+      return;
+    }
+
     if (isConfirmationYes(text)) {
       const linked = await getLinkedUserByTelegramId(telegramUserId);
       if (!linked) {
@@ -125,12 +136,33 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     if (isConfirmationNo(text)) {
+      if (pending.type === "ai_intent" && pending.resolved.intent === "create_expense") {
+        const linked = await getLinkedUserByTelegramId(telegramUserId);
+        if (!linked) {
+          clearPendingConfirmation(telegramUserId);
+          await ctx.reply(NOT_LINKED_MESSAGE);
+          return;
+        }
+        clearPendingConfirmation(telegramUserId);
+        await startBudgetSelectionFromExpenseConfirmation(
+          ctx,
+          telegramUserId,
+          linked,
+          pending.resolved,
+        );
+        return;
+      }
+
       clearPendingConfirmation(telegramUserId);
       await ctx.reply("Отменено.");
       return;
     }
 
-    await ctx.reply(CONFIRM_WAIT_MESSAGE);
+    const waitMessage =
+      pending.type === "ai_intent" && pending.resolved.intent === "create_expense"
+        ? CREATE_EXPENSE_CONFIRM_WAIT_MESSAGE
+        : CONFIRM_WAIT_MESSAGE;
+    await ctx.reply(waitMessage);
     return;
   }
 

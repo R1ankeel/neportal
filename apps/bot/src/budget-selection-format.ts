@@ -7,14 +7,12 @@ function receiptLabel(requiresReceipt: boolean): string {
 
 export function formatBudgetSelectionMessage(
   candidates: BudgetCandidate[],
-  options?: { notFoundHint?: string; ambiguous?: boolean },
+  options?: { ambiguous?: boolean; fromConfirmation?: boolean },
 ): string {
   const lines: string[] = [];
 
-  if (options?.notFoundHint) {
-    lines.push(
-      `Не нашёл подходящий бюджет для «${options.notFoundHint}». Выберите бюджет из списка:`,
-    );
+  if (options?.fromConfirmation) {
+    lines.push("К какому бюджету отнести расход?");
   } else if (options?.ambiguous) {
     lines.push("Не смог однозначно определить бюджет. Выберите бюджет из списка:");
   } else {
@@ -33,6 +31,6 @@ export function formatBudgetSelectionMessage(
     if (index < candidates.length - 1) lines.push("");
   });
 
-  lines.push("", "Напишите номер бюджета.");
+  lines.push("", "Напишите номер бюджета или «отмена».");
   return lines.join("\n");
 }

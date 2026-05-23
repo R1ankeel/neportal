@@ -14,6 +14,14 @@ export class UpdateBudgetDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({
+    description: "Ключевые слова для бота (через запятую); null — очистить",
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  matchingKeywords?: string | null;
+
   @ApiPropertyOptional()
   @Type(() => Number)
   @IsOptional()

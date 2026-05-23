@@ -13,6 +13,7 @@ import {
 import type { ApiBudget, ApiUser } from "@/lib/types";
 import { AddExpenseForm } from "./AddExpenseForm";
 import { ExpenseAttachments } from "./ExpenseAttachments";
+import { EditBudgetKeywordsForm } from "./EditBudgetKeywordsForm";
 import { UploadReceiptForm } from "./UploadReceiptForm";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,18 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
         </div>
         {budget.description ? (
           <p className="mt-3 text-lg text-zinc-600 dark:text-zinc-400">{budget.description}</p>
+        ) : null}
+        {budget.matchingKeywords?.trim() ? (
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Ключевые слова: {budget.matchingKeywords}
+          </p>
+        ) : null}
+        {!isArchived ? (
+          <EditBudgetKeywordsForm
+            budgetId={budget.id}
+            projectId={budget.project?.id}
+            initialKeywords={budget.matchingKeywords}
+          />
         ) : null}
         <dl className="mt-6 grid gap-4 sm:grid-cols-2">
           <div>

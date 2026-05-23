@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getApiBaseUrl } from "@/lib/api";
+import { apiPatchJson, getApiBaseUrl } from "@/lib/api";
 
 export type AddExpenseState = { ok: boolean; message?: string; saved?: boolean };
+
+export type BudgetKeywordsState = { ok: boolean; message?: string };
 
 export async function addBudgetExpense(
   _prev: AddExpenseState | undefined,
@@ -58,4 +60,28 @@ export async function addBudgetExpense(
     revalidatePath(`/projects/${data.budget.project.id}`);
   }
   return { ok: true, saved: true };
+}
+
+export async function updateBudgetMatchingKeywords(
+  _prev: BudgetKeywordsState | undefined,
+  formData: FormData,
+): Promise<BudgetKeywordsState> {
+  const budgetId = String(formData.get("budgetId") ?? "");
+  if (!budgetId) return { ok: false, message: "Не указан бюджет" };
+
+  const raw = String(formData.get("matchingKeywords") ?? "").trim();
+  const matchingKeywords = raw.length > 0 ? raw : null;
+
+  try {
+    await apiPatchJson(`/budgets/${budgetId}`, { matchingKeywords });
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Ошибка сохранения" };
+  }
+
+  revalidatePath(`/budgets/${budgetId}`);
+  if (formData.get("projectId")) {
+    revalidatePath(`/projects/${String(formData.get("projectId"))}/budgets`);
+  }
+  revalidatePath("/budgets");
+  return { ok: true };
 }

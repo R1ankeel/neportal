@@ -1,125 +1,16 @@
 import type { ApiBudget, ApiUser } from "./api";
 import { budgetTotalsOrFallback } from "./api";
 
-/** Минимальный score для участия в сопоставлении */
-const MIN_MATCH_SCORE = 50;
-/** Score, при котором один лидер считается уверенным (если нет равного второго) */
-const CONFIDENT_SCORE = 70;
+const SCORE_EXACT_NAME = 100;
+const SCORE_NAME_PHRASE = 90;
+const SCORE_KEYWORD = 80;
+const SCORE_WEAK_INCLUDES = 50;
 
-const SCORE_EXACT = 100;
-const SCORE_HINT_CATEGORY = 90;
-const SCORE_DESC_CATEGORY = 80;
-const SCORE_INCLUDES = 70;
-const SCORE_FUZZY = 50;
+const AUTO_PICK_MIN_SCORE = 80;
+const AUTO_PICK_MIN_GAP = 20;
+const MIN_HINT_LENGTH_FOR_INCLUDES = 4;
 
-const BUDGET_STOP_WORDS = new Set([
-  "закупка",
-  "покупка",
-  "бюджет",
-  "расходы",
-  "расход",
-  "траты",
-  "оплата",
-  "на",
-  "для",
-  "по",
-]);
-
-const RUSSIAN_ENDINGS = [
-  "ия",
-  "ии",
-  "ию",
-  "ией",
-  "ей",
-  "ов",
-  "ев",
-  "ый",
-  "ая",
-  "ую",
-  "ом",
-  "ем",
-  "ами",
-  "ями",
-  "ах",
-  "ях",
-  "а",
-  "я",
-  "и",
-  "ы",
-  "е",
-  "у",
-  "ю",
-];
-
-export type BudgetCategory = "stationery" | "vk_ads";
-
-/** Падежные и разговорные формы → базовая лексема (MVP) */
-const WORD_ALIASES: Record<string, string> = {
-  канцелярии: "канцелярия",
-  канцелярию: "канцелярия",
-  канцелярку: "канцелярия",
-  канцелярке: "канцелярия",
-  канцтоваров: "канцтовары",
-  канцтовара: "канцтовары",
-  рекламу: "реклама",
-  ручек: "ручки",
-  ручкой: "ручки",
-  ручку: "ручка",
-  карандашей: "карандаши",
-  карандаша: "карандаш",
-  карандашем: "карандаш",
-  бумагу: "бумага",
-  бумаги: "бумага",
-  тетрадью: "тетради",
-  тетрадей: "тетради",
-  папку: "папки",
-  папок: "папки",
-  печати: "печать",
-  печатью: "печать",
-};
-
-const CATEGORY_ALIASES: Record<BudgetCategory, string[]> = {
-  stationery: [
-    "канцелярия",
-    "канцелярии",
-    "канцелярию",
-    "канцелярские товары",
-    "канцтовары",
-    "канцтоваров",
-    "канцелярка",
-    "канцелярку",
-    "ручки",
-    "ручка",
-    "ручек",
-    "карандаши",
-    "карандаш",
-    "карандашей",
-    "бумага",
-    "бумагу",
-    "бумаги",
-    "тетради",
-    "тетрадь",
-    "скрепки",
-    "файлы",
-    "папки",
-    "печать",
-    "печати",
-    "марки",
-  ],
-  vk_ads: [
-    "реклама vk",
-    "реклама вк",
-    "рекламу vk",
-    "рекламу вк",
-    "вк",
-    "vk",
-    "рекламный кабинет",
-    "таргет",
-    "таргетинг",
-    "объявления",
-    "продвижение",
-  ],
-};
+const SHORT_KEYWORDS = new Set(["vk", "вк"]);
 
 export function normalizeBudgetText(value: string): string {
   return value
@@ -130,208 +21,71 @@ export function normalizeBudgetText(value: string): string {
     .trim();
 }
 
-function canonicalToken(token: string): string {
-  const normalized = normalizeBudgetText(token);
-  if (!normalized) return "";
-  return WORD_ALIASES[normalized] ?? normalized;
+export function parseMatchingKeywords(raw: string | null | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((part) => normalizeBudgetText(part))
+    .filter((kw) => kw.length > 0 && (kw.length >= 3 || SHORT_KEYWORDS.has(kw)));
 }
 
-export function tokenizeBudgetText(text: string, stripStopWords = true): string[] {
+/** Keyword как отдельный токен или фраза (без подстрочного «бумага» в «бумаги»). */
+export function textContainsKeyword(normalizedText: string, keyword: string): boolean {
+  const kw = normalizeBudgetText(keyword);
+  if (!kw) return false;
+  if (kw.length < 3 && !SHORT_KEYWORDS.has(kw)) return false;
+
+  if (kw.includes(" ")) {
+    return normalizedText.includes(kw);
+  }
+
+  const tokens = normalizedText.split(" ").filter(Boolean);
+  return tokens.some((t) => t === kw);
+}
+
+function combinedSearchText(budgetHint?: string, expenseDescription?: string): string {
+  return normalizeBudgetText([budgetHint, expenseDescription].filter(Boolean).join(" "));
+}
+
+function scoreExactNameMatch(budgetName: string, hint: string): number {
+  const name = normalizeBudgetText(budgetName);
+  const h = normalizeBudgetText(hint);
+  if (!name || !h) return 0;
+  if (name === h) return SCORE_EXACT_NAME;
+  return 0;
+}
+
+function scoreNamePhraseMatch(budgetName: string, text: string): number {
+  const name = normalizeBudgetText(budgetName);
   const normalized = normalizeBudgetText(text);
-  if (!normalized) return [];
-  return normalized
-    .split(" ")
-    .map(canonicalToken)
-    .filter((t) => t.length > 0 && (!stripStopWords || !BUDGET_STOP_WORDS.has(t)));
-}
+  if (!name || !normalized) return 0;
 
-export function russianStem(word: string): string {
-  let w = canonicalToken(word);
-  if (w.length < 4) return w;
-  const sorted = [...RUSSIAN_ENDINGS].sort((a, b) => b.length - a.length);
-  for (const ending of sorted) {
-    if (w.endsWith(ending) && w.length - ending.length >= 3) {
-      return w.slice(0, -ending.length);
-    }
+  if (normalized.includes(name)) return SCORE_NAME_PHRASE;
+
+  const hintOnly = normalizeBudgetText(text);
+  if (hintOnly.length >= MIN_HINT_LENGTH_FOR_INCLUDES) {
+    if (name.includes(hintOnly)) return SCORE_NAME_PHRASE;
   }
-  return w;
+
+  return 0;
 }
 
-export function isSimilarRussianWord(a: string, b: string): boolean {
-  const na = canonicalToken(a);
-  const nb = canonicalToken(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-
-  const sa = russianStem(na);
-  const sb = russianStem(nb);
-  if (sa === sb) return true;
-  if (sa.length >= 4 && sb.length >= 4 && (sa.startsWith(sb) || sb.startsWith(sa))) return true;
-  if (na.startsWith(nb) || nb.startsWith(na)) return true;
-  return false;
+function scoreWeakIncludes(budgetName: string, hint: string): number {
+  const name = normalizeBudgetText(budgetName);
+  const h = normalizeBudgetText(hint);
+  if (!name || !h || h.length < MIN_HINT_LENGTH_FOR_INCLUDES) return 0;
+  if (name.includes(h) || h.includes(name)) return SCORE_WEAK_INCLUDES;
+  return 0;
 }
 
-function stripStopWordsFromText(text: string): string {
-  return tokenizeBudgetText(text, true).join(" ");
-}
-
-/** Категория бюджета → budgetHint для AI/детерминированного парсера */
-export function inferBudgetHintFromText(text: string): string | undefined {
-  const categories = detectCategoriesInText(text);
-  if (categories.has("stationery")) return "канцелярия";
-  if (categories.has("vk_ads")) return "реклама VK";
-  return undefined;
-}
-
-function detectCategoriesInText(text: string): Set<BudgetCategory> {
+function scoreKeywordMatches(budget: ApiBudget, text: string): number {
+  const keywords = parseMatchingKeywords(budget.matchingKeywords);
+  if (keywords.length === 0) return 0;
   const normalized = normalizeBudgetText(text);
-  const categories = new Set<BudgetCategory>();
-  if (!normalized) return categories;
+  if (!normalized) return 0;
 
-  for (const [category, aliases] of Object.entries(CATEGORY_ALIASES) as [BudgetCategory, string[]][]) {
-    for (const alias of aliases) {
-      const aliasNorm = normalizeBudgetText(alias);
-      if (!aliasNorm) continue;
-      if (aliasNorm.includes(" ")) {
-        if (normalized.includes(aliasNorm)) {
-          categories.add(category);
-        }
-        continue;
-      }
-      const tokens = normalized.split(" ");
-      if (tokens.some((t) => t === aliasNorm || isSimilarRussianWord(t, aliasNorm))) {
-        categories.add(category);
-      }
-      if (normalized.includes(aliasNorm) && aliasNorm.length >= 3) {
-        categories.add(category);
-      }
-    }
-  }
-
-  if (normalized.includes("канцеляр")) {
-    categories.add("stationery");
-  }
-  if (
-    /\b(vk|вк)\b/.test(normalized) ||
-    (normalized.includes("реклам") && (normalized.includes("vk") || normalized.includes("вк"))) ||
-    normalized.includes("таргет")
-  ) {
-    categories.add("vk_ads");
-  }
-
-  return categories;
-}
-
-function detectBudgetCategories(budgetTitle: string): Set<BudgetCategory> {
-  const fromText = detectCategoriesInText(budgetTitle);
-  const normalized = normalizeBudgetText(budgetTitle);
-  if (normalized.includes("канцеляр")) {
-    fromText.add("stationery");
-  }
-  if (
-    (normalized.includes("реклам") && (/\bvk\b/.test(normalized) || /\bвк\b/.test(normalized))) ||
-    /\bреклама\s+(vk|вк)\b/.test(normalized)
-  ) {
-    fromText.add("vk_ads");
-  }
-  return fromText;
-}
-
-function categoriesOverlap(a: Set<BudgetCategory>, b: Set<BudgetCategory>): boolean {
-  for (const c of a) {
-    if (b.has(c)) return true;
-  }
-  return false;
-}
-
-function scoreExactMatch(budgetTitle: string, hint: string): number {
-  const titleCore = stripStopWordsFromText(budgetTitle);
-  const hintCore = stripStopWordsFromText(hint);
-  if (!titleCore || !hintCore) return 0;
-  if (titleCore === hintCore) return SCORE_EXACT;
-  const titleNorm = normalizeBudgetText(budgetTitle);
-  const hintNorm = normalizeBudgetText(hint);
-  if (titleNorm === hintNorm) return SCORE_EXACT;
-  return 0;
-}
-
-function scoreIncludesMatch(budgetTitle: string, text: string): number {
-  const titleCore = stripStopWordsFromText(budgetTitle);
-  const textCore = stripStopWordsFromText(text);
-  const titleNorm = normalizeBudgetText(budgetTitle);
-  const textNorm = normalizeBudgetText(text);
-  if (!titleCore || !textCore) return 0;
-
-  if (titleCore.includes(textCore) || textCore.includes(titleCore)) return SCORE_INCLUDES;
-  if (titleNorm.includes(textNorm) || textNorm.includes(titleNorm)) return SCORE_INCLUDES;
-
-  const titleTokens = tokenizeBudgetText(budgetTitle);
-  const textTokens = tokenizeBudgetText(text);
-  if (textTokens.length === 0) return 0;
-
-  const allInTitle = textTokens.every((t) =>
-    titleTokens.some((tw) => tw.includes(t) || t.includes(tw) || isSimilarRussianWord(tw, t)),
-  );
-  if (allInTitle) return SCORE_INCLUDES;
-
-  const allInText =
-    titleTokens.length > 0 &&
-    titleTokens.every((t) =>
-      textTokens.some((tw) => tw.includes(t) || t.includes(tw) || isSimilarRussianWord(tw, t)),
-    );
-  if (allInText) return SCORE_INCLUDES;
-
-  return 0;
-}
-
-function scoreFuzzyTokenMatch(budgetTitle: string, text: string): number {
-  const titleTokens = tokenizeBudgetText(budgetTitle);
-  const textTokens = tokenizeBudgetText(text);
-  if (titleTokens.length === 0 || textTokens.length === 0) return 0;
-
-  const matched = textTokens.filter((t) =>
-    titleTokens.some((tw) => isSimilarRussianWord(tw, t)),
-  ).length;
-  if (matched === 0) return 0;
-
-  const minLen = Math.min(textTokens.length, titleTokens.length);
-  if (matched >= minLen) return SCORE_FUZZY;
-  if (matched >= 1 && textTokens.length === 1) return SCORE_FUZZY;
-  return 0;
-}
-
-function scoreCategoryMatch(
-  budgetTitle: string,
-  text: string,
-  forHint: boolean,
-): number {
-  const budgetCats = detectBudgetCategories(budgetTitle);
-  const textCats = detectCategoriesInText(text);
-  if (budgetCats.size === 0 || textCats.size === 0) return 0;
-  if (!categoriesOverlap(budgetCats, textCats)) return 0;
-  return forHint ? SCORE_HINT_CATEGORY : SCORE_DESC_CATEGORY;
-}
-
-function scoreBudgetAgainstText(
-  budgetTitle: string,
-  text: string,
-  options: { isHint: boolean },
-): number {
-  const trimmed = text.trim();
-  if (!trimmed) return 0;
-
-  let max = 0;
-  max = Math.max(max, scoreExactMatch(budgetTitle, trimmed));
-  max = Math.max(max, scoreCategoryMatch(budgetTitle, trimmed, options.isHint));
-  max = Math.max(max, scoreIncludesMatch(budgetTitle, trimmed));
-  max = Math.max(max, scoreFuzzyTokenMatch(budgetTitle, trimmed));
-
-  if (!options.isHint) {
-    const catOnly = scoreCategoryMatch(budgetTitle, trimmed, false);
-    max = Math.max(max, catOnly);
-  }
-
-  return max;
+  const matched = keywords.some((kw) => textContainsKeyword(normalized, kw));
+  return matched ? SCORE_KEYWORD : 0;
 }
 
 function scoreBudgetForExpense(
@@ -342,18 +96,23 @@ function scoreBudgetForExpense(
   let max = 0;
   const hint = budgetHint?.trim();
   const description = expenseDescription?.trim();
+  const combined = combinedSearchText(hint, description);
 
   if (hint) {
-    max = Math.max(max, scoreBudgetAgainstText(budget.title, hint, { isHint: true }));
-  }
-  if (description) {
-    max = Math.max(max, scoreBudgetAgainstText(budget.title, description, { isHint: false }));
+    max = Math.max(max, scoreExactNameMatch(budget.title, hint));
+    max = Math.max(max, scoreNamePhraseMatch(budget.title, hint));
+    max = Math.max(max, scoreWeakIncludes(budget.title, hint));
+    max = Math.max(max, scoreKeywordMatches(budget, hint));
   }
 
-  if (hint && description) {
-    const combined = `${hint} ${description}`;
-    max = Math.max(max, scoreCategoryMatch(budget.title, combined, true));
-    max = Math.max(max, scoreCategoryMatch(budget.title, combined, false));
+  if (description) {
+    max = Math.max(max, scoreNamePhraseMatch(budget.title, description));
+    max = Math.max(max, scoreKeywordMatches(budget, description));
+  }
+
+  if (combined) {
+    max = Math.max(max, scoreNamePhraseMatch(budget.title, combined));
+    max = Math.max(max, scoreKeywordMatches(budget, combined));
   }
 
   return max;
@@ -361,40 +120,20 @@ function scoreBudgetForExpense(
 
 type ScoredBudget = { budget: ApiBudget; score: number };
 
-function pickBestBudget(
-  budgets: ApiBudget[],
-  scoreFn: (budget: ApiBudget) => number,
-): { kind: "one"; budget: ApiBudget } | { kind: "many"; budgets: ApiBudget[] } | { kind: "none" } {
-  const scored: ScoredBudget[] = budgets
-    .map((b) => ({ budget: b, score: scoreFn(b) }))
-    .filter((x) => x.score >= MIN_MATCH_SCORE)
-    .sort((a, b) => b.score - a.score);
+function pickConfidentBudget(scored: ScoredBudget[]): ApiBudget | null {
+  const strong = scored.filter((x) => x.score >= AUTO_PICK_MIN_SCORE).sort((a, b) => b.score - a.score);
+  if (strong.length === 0) return null;
+  if (strong.length === 1) return strong[0].budget;
 
-  if (scored.length === 0) return { kind: "none" };
+  const top = strong[0].score;
+  const second = strong[1]?.score ?? 0;
+  const leaders = strong.filter((x) => x.score === top);
 
-  if (scored.length === 1) {
-    return { kind: "one", budget: scored[0].budget };
+  if (leaders.length === 1 && top - second >= AUTO_PICK_MIN_GAP) {
+    return leaders[0].budget;
   }
 
-  const topScore = scored[0].score;
-  const tiedTop = scored.filter((x) => x.score === topScore);
-
-  if (tiedTop.length === 1) {
-    const secondScore = scored[1]?.score ?? 0;
-    if (topScore >= CONFIDENT_SCORE || topScore - secondScore >= 10) {
-      return { kind: "one", budget: tiedTop[0].budget };
-    }
-  }
-
-  if (tiedTop.length === 1 && topScore >= SCORE_HINT_CATEGORY) {
-    return { kind: "one", budget: tiedTop[0].budget };
-  }
-
-  if (tiedTop.length > 1) {
-    return { kind: "many", budgets: tiedTop.map((x) => x.budget) };
-  }
-
-  return { kind: "one", budget: scored[0].budget };
+  return null;
 }
 
 export function filterActiveAccessibleBudgets(budgets: ApiBudget[]): ApiBudget[] {
@@ -413,9 +152,6 @@ export type BudgetResolveResult =
   | {
       kind: "selection";
       candidates: ApiBudget[];
-      /** Подсказка не сопоставилась ни с одним бюджетом (нет category/token match) */
-      notFoundHint?: string;
-      /** Несколько бюджетов с одинаково высоким score */
       ambiguous?: boolean;
     }
   | { kind: "none"; message: string };
@@ -431,43 +167,27 @@ export function resolveBudgetForExpense(input: BudgetResolveInput): BudgetResolv
   const description = input.expenseDescription?.trim();
   const hasTargetingText = Boolean(hint || description);
 
-  if (hasTargetingText) {
-    const picked = pickBestBudget(accessible, (b) =>
-      scoreBudgetForExpense(b, hint, description),
-    );
-
-    if (picked.kind === "one") {
-      return { kind: "resolved", budget: picked.budget };
-    }
-
-    if (picked.kind === "many") {
-      return {
-        kind: "selection",
-        candidates: picked.budgets,
-        ambiguous: true,
-      };
-    }
-
-    if (hint) {
-      return {
-        kind: "selection",
-        candidates: accessible,
-        notFoundHint: hint,
-      };
-    }
-
-    return {
-      kind: "selection",
-      candidates: accessible,
-      ambiguous: true,
-    };
+  if (!hasTargetingText) {
+    return { kind: "selection", candidates: accessible };
   }
 
-  if (accessible.length === 1) {
-    return { kind: "resolved", budget: accessible[0] };
+  const scored: ScoredBudget[] = accessible
+    .map((b) => ({ budget: b, score: scoreBudgetForExpense(b, hint, description) }))
+    .sort((a, b) => b.score - a.score);
+
+  const confident = pickConfidentBudget(scored);
+  if (confident) {
+    return { kind: "resolved", budget: confident };
   }
 
-  return { kind: "selection", candidates: accessible };
+  const strong = scored.filter((x) => x.score >= AUTO_PICK_MIN_SCORE);
+  if (strong.length > 1) {
+    const top = strong[0].score;
+    const tied = strong.filter((x) => x.score === top).map((x) => x.budget);
+    return { kind: "selection", candidates: tied, ambiguous: true };
+  }
+
+  return { kind: "selection", candidates: accessible, ambiguous: true };
 }
 
 export type BudgetCandidate = {
@@ -482,6 +202,7 @@ export type BudgetCandidate = {
   requiresReceipt: boolean;
   status: string;
   currency: string;
+  matchingKeywords?: string | null;
 };
 
 export function apiBudgetToCandidate(budget: ApiBudget): BudgetCandidate {
@@ -498,12 +219,14 @@ export function apiBudgetToCandidate(budget: ApiBudget): BudgetCandidate {
     requiresReceipt: budget.requiresReceipt,
     status: budget.status,
     currency: budget.currency,
+    matchingKeywords: budget.matchingKeywords ?? null,
   };
 }
 
 export function candidateToApiBudget(
   candidate: BudgetCandidate,
   project?: { id: string; name: string } | null,
+  matchingKeywords?: string | null,
 ): ApiBudget {
   return {
     id: candidate.id,
@@ -513,6 +236,7 @@ export function candidateToApiBudget(
     currency: candidate.currency,
     status: candidate.status,
     requiresReceipt: candidate.requiresReceipt,
+    matchingKeywords: matchingKeywords ?? null,
     project:
       project ?? (candidate.projectName !== "—" ? { id: "", name: candidate.projectName } : null),
     totals: {

@@ -423,41 +423,12 @@ create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
 
 create_expense — бюджет и описание:
-- budgetHint — категория или подсказка бюджета (не обязательно точное название), если понятно, на что потратили (не проект).
-- description — конкретный расход: товар, услуга, краткая суть (без «потратил», «рублей», суммы).
-- Для канцелярских товаров (ручки, карандаши, бумага, канцтовары и т.п.) → budgetHint: "канцелярия", description — что купили («ручки», «карандаши»).
-- Для рекламы VK/ВК → budgetHint: "реклама VK", description — «реклама VK» или как сказал пользователь.
+- budgetHint — только если пользователь явно назвал бюджет или направление («на рекламу VK», «в бюджет канцелярии»). Не выдумывай и не подставляй категории по товару.
+- description — конкретный расход (без «потратил», «рублей», суммы).
+- Если пользователь назвал только товар без бюджета — укажи description, budgetHint не добавляй (бот предложит выбрать бюджет).
 - Если сумма есть, а цель траты неясна — не выдумывай budgetHint и description.
 
-Пример create_expense (ручки):
-Input: «Потратил 100 рублей на ручки»
-Output:
-{
-  "intent": "create_expense",
-  "confidence": 0.9,
-  "requiresConfirmation": true,
-  "payload": {
-    "amount": 100,
-    "budgetHint": "канцелярия",
-    "description": "ручки"
-  }
-}
-
-Пример create_expense (карандаши):
-Input: «Потратил 100 на карандаши»
-Output:
-{
-  "intent": "create_expense",
-  "confidence": 0.9,
-  "requiresConfirmation": true,
-  "payload": {
-    "amount": 100,
-    "budgetHint": "канцелярия",
-    "description": "карандаши"
-  }
-}
-
-Пример create_expense (реклама VK):
+Пример create_expense (явный бюджет):
 Input: «Потратил 1500 рублей на рекламу VK»
 Output:
 {
@@ -471,31 +442,16 @@ Output:
   }
 }
 
-Пример create_expense (реклама вк):
-Input: «Потратил 1500 на рекламу вк»
+Пример create_expense (товар без бюджета):
+Input: «Потратил 100 рублей на ручки»
 Output:
 {
   "intent": "create_expense",
   "confidence": 0.9,
   "requiresConfirmation": true,
   "payload": {
-    "amount": 1500,
-    "budgetHint": "реклама VK",
-    "description": "реклама вк"
-  }
-}
-
-Пример create_expense (канцелярия):
-Input: «Потратил 1500 рублей на канцелярию»
-Output:
-{
-  "intent": "create_expense",
-  "confidence": 0.9,
-  "requiresConfirmation": true,
-  "payload": {
-    "amount": 1500,
-    "budgetHint": "канцелярия",
-    "description": "канцелярия"
+    "amount": 100,
+    "description": "ручки"
   }
 }
 

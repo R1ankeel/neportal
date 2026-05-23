@@ -22,6 +22,7 @@ export type ExpenseSelectionPayload = {
   projectName: string;
   userId: string;
   budgetHint?: string;
+  previousBudgetId?: string;
   source: "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
 };
 
@@ -54,7 +55,6 @@ export type ResolveCreateExpenseResult =
       kind: "selection";
       project: ApiProject;
       candidates: BudgetCandidate[];
-      notFoundHint?: string;
       ambiguous?: boolean;
     }
   | { kind: "error"; message: string };
@@ -92,7 +92,6 @@ export async function resolveCreateExpense(
       kind: "selection",
       project,
       candidates: budgetResult.candidates.map(apiBudgetToCandidate),
-      notFoundHint: budgetResult.notFoundHint,
       ambiguous: budgetResult.ambiguous,
     };
   }
@@ -133,7 +132,6 @@ export async function beginCreateExpenseFlow(
   if (result.kind === "selection") {
     startPendingBudgetSelection(telegramUserId, {
       candidates: result.candidates,
-      notFoundHint: result.notFoundHint,
       payload: {
         amount: params.amount,
         description: params.description,
@@ -146,7 +144,6 @@ export async function beginCreateExpenseFlow(
     });
     await ctx.reply(
       formatBudgetSelectionMessage(result.candidates, {
-        notFoundHint: result.notFoundHint,
         ambiguous: result.ambiguous,
       }),
     );
@@ -192,6 +189,7 @@ export function confirmCreateExpenseAfterBudgetSelection(
     currency: selected.currency,
     status: selected.status,
     requiresReceipt: selected.requiresReceipt,
+    matchingKeywords: selected.matchingKeywords ?? null,
     project,
     totals: {
       amount: selected.amount,

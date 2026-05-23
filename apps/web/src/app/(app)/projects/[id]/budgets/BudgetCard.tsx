@@ -39,6 +39,12 @@ export function BudgetCard({
           </div>
         </div>
 
+        {budget.matchingKeywords?.trim() ? (
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Ключевые слова: {budget.matchingKeywords}
+          </p>
+        ) : null}
+
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <dt className="text-sm text-zinc-500">Сумма</dt>

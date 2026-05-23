@@ -3,7 +3,7 @@ import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
 import { transferPreviewNote } from "./task-transfer-flow";
 
-import { CONFIRM_REPLY_PROMPT } from "./confirmation";
+import { CONFIRM_REPLY_PROMPT, CREATE_EXPENSE_CONFIRM_FOOTER } from "./confirmation";
 
 const CONFIRM_FOOTER = `\n\n${CONFIRM_REPLY_PROMPT}`;
 
@@ -37,9 +37,10 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         `Бюджет: ${resolved.budget.title}`,
         `Сумма: ${formatMoney(resolved.amount, resolved.budget.currency)}`,
         resolved.description ? `Описание: ${resolved.description}` : null,
+        "Если бюджет выбран неверно, ответьте «нет».",
       ]
         .filter((line): line is string => line != null)
-        .join("\n") + CONFIRM_FOOTER;
+        .join("\n") + CREATE_EXPENSE_CONFIRM_FOOTER;
 
     case "create_absence": {
       const typeLabel = resolved.type === "SICK_LEAVE" ? "больничный" : "отпуск";

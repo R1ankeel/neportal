@@ -17,6 +17,7 @@ export async function createProjectBudget(
   const projectId = String(formData.get("projectId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || undefined;
+  const matchingKeywords = String(formData.get("matchingKeywords") ?? "").trim() || undefined;
   const amountRaw = formData.get("amount");
   const amount = typeof amountRaw === "string" ? Number(amountRaw) : Number(amountRaw);
   const requiresReceipt = formData.get("requiresReceipt") === "on";
@@ -41,6 +42,7 @@ export async function createProjectBudget(
       projectId,
       name,
       description,
+      matchingKeywords,
       amount,
       requiresReceipt,
       accessUserIds,

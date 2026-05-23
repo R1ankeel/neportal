@@ -375,7 +375,6 @@ async function reconfirmAfterEdit(
       if (expenseResult.kind === "selection") {
         startPendingBudgetSelection(telegramUserId, {
           candidates: expenseResult.candidates,
-          notFoundHint: expenseResult.notFoundHint,
           payload: {
             amount: intent.payload.amount,
             description: intent.payload.description,
@@ -388,7 +387,7 @@ async function reconfirmAfterEdit(
         });
         await ctx.reply(
           formatBudgetSelectionMessage(expenseResult.candidates, {
-            notFoundHint: expenseResult.notFoundHint,
+            ambiguous: expenseResult.ambiguous,
           }),
         );
         clearPendingConfirmationEdit(telegramUserId);

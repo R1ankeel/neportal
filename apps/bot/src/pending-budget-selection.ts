@@ -17,7 +17,6 @@ export type PendingBudgetSelection = {
   type: "select_budget_for_expense";
   candidates: BudgetCandidate[];
   payload: ExpenseSelectionPayload;
-  notFoundHint?: string;
   createdAt: number;
 };
 

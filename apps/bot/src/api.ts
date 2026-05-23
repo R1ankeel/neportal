@@ -54,6 +54,7 @@ export type ApiBudget = {
   currency: string;
   status: string;
   requiresReceipt: boolean;
+  matchingKeywords?: string | null;
   project?: { id: string; name: string } | null;
   totals?: ApiBudgetTotals;
 };

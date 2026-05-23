@@ -178,6 +178,7 @@ export class BudgetsService {
           organizationId: org,
           title: dto.name,
           description: dto.description,
+          matchingKeywords: dto.matchingKeywords?.trim() || null,
           projectId: dto.projectId,
           initialAmount: dto.amount,
           currency: dto.currency ?? "RUB",
@@ -226,6 +227,9 @@ export class BudgetsService {
       data: {
         ...(dto.name != null ? { title: dto.name } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.matchingKeywords !== undefined
+          ? { matchingKeywords: dto.matchingKeywords?.trim() || null }
+          : {}),
         ...(dto.amount != null ? { initialAmount: dto.amount } : {}),
         ...(dto.requiresReceipt !== undefined ? { requiresReceipt: dto.requiresReceipt } : {}),
       },

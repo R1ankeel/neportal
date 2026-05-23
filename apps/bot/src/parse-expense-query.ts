@@ -1,5 +1,4 @@
 import type { AiIntent } from "./ai-contracts";
-import { inferBudgetHintFromText } from "./budget-resolver";
 
 const EXPENSE_VERB =
   /^(потратил|потратила|потратили|потрачено|израсходовал|израсходовала|израсходовали|заплатил|заплатила|заплатили|оплатил|оплатила|оплатили)\s+/i;
@@ -63,7 +62,6 @@ export function parseExpenseQuery(text: string): Extract<AiIntent, { intent: "cr
   const payload: {
     amount: number;
     description?: string;
-    budgetHint?: string;
   } = { amount };
 
   const descriptionNorm = bodyMatch[2]?.trim();
@@ -71,10 +69,6 @@ export function parseExpenseQuery(text: string): Extract<AiIntent, { intent: "cr
     const description = extractDescriptionPreservingCase(trimmed, descriptionNorm);
     if (description) {
       payload.description = description;
-      const budgetHint = inferBudgetHintFromText(description);
-      if (budgetHint) {
-        payload.budgetHint = budgetHint;
-      }
     }
   }
 

@@ -3,7 +3,7 @@ import { confirmCreateExpenseAfterBudgetSelection } from "./create-expense-flow"
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { buildIntentPreview } from "./intent-preview";
 import type { ApiProject } from "./api";
-import { isPendingDetailsCancel } from "./pending-task-status-details";
+import { isConfirmationCancel } from "./confirmation";
 import {
   clearPendingBudgetSelection,
   getPendingBudgetSelection,
@@ -32,7 +32,7 @@ export async function handlePendingBudgetSelectionMessage(
     return true;
   }
 
-  if (isPendingDetailsCancel(text)) {
+  if (isConfirmationCancel(text)) {
     clearPendingBudgetSelection(telegramUserId);
     await ctx.reply("Ок, расход отменён.");
     return true;

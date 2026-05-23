@@ -385,6 +385,8 @@ model Budget {
 
   title       String
   description String?
+  /// Ключевые слова для распознавания расходов в боте (через запятую)
+  matchingKeywords String?
 
   initialAmount Decimal @db.Decimal(14, 2)
   spentAmount   Decimal @default(0) @db.Decimal(14, 2)

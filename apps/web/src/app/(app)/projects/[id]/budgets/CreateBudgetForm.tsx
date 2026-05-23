@@ -45,6 +45,17 @@ export function CreateBudgetForm({ projectId, users }: { projectId: string; user
         </label>
 
         <label className="block">
+          <span className="mb-1 block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            Ключевые слова для распознавания
+          </span>
+          <input
+            name="matchingKeywords"
+            placeholder="например: реклама, вк, таргет, паблик"
+            className="w-full rounded-xl border border-zinc-300 px-4 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+          />
+        </label>
+
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-zinc-600 dark:text-zinc-400">Сумма (₽)</span>
           <input
             name="amount"
