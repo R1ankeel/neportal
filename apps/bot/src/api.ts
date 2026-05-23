@@ -36,13 +36,26 @@ export type ApiProject = {
   name: string;
 };
 
+export type ApiBudgetTotals = {
+  amount: number;
+  confirmedSpent: number;
+  pendingSpent: number;
+  totalSpent: number;
+  confirmedRemaining: number;
+  projectedRemaining: number;
+  spent: number;
+};
+
 export type ApiBudget = {
   id: string;
   title: string;
   initialAmount: string | number;
   spentAmount: string | number;
   currency: string;
+  status: string;
+  requiresReceipt: boolean;
   project?: { id: string; name: string } | null;
+  totals?: ApiBudgetTotals;
 };
 
 export async function fetchUsers(): Promise<ApiUser[]> {
@@ -143,9 +156,11 @@ export function pickDefaultProject(projects: ApiProject[]): ApiProject | null {
   return preferred ?? projects[0];
 }
 
-export async function fetchBudgets(projectId: string): Promise<ApiBudget[]> {
+export async function fetchBudgets(projectId: string, userId?: string): Promise<ApiBudget[]> {
   const url = new URL(`${getApiBaseUrl()}/budgets`);
   url.searchParams.set("projectId", projectId);
+  url.searchParams.set("status", "ACTIVE");
+  if (userId) url.searchParams.set("userId", userId);
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -183,13 +198,16 @@ export async function createBudgetExpense(
   budgetId: string,
   body: {
     userId: string;
+    actorUserId?: string;
     amount: number;
     description?: string;
     source: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
+    hasReceipt?: boolean;
   },
 ): Promise<{
   id: string;
   amount: string | number;
+  status: string;
   budget: ApiBudget;
 }> {
   const res = await fetch(`${getApiBaseUrl()}/budgets/${budgetId}/expenses`, {
@@ -197,17 +215,29 @@ export async function createBudgetExpense(
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       userId: body.userId,
+      actorUserId: body.actorUserId ?? body.userId,
       amount: body.amount,
       currency: "RUB",
       description: body.description,
       source: body.source,
+      hasReceipt: body.hasReceipt ?? false,
     }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`POST /budgets/${budgetId}/expenses → ${res.status} ${text}`.trim());
   }
-  return res.json() as Promise<{ id: string; amount: string | number; budget: ApiBudget }>;
+  return res.json() as Promise<{
+    id: string;
+    amount: string | number;
+    status: string;
+    budget: ApiBudget;
+  }>;
+}
+
+export function budgetRemaining(budget: ApiBudget): number {
+  if (budget.totals) return budget.totals.projectedRemaining;
+  return parseAmount(budget.initialAmount) - parseAmount(budget.spentAmount);
 }
 
 export async function createExpenseAttachment(

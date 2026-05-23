@@ -1,11 +1,13 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { PrismaService } from "@neportal/database";
+import { BudgetStatus, PrismaService } from "@neportal/database";
+import { BudgetsService } from "../budgets/budgets.service";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-attachment.dto";
 
@@ -20,6 +22,7 @@ export class BudgetExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly budgetsService: BudgetsService,
   ) {}
 
   private orgId() {
@@ -58,7 +61,11 @@ export class BudgetExpensesService {
 
   async createAttachment(expenseId: string, dto: CreateBudgetExpenseAttachmentDto) {
     const org = this.orgId();
-    await this.ensureExpenseInOrg(expenseId);
+    const expense = await this.ensureExpenseInOrg(expenseId);
+
+    if (expense.budget.status === BudgetStatus.ARCHIVED) {
+      throw new ForbiddenException("Cannot attach receipts to expenses in an archived budget");
+    }
 
     const uploader = await this.prisma.user.findFirst({
       where: { id: dto.uploadedById, organizationId: org },
@@ -67,7 +74,7 @@ export class BudgetExpensesService {
       throw new NotFoundException(`User with id "${dto.uploadedById}" not found in this organization`);
     }
 
-    return this.prisma.budgetExpenseAttachment.create({
+    const attachment = await this.prisma.budgetExpenseAttachment.create({
       data: {
         expenseId,
         storageKey: null,
@@ -78,6 +85,10 @@ export class BudgetExpensesService {
       },
       include: { uploadedBy: { select: { id: true, fullName: true } } },
     });
+
+    await this.budgetsService.approveExpenseReceipt(expenseId);
+
+    return attachment;
   }
 
   private async getAttachmentInOrg(attachmentId: string) {
@@ -173,6 +184,7 @@ export class BudgetExpensesService {
   private async ensureExpenseInOrg(expenseId: string) {
     const expense = await this.prisma.budgetExpense.findFirst({
       where: { id: expenseId, organizationId: this.orgId() },
+      include: { budget: { select: { status: true, organizationId: true } } },
     });
     if (!expense) {
       throw new NotFoundException(`Expense with id "${expenseId}" not found`);

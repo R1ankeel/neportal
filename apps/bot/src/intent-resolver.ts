@@ -252,7 +252,7 @@ export async function resolveIntent(
         return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
       }
 
-      const budgets = await fetchBudgets(project.id);
+      const budgets = await fetchBudgets(project.id, userId);
       const budget = findBudgetByHint(budgets, intent.payload.budgetHint);
       if (!budget) {
         return { ok: false, message: `В проекте «${project.name}» нет бюджетов.` };

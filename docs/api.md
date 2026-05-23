@@ -173,27 +173,45 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/budgets` | `projectId?` | Список бюджетов |
+| GET | `/budgets` | `projectId?`, `status?`, `includeArchived?`, `userId?` | Список бюджетов (по умолчанию только `ACTIVE`) |
 | POST | `/budgets` | — | Создать бюджет |
-| GET | `/budgets/:id` | — | Бюджет с расходами |
+| PATCH | `/budgets/:id` | — | Обновить бюджет (не для `ARCHIVED`) |
+| POST | `/budgets/:id/archive` | — | Архивировать бюджет |
+| GET | `/budgets/:id` | — | Бюджет, `accessUsers`, `expenses`, `totals` |
 | GET | `/budgets/:id/expenses` | — | Расходы бюджета |
 | POST | `/budgets/:id/expenses` | — | Добавить расход |
+
+**POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `accessUserIds?`, `createdById`.
+
+**POST /budgets/:id/archive**: `archivedById` (OWNER/MANAGER), `archiveReason?`.
+
+**Totals** (в списке и в `GET /budgets/:id`):
+
+| Поле | Формула |
+|------|---------|
+| `confirmedSpent` | сумма расходов `APPROVED` |
+| `pendingSpent` | сумма `PENDING_RECEIPT` |
+| `totalSpent` | confirmed + pending |
+| `confirmedRemaining` | amount − confirmedSpent |
+| `projectedRemaining` | amount − totalSpent |
+| `spent` | = confirmedSpent (совместимость) |
 
 **POST /budgets/:id/expenses** (`CreateBudgetExpenseDto`):
 
 ```json
 {
   "userId": "cuid",
+  "actorUserId": "cuid",
   "amount": 1500.5,
   "currency": "RUB",
   "description": "реклама VK",
   "expenseDate": "2026-05-19T12:00:00.000Z",
   "source": "TELEGRAM_TEXT",
-  "status": "PENDING"
+  "hasReceipt": false
 }
 ```
 
-При одобрении расхода обновляется `spentAmount` бюджета (логика в `BudgetsService` / `BudgetExpensesService`).
+Правила: бюджет `ACTIVE`; доступ — OWNER/MANAGER или `BudgetAccess`; при `requiresReceipt` и без чека — `PENDING_RECEIPT`, иначе `APPROVED`. `spentAmount` увеличивается только для `APPROVED`. Прикрепление чека (`POST .../attachments`) переводит `PENDING_RECEIPT` → `APPROVED`.
 
 ## Budget expenses (вложения)
 

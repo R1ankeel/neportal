@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
-import { budgetRemainder, formatMoney, parseAmount } from "@/lib/format";
+import { budgetTotalsOrFallback, formatMoney } from "@/lib/format";
 import type { ApiBudget } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +32,7 @@ export default async function BudgetsPage() {
           </li>
         ) : (
           budgets.map((b) => {
-            const initial = parseAmount(b.initialAmount);
-            const spent = parseAmount(b.spentAmount);
-            const left = budgetRemainder(b);
+            const totals = budgetTotalsOrFallback(b);
             return (
               <li key={b.id}>
                 <Link
@@ -45,16 +43,16 @@ export default async function BudgetsPage() {
                   <dl className="mt-4 grid gap-4 sm:grid-cols-3">
                     <div>
                       <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Сумма</dt>
-                      <dd className="mt-1 text-2xl font-semibold">{formatMoney(initial, b.currency)}</dd>
+                      <dd className="mt-1 text-2xl font-semibold">{formatMoney(totals.amount, b.currency)}</dd>
                     </div>
                     <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Потрачено</dt>
-                      <dd className="mt-1 text-2xl font-semibold">{formatMoney(spent, b.currency)}</dd>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Подтверждено</dt>
+                      <dd className="mt-1 text-2xl font-semibold">{formatMoney(totals.confirmedSpent, b.currency)}</dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Остаток</dt>
                       <dd className="mt-1 text-2xl font-semibold text-emerald-700 dark:text-emerald-400">
-                        {formatMoney(left, b.currency)}
+                        {formatMoney(totals.confirmedRemaining, b.currency)}
                       </dd>
                     </div>
                   </dl>

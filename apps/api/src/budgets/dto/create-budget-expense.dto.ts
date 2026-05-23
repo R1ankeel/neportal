@@ -1,13 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { ExpenseSource, ExpenseStatus } from "@neportal/database";
+import { BudgetExpenseStatus, ExpenseSource } from "@neportal/database";
 import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import {
+  IsBoolean,
+  IsDate,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from "class-validator";
 
 export class CreateBudgetExpenseDto {
   @ApiProperty({ description: "Пользователь, от имени которого расход" })
   @IsString()
   @IsNotEmpty()
   userId!: string;
+
+  @ApiPropertyOptional({
+    description: "Кто выполняет операцию (для проверки доступа). По умолчанию — userId.",
+  })
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
 
   @ApiProperty({ example: 1500.5, description: "Положительная сумма расхода" })
   @Type(() => Number)
@@ -38,8 +54,15 @@ export class CreateBudgetExpenseDto {
   @IsEnum(ExpenseSource)
   source!: ExpenseSource;
 
-  @ApiPropertyOptional({ enum: ExpenseStatus })
+  @ApiPropertyOptional({
+    description: "Чек передан при создании (Web upload / inline)",
+  })
   @IsOptional()
-  @IsEnum(ExpenseStatus)
-  status?: ExpenseStatus;
+  @IsBoolean()
+  hasReceipt?: boolean;
+
+  @ApiPropertyOptional({ enum: BudgetExpenseStatus })
+  @IsOptional()
+  @IsEnum(BudgetExpenseStatus)
+  status?: BudgetExpenseStatus;
 }

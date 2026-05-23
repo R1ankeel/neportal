@@ -423,17 +423,21 @@ Pending confirmation хранится **в памяти** процесса (`pen
 Логика в `apps/bot/src/api.ts`:
 
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
-2. **Бюджет:** из `GET /budgets?projectId=…` предпочитается заголовок, содержащий «Реклама VK», иначе первый.
+2. **Бюджет:** из `GET /budgets?projectId=…&status=ACTIVE&userId=…` (фильтр доступа) предпочитается заголовок с «Реклама VK», иначе первый.
 3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
 4. **Исполнитель задачи (AI):** если `assigneeHint` не указан — бот уточняет исполнителя (см. выше); иначе подсказка / `__self__` / User Resolution Flow. Slash `/task` по-прежнему использует `pickAssigneeId` (Вася или первый `EMPLOYEE`).
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
 
-### Чеки к расходу
+### Чеки к расходу и подтверждение
 
-1. Пользователь отправляет `/expense 1500 реклама VK`.
-2. Бот создаёт расход и сохраняет «последний расход» в памяти (`last-expense.ts`) по `telegram user id`.
-3. Следующее **фото** или **документ** → `POST /budget-expenses/:expenseId/attachments` с `telegramFileId`.
+1. Пользователь отправляет `/expense 1500 реклама VK` (или AI `create_expense`).
+2. API проверяет: бюджет `ACTIVE`, доступ (OWNER/MANAGER или `BudgetAccess`).
+3. Если `requiresReceipt` и чека нет — расход `PENDING_RECEIPT`, ответ: «Расход добавлен как неподтверждённый…».
+4. Иначе — `APPROVED` как раньше; чек можно прикрепить опционально.
+5. Следующее **фото** или **документ** → `POST /budget-expenses/:expenseId/attachments`; для `PENDING_RECEIPT` статус → `APPROVED`, ответ: «Чек прикреплён. Расход подтверждён.»
+
+Архивный бюджет / нет доступа — сообщения из API на русском.
 
 Открытие чека в браузере: через API `GET /budget-expense-attachments/:id/preview`.
 

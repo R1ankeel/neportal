@@ -4,6 +4,7 @@ export type LastExpenseEntry = {
   amount: number;
   createdAt: Date;
   uploadedById: string;
+  pendingReceipt?: boolean;
 };
 
 const EXPIRY_MS = 30 * 60 * 1000;

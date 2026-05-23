@@ -59,14 +59,17 @@ erDiagram
 
 ### Budget
 
-- `initialAmount`, `spentAmount`, `currency` (по умолчанию RUB).
-- Статус: `ACTIVE`, `EXHAUSTED`, `ARCHIVED`.
+- `initialAmount`, `spentAmount` (подтверждённые расходы), `currency` (по умолчанию RUB).
+- Статус: `ACTIVE`, `ARCHIVED`.
+- `requiresReceipt` — обязательность чека для подтверждения расхода.
+- Архивация: `archivedAt`, `archivedById`, `archiveReason`.
+- `BudgetAccess` — доступ сотрудников к бюджету (`@@unique([budgetId, userId])`).
 
 ### BudgetExpense
 
-- Статус: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`.
+- Статус: `PENDING_RECEIPT`, `APPROVED` (`BudgetExpenseStatus`).
 - Источник: `WEB`, `TELEGRAM_TEXT`, `TELEGRAM_VOICE`.
-- Согласование: `approvedById`, `approvedAt`.
+- При `requiresReceipt` и создании без чека — `PENDING_RECEIPT`; после вложения — `APPROVED` и инкремент `spentAmount`.
 
 ### BudgetExpenseAttachment
 
@@ -98,8 +101,8 @@ erDiagram
 |------|----------|
 | EntityStatus | ACTIVE, ARCHIVED, DELETED |
 | TaskStatus | NEW, IN_PROGRESS, DONE, CANCELLED |
-| BudgetStatus | ACTIVE, EXHAUSTED, ARCHIVED |
-| ExpenseStatus | PENDING, APPROVED, REJECTED, CANCELLED |
+| BudgetStatus | ACTIVE, ARCHIVED |
+| BudgetExpenseStatus | PENDING_RECEIPT, APPROVED |
 | AbsenceType | SICK_LEAVE, VACATION |
 | AbsenceStatus | PENDING, APPROVED, REJECTED, CANCELLED |
 | AbsenceNotificationType | ABSENCE_AFFECTED_TASKS_EMPLOYEE, ABSENCE_AFFECTED_TASK_CREATOR, ABSENCE_TASK_DELEGATED_CREATOR |

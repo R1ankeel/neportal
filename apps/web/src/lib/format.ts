@@ -1,4 +1,4 @@
-import type { ApiBudget } from "./types";
+import type { ApiBudget, ApiBudgetTotals } from "./types";
 
 export function parseAmount(value: string | number | undefined | null): number {
   if (value == null) return 0;
@@ -16,7 +16,23 @@ export function formatMoney(amount: number, currency: string): string {
 }
 
 export function budgetRemainder(b: ApiBudget): number {
+  if (b.totals) return b.totals.confirmedRemaining;
   return parseAmount(b.initialAmount) - parseAmount(b.spentAmount);
+}
+
+export function budgetTotalsOrFallback(b: ApiBudget): ApiBudgetTotals {
+  if (b.totals) return b.totals;
+  const amount = parseAmount(b.initialAmount);
+  const confirmedSpent = parseAmount(b.spentAmount);
+  return {
+    amount,
+    confirmedSpent,
+    pendingSpent: 0,
+    totalSpent: confirmedSpent,
+    confirmedRemaining: amount - confirmedSpent,
+    projectedRemaining: amount - confirmedSpent,
+    spent: confirmedSpent,
+  };
 }
 
 /** Календарная дата (дедлайны, отсутствия): API хранит конец дня UTC, показываем дату в UTC. */
@@ -81,11 +97,22 @@ export function expenseSourceLabel(source: string): string {
 }
 
 const expenseStatusRu: Record<string, string> = {
+  PENDING_RECEIPT: "Ожидает чек",
+  APPROVED: "Подтверждён",
   PENDING: "На согласовании",
-  APPROVED: "Одобрен",
   REJECTED: "Отклонён",
   CANCELLED: "Отменён",
 };
+
+export function requiresReceiptLabel(requiresReceipt: boolean): string {
+  return requiresReceipt ? "Чек обязателен" : "Чек не обязателен";
+}
+
+export function budgetStatusLabel(status: string): string {
+  if (status === "ARCHIVED") return "Архив";
+  if (status === "ACTIVE") return "Активный";
+  return status;
+}
 
 export function expenseStatusLabel(status: string): string {
   return expenseStatusRu[status] ?? status;

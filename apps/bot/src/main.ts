@@ -16,7 +16,6 @@ import {
   fetchUsers,
   linkTelegramUser,
   formatMoney,
-  parseAmount,
   pickAssigneeId,
   pickDefaultBudget,
   pickDefaultProject,
@@ -29,6 +28,7 @@ import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user"
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
+import { formatExpenseCreatedReply } from "./expense-reply";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import {
@@ -360,31 +360,29 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
       return;
     }
 
-    const budgets = await fetchBudgets(project.id);
+    const budgets = await fetchBudgets(project.id, userId);
     const budget = pickDefaultBudget(budgets);
     if (!budget) {
-      await ctx.reply(`В проекте «${project.name}» нет бюджетов. Создайте бюджет в Web.`);
+      await ctx.reply(`В проекте «${project.name}» нет доступных бюджетов. Создайте бюджет в Web.`);
       return;
     }
 
     const result = await createBudgetExpense(budget.id, {
       userId,
+      actorUserId: userId,
       amount,
       description,
       source: "TELEGRAM_TEXT",
     });
 
     const updatedBudget = result.budget;
-    const remaining =
-      parseAmount(updatedBudget.initialAmount) - parseAmount(updatedBudget.spentAmount);
+    const pendingReceipt = result.status === "PENDING_RECEIPT";
 
     await ctx.reply(
-      [
-        `Расход создан в бюджете «${updatedBudget.title}»: ${formatMoney(amount, updatedBudget.currency)}`,
-        `Остаток бюджета: ${formatMoney(remaining, updatedBudget.currency)}`,
-        "",
-        "Отправьте фото или документ чека, чтобы прикрепить его к этому расходу.",
-      ].join("\n"),
+      formatExpenseCreatedReply(updatedBudget, amount, {
+        requiresReceipt: updatedBudget.requiresReceipt,
+        pendingReceipt,
+      }),
     );
 
     const telegramUserId = ctx.from?.id;
@@ -395,6 +393,7 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
         amount,
         createdAt: new Date(),
         uploadedById: userId,
+        pendingReceipt,
       });
     }
   } catch (e) {
@@ -807,7 +806,9 @@ async function handleReceiptAttachment(
     });
 
     await ctx.reply(
-      `Чек прикреплён к расходу ${formatMoney(lastExpense.amount)} по бюджету «${lastExpense.budgetTitle}».`,
+      lastExpense.pendingReceipt
+        ? "Чек прикреплён. Расход подтверждён."
+        : `Чек прикреплён к расходу ${formatMoney(lastExpense.amount)} по бюджету «${lastExpense.budgetTitle}».`,
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

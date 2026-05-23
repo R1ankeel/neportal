@@ -4,10 +4,9 @@ import {
   createBudgetExpense,
   createNote,
   createTask,
-  formatMoney,
-  parseAmount,
   setTaskDeadline,
 } from "./api";
+import { formatExpenseCreatedReply } from "./expense-reply";
 import { getLinkedUserByTelegramId } from "./current-user";
 import { executeTaskComment } from "./task-comment-flow";
 import { executeMentionInTask } from "./task-mention-flow";
@@ -69,14 +68,14 @@ export async function executeResolvedIntent(
     case "create_expense": {
       const result = await createBudgetExpense(resolved.budget.id, {
         userId: resolved.userId,
+        actorUserId: resolved.userId,
         amount: resolved.amount,
         description: resolved.description,
         source: "TELEGRAM_TEXT",
       });
 
       const updatedBudget = result.budget;
-      const remaining =
-        parseAmount(updatedBudget.initialAmount) - parseAmount(updatedBudget.spentAmount);
+      const pendingReceipt = result.status === "PENDING_RECEIPT";
 
       if (telegramUserId) {
         setLastExpense(telegramUserId, {
@@ -85,15 +84,14 @@ export async function executeResolvedIntent(
           amount: resolved.amount,
           createdAt: new Date(),
           uploadedById: resolved.userId,
+          pendingReceipt,
         });
       }
 
-      return [
-        `Расход создан в бюджете «${updatedBudget.title}»: ${formatMoney(resolved.amount, updatedBudget.currency)}`,
-        `Остаток бюджета: ${formatMoney(remaining, updatedBudget.currency)}`,
-        "",
-        "Отправьте фото или документ чека, чтобы прикрепить его к этому расходу.",
-      ].join("\n");
+      return formatExpenseCreatedReply(updatedBudget, resolved.amount, {
+        requiresReceipt: updatedBudget.requiresReceipt,
+        pendingReceipt,
+      });
     }
 
     case "create_absence": {

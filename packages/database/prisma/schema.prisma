@@ -51,15 +51,12 @@ enum TaskCommentSource {
 
 enum BudgetStatus {
   ACTIVE
-  EXHAUSTED
   ARCHIVED
 }
 
-enum ExpenseStatus {
-  PENDING
+enum BudgetExpenseStatus {
+  PENDING_RECEIPT
   APPROVED
-  REJECTED
-  CANCELLED
 }
 
 enum ExpenseSource {
@@ -126,6 +123,7 @@ model Organization {
   tasks          Task[]
   notes          Note[]
   budgets        Budget[]
+  budgetAccess   BudgetAccess[]
   budgetExpenses BudgetExpense[]
   absences              Absence[]
   reminders             Reminder[]
@@ -158,8 +156,10 @@ model User {
   assignedTasks    Task[]          @relation("TaskAssignee")
   notes            Note[]
   createdBudgets   Budget[]        @relation("BudgetCreator")
+  archivedBudgets  Budget[]        @relation("BudgetArchivedBy")
+  budgetAccess     BudgetAccess[]  @relation("BudgetAccessUser")
+  budgetAccessCreated BudgetAccess[] @relation("BudgetAccessCreatedBy")
   budgetExpenses   BudgetExpense[] @relation("ExpenseUser")
-  approvedExpenses BudgetExpense[] @relation("ExpenseApprover")
   attachments      BudgetExpenseAttachment[]
   absences               Absence[]
   cancelledAbsences      Absence[]                 @relation("AbsenceCancelledBy")
@@ -390,7 +390,13 @@ model Budget {
   spentAmount   Decimal @default(0) @db.Decimal(14, 2)
   currency      String  @default("RUB")
 
-  status BudgetStatus @default(ACTIVE)
+  status          BudgetStatus @default(ACTIVE)
+  requiresReceipt Boolean      @default(false)
+
+  archivedAt     DateTime?
+  archivedById   String?
+  archivedBy     User?     @relation("BudgetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  archiveReason  String?
 
   createdById String
   createdBy   User   @relation("BudgetCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -399,9 +405,31 @@ model Budget {
   updatedAt DateTime @updatedAt
 
   expenses BudgetExpense[]
+  access   BudgetAccess[]
 
   @@index([organizationId])
   @@index([projectId])
+  @@index([createdById])
+  @@index([archivedById])
+  @@index([status])
+}
+
+model BudgetAccess {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  budgetId       String
+  budget         Budget       @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("BudgetAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  createdById    String?
+  createdBy      User?        @relation("BudgetAccessCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([budgetId, userId])
+  @@index([organizationId])
+  @@index([budgetId])
+  @@index([userId])
   @@index([createdById])
 }
 
@@ -422,12 +450,8 @@ model BudgetExpense {
 
   expenseDate DateTime
 
-  status ExpenseStatus @default(PENDING)
+  status BudgetExpenseStatus @default(APPROVED)
   source ExpenseSource
-
-  approvedById String?
-  approvedBy   User?   @relation("ExpenseApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

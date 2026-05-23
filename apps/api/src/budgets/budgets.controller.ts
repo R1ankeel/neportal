@@ -1,7 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { BudgetStatus } from "@neportal/database";
+import { ArchiveBudgetDto } from "./dto/archive-budget.dto";
 import { CreateBudgetExpenseDto } from "./dto/create-budget-expense.dto";
 import { CreateBudgetDto } from "./dto/create-budget.dto";
+import { UpdateBudgetDto } from "./dto/update-budget.dto";
 import { BudgetsService } from "./budgets.service";
 
 @ApiTags("budgets")
@@ -11,15 +14,42 @@ export class BudgetsController {
 
   @Get()
   @ApiOperation({ summary: "Список бюджетов" })
-  @ApiQuery({ name: "projectId", required: false, description: "Фильтр по проекту" })
-  findAll(@Query("projectId") projectId?: string) {
-    return this.budgetsService.findAll(projectId);
+  @ApiQuery({ name: "projectId", required: false })
+  @ApiQuery({ name: "status", required: false, enum: BudgetStatus })
+  @ApiQuery({ name: "includeArchived", required: false, type: Boolean })
+  @ApiQuery({ name: "userId", required: false, description: "Фильтр доступа для не-менеджеров" })
+  findAll(
+    @Query("projectId") projectId?: string,
+    @Query("status") status?: BudgetStatus,
+    @Query("includeArchived") includeArchived?: string,
+    @Query("userId") userId?: string,
+  ) {
+    return this.budgetsService.findAll({
+      projectId,
+      status,
+      includeArchived: includeArchived === "true" || includeArchived === "1",
+      userId,
+    });
   }
 
   @Post()
   @ApiOperation({ summary: "Создать бюджет" })
   create(@Body() dto: CreateBudgetDto) {
     return this.budgetsService.create(dto);
+  }
+
+  @Patch(":id")
+  @ApiOperation({ summary: "Обновить бюджет (не для ARCHIVED)" })
+  @ApiParam({ name: "id" })
+  update(@Param("id") id: string, @Body() dto: UpdateBudgetDto) {
+    return this.budgetsService.update(id, dto);
+  }
+
+  @Post(":id/archive")
+  @ApiOperation({ summary: "Архивировать бюджет" })
+  @ApiParam({ name: "id" })
+  archive(@Param("id") id: string, @Body() dto: ArchiveBudgetDto) {
+    return this.budgetsService.archive(id, dto);
   }
 
   @Get(":id/expenses")
@@ -37,7 +67,7 @@ export class BudgetsController {
   }
 
   @Get(":id")
-  @ApiOperation({ summary: "Бюджет по id" })
+  @ApiOperation({ summary: "Бюджет по id с расходами и totals" })
   @ApiParam({ name: "id" })
   findOne(@Param("id") id: string) {
     return this.budgetsService.findOne(id);

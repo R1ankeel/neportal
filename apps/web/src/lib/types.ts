@@ -76,6 +76,16 @@ export type ApiTask = {
   transfers?: ApiTaskTransfer[];
 };
 
+export type ApiBudgetTotals = {
+  amount: number;
+  confirmedSpent: number;
+  pendingSpent: number;
+  totalSpent: number;
+  confirmedRemaining: number;
+  projectedRemaining: number;
+  spent: number;
+};
+
 export type ApiBudget = {
   id: string;
   title: string;
@@ -84,10 +94,17 @@ export type ApiBudget = {
   spentAmount: string | number;
   currency: string;
   status: string;
+  requiresReceipt: boolean;
+  archivedAt?: string | null;
+  archiveReason?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy?: { id: string; fullName: string };
+  archivedBy?: { id: string; fullName: string } | null;
   project?: { id: string; name: string } | null;
+  accessUsers?: ApiUser[];
+  totals?: ApiBudgetTotals;
+  expenses?: ApiBudgetExpense[];
 };
 
 export type ApiBudgetExpenseAttachment = {
