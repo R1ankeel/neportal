@@ -2,7 +2,15 @@
  * Базовый URL API. На сервере доступны `API_URL` и `NEXT_PUBLIC_API_URL`;
  * для клиентского fetch из браузера задайте `NEXT_PUBLIC_API_URL`.
  */
+/**
+ * Базовый URL API.
+ * - В браузере: `/api` (прокси через Next.js rewrites → без CORS).
+ * - На сервере (RSC): прямой URL из env.
+ */
 export function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api";
+  }
   const raw =
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||

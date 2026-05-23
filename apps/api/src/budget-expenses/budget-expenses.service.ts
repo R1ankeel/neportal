@@ -179,10 +179,42 @@ export class BudgetExpensesService {
 
     await this.budgetsService.approveExpenseReceipt(expenseId);
 
-    return this.prisma.budgetExpense.findFirstOrThrow({
+    const updated = await this.prisma.budgetExpense.findFirstOrThrow({
       where: { id: expenseId, organizationId: org },
       include: expenseWithAttachmentsInclude,
     });
+
+    return this.toUploadReceiptResponse(updated);
+  }
+
+  private toUploadReceiptResponse(expense: {
+    id: string;
+    status: string;
+    amount: unknown;
+    currency: string;
+    attachments: Array<{
+      id: string;
+      mimeType: string | null;
+      originalFilename: string | null;
+      telegramFileId: string | null;
+      createdAt: Date;
+      uploadedBy: { id: string; fullName: string };
+    }>;
+  }) {
+    return {
+      id: expense.id,
+      status: expense.status,
+      amount: Number(expense.amount),
+      currency: expense.currency,
+      attachments: expense.attachments.map((a) => ({
+        id: a.id,
+        mimeType: a.mimeType,
+        originalFilename: a.originalFilename,
+        telegramFileId: a.telegramFileId,
+        createdAt: a.createdAt.toISOString(),
+        uploadedBy: a.uploadedBy,
+      })),
+    };
   }
 
   private async getAttachmentInOrg(attachmentId: string) {

@@ -15,6 +15,17 @@ if (envPath) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const corsOrigins = [
+    process.env.APP_URL?.trim(),
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+  ].filter((v): v is string => Boolean(v));
+
+  app.enableCors({
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

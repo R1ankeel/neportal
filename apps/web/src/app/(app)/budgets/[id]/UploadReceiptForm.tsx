@@ -54,12 +54,17 @@ export function UploadReceiptForm({
         return;
       }
 
+      await res.json().catch(() => null);
+
       setSuccess(true);
       form.reset();
       router.refresh();
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
       setError(
-        "Не удалось отправить файл. Убедитесь, что API запущен (порт 4000) и задан NEXT_PUBLIC_API_URL.",
+        msg && msg !== "Failed to fetch"
+          ? msg
+          : "Не удалось получить ответ от сервера. Если чек уже прикрепился — обновите страницу.",
       );
     } finally {
       setPending(false);
