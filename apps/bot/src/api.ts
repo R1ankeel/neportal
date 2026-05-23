@@ -240,6 +240,21 @@ export function budgetRemaining(budget: ApiBudget): number {
   return parseAmount(budget.initialAmount) - parseAmount(budget.spentAmount);
 }
 
+export function budgetTotalsOrFallback(budget: ApiBudget): ApiBudgetTotals {
+  if (budget.totals) return budget.totals;
+  const amount = parseAmount(budget.initialAmount);
+  const confirmedSpent = parseAmount(budget.spentAmount);
+  return {
+    amount,
+    confirmedSpent,
+    pendingSpent: 0,
+    totalSpent: confirmedSpent,
+    confirmedRemaining: amount - confirmedSpent,
+    projectedRemaining: amount - confirmedSpent,
+    spent: confirmedSpent,
+  };
+}
+
 export async function createExpenseAttachment(
   expenseId: string,
   body: {

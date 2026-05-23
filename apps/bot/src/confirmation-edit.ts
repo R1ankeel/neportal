@@ -13,8 +13,11 @@ import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
+import { formatBudgetSelectionMessage } from "./budget-selection-format";
+import { resolveCreateExpense } from "./create-expense-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
+import { startPendingBudgetSelection } from "./pending-budget-selection";
 import {
   getPendingConfirmation,
   setPendingConfirmation,
@@ -356,9 +359,54 @@ async function reconfirmAfterEdit(
   }
 
   switch (intent.intent) {
+    case "create_expense": {
+      const expenseResult = await resolveCreateExpense(linked, {
+        amount: intent.payload.amount,
+        description: intent.payload.description,
+        projectHint: intent.payload.projectHint,
+        budgetHint: intent.payload.budgetHint,
+      });
+
+      if (expenseResult.kind === "error") {
+        await ctx.reply(expenseResult.message);
+        return false;
+      }
+
+      if (expenseResult.kind === "selection") {
+        startPendingBudgetSelection(telegramUserId, {
+          candidates: expenseResult.candidates,
+          notFoundHint: expenseResult.notFoundHint,
+          payload: {
+            amount: intent.payload.amount,
+            description: intent.payload.description,
+            projectId: expenseResult.project.id,
+            projectName: expenseResult.project.name,
+            userId: linked.id,
+            budgetHint: intent.payload.budgetHint,
+            source: "TELEGRAM_TEXT",
+          },
+        });
+        await ctx.reply(
+          formatBudgetSelectionMessage(expenseResult.candidates, {
+            notFoundHint: expenseResult.notFoundHint,
+          }),
+        );
+        clearPendingConfirmationEdit(telegramUserId);
+        return true;
+      }
+
+      setPendingConfirmation(telegramUserId, {
+        type: "ai_intent",
+        intent,
+        resolved: expenseResult.resolved,
+      });
+      await ctx.reply(buildIntentPreview(expenseResult.resolved));
+      clearPendingConfirmationEdit(telegramUserId);
+      return true;
+    }
+
     case "create_task":
     case "create_note":
-    case "create_expense":
     case "create_absence": {
       const users = await fetchUsers();
       if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {

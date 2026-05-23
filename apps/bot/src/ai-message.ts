@@ -42,6 +42,8 @@ import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
+import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
+import { beginCreateExpenseFromAiIntent } from "./create-expense-flow";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
@@ -143,6 +145,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     await ctx.reply(CONFIRM_WAIT_MESSAGE);
+    return;
+  }
+
+  if (await handlePendingBudgetSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
 
@@ -310,6 +316,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       console.error(`[bot] list_user_tasks error: ${msg}`);
       await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
     }
+    return;
+  }
+
+  if (intent.intent === "create_expense") {
+    await beginCreateExpenseFromAiIntent(ctx, telegramUserId, linked, intent);
     return;
   }
 

@@ -7,6 +7,7 @@ import { clearPendingTaskTransferComment } from "./pending-task-transfer-comment
 import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingUserSelection } from "./pending-user-selection";
+import { clearPendingBudgetSelection } from "./pending-budget-selection";
 
 export type PendingCreateTaskAssignee = {
   type: "awaiting_create_task_assignee";
@@ -59,6 +60,7 @@ export function startPendingCreateTaskAssignee(
   clearPendingTaskTransferDecision(telegramUserId);
   clearPendingTaskTransferRejection(telegramUserId);
   clearPendingUserSelection(telegramUserId);
+  clearPendingBudgetSelection(telegramUserId);
   setPendingCreateTaskAssignee(telegramUserId, {
     type: "awaiting_create_task_assignee",
     ...data,

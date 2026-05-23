@@ -415,6 +415,53 @@ create_note.payload:
 create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
 
+create_expense — бюджет и описание:
+- budgetHint — название или подсказка бюджета, если пользователь сказал, на что потратил (не проект).
+- «на рекламу VK» → budgetHint: "реклама VK"
+- «на канцелярию» → budgetHint: "канцелярия"
+- description — очищенное описание расхода без слов «потратил», «рублей», суммы; можно совпадать с budgetHint.
+- Если сумма есть, а цель траты неясна — не выдумывай budgetHint.
+
+Пример create_expense (реклама):
+Input: «Потратил 1500 рублей на рекламу VK»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 1500,
+    "budgetHint": "реклама VK",
+    "description": "реклама VK"
+  }
+}
+
+Пример create_expense (канцелярия):
+Input: «Потратил 1500 рублей на канцелярию»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 1500,
+    "budgetHint": "канцелярия",
+    "description": "канцелярия"
+  }
+}
+
+Пример create_expense (без цели):
+Input: «Потратил 1500 рублей»
+Output:
+{
+  "intent": "create_expense",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": {
+    "amount": 1500
+  }
+}
+
 create_absence.payload:
 { "userHint"?: string, "type": "SICK_LEAVE" | "VACATION", "startDate"?: "YYYY-MM-DD", "endDate"?: "YYYY-MM-DD", "documentNumber"?: string, "comment"?: string }
 

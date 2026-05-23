@@ -6,18 +6,15 @@ import {
   handleVacationSlashCommand,
 } from "./absence-slash-flow";
 import {
-  createBudgetExpense,
   createExpenseAttachment,
   createNote,
   createTask,
-  fetchBudgets,
   fetchProjects,
   fetchUserByTelegramId,
   fetchUsers,
   linkTelegramUser,
   formatMoney,
   pickAssigneeId,
-  pickDefaultBudget,
   pickDefaultProject,
   pickDefaultProjectId,
   getApiBaseUrl,
@@ -28,8 +25,8 @@ import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user"
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
-import { formatExpenseCreatedReply } from "./expense-reply";
-import { getLastExpense, setLastExpense } from "./last-expense";
+import { beginCreateExpenseFlow } from "./create-expense-flow";
+import { getLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
 import {
   apiUserToCandidate,
@@ -352,7 +349,6 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
     if (!currentUser) return;
 
     const projects = await fetchProjects();
-    const userId = currentUser.id;
 
     const project = pickDefaultProject(projects);
     if (!project) {
@@ -360,41 +356,17 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
       return;
     }
 
-    const budgets = await fetchBudgets(project.id, userId);
-    const budget = pickDefaultBudget(budgets);
-    if (!budget) {
-      await ctx.reply(`В проекте «${project.name}» нет доступных бюджетов. Создайте бюджет в Web.`);
-      return;
-    }
+    const telegramUserId = ctx.from?.id;
+    if (!telegramUserId) return;
 
-    const result = await createBudgetExpense(budget.id, {
-      userId,
-      actorUserId: userId,
+    const flow = await beginCreateExpenseFlow(ctx, telegramUserId, currentUser, {
       amount,
       description,
-      source: "TELEGRAM_TEXT",
+      executeIfResolved: true,
     });
 
-    const updatedBudget = result.budget;
-    const pendingReceipt = result.status === "PENDING_RECEIPT";
-
-    await ctx.reply(
-      formatExpenseCreatedReply(updatedBudget, amount, {
-        requiresReceipt: updatedBudget.requiresReceipt,
-        pendingReceipt,
-      }),
-    );
-
-    const telegramUserId = ctx.from?.id;
-    if (telegramUserId) {
-      setLastExpense(telegramUserId, {
-        expenseId: result.id,
-        budgetTitle: updatedBudget.title,
-        amount,
-        createdAt: new Date(),
-        uploadedById: userId,
-        pendingReceipt,
-      });
+    if (flow.kind === "error") {
+      await ctx.reply(flow.message);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

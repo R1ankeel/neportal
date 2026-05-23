@@ -12,7 +12,8 @@ import {
   getLinkedUserByTelegramId,
   NOT_LINKED_MESSAGE,
 } from "./current-user";
-import { findBudgetByHint, findProjectByHint, findUserByHint } from "./hint-matchers";
+import { resolveBudgetForExpense } from "./budget-resolver";
+import { findProjectByHint, findUserByHint } from "./hint-matchers";
 import {
   isResolvableNamedUserHint,
   sanitizeAiUserHint,
@@ -253,9 +254,19 @@ export async function resolveIntent(
       }
 
       const budgets = await fetchBudgets(project.id, userId);
-      const budget = findBudgetByHint(budgets, intent.payload.budgetHint);
-      if (!budget) {
-        return { ok: false, message: `В проекте «${project.name}» нет бюджетов.` };
+      const budgetResult = resolveBudgetForExpense({
+        budgets,
+        budgetHint: intent.payload.budgetHint,
+        expenseDescription: intent.payload.description,
+        currentUser,
+      });
+
+      if (budgetResult.kind === "none") {
+        return { ok: false, message: budgetResult.message };
+      }
+
+      if (budgetResult.kind === "selection") {
+        return { ok: false, message: "BUDGET_SELECTION_NEEDED" };
       }
 
       return {
@@ -263,7 +274,7 @@ export async function resolveIntent(
         resolved: {
           intent: "create_expense",
           project,
-          budget,
+          budget: budgetResult.budget,
           userId,
           amount: intent.payload.amount,
           description: intent.payload.description,
