@@ -21,7 +21,7 @@ export class BudgetExpenseAttachmentsController {
   @ApiResponse({ status: 502, description: "Ошибка Telegram API" })
   @Header("Cache-Control", "private, max-age=300")
   async preview(@Param("id") id: string): Promise<StreamableFile> {
-    const file = await this.budgetExpensesService.fetchTelegramFile(id);
+    const file = await this.budgetExpensesService.fetchAttachmentFile(id);
     return new StreamableFile(file.buffer, {
       type: file.contentType,
       disposition: this.budgetExpensesService.formatContentDisposition(file.filename, true),
@@ -41,7 +41,7 @@ export class BudgetExpenseAttachmentsController {
   @ApiResponse({ status: 404, description: "Вложение не найдено" })
   @ApiResponse({ status: 502, description: "Ошибка Telegram API" })
   async download(@Param("id") id: string): Promise<StreamableFile> {
-    const file = await this.budgetExpensesService.fetchTelegramFile(id);
+    const file = await this.budgetExpensesService.fetchAttachmentFile(id);
     return new StreamableFile(file.buffer, {
       type: file.contentType,
       disposition: this.budgetExpensesService.formatContentDisposition(file.filename, false),

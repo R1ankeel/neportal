@@ -385,6 +385,11 @@ export class BudgetsService {
     });
   }
 
+  async assertBudgetAccess(budgetId: string, userId: string): Promise<void> {
+    const budget = await this.ensureBudgetInOrg(budgetId);
+    await this.ensureUserCanAccessBudget(budgetId, userId, budget.title);
+  }
+
   private async ensureUserCanAccessBudget(budgetId: string, userId: string, budgetTitle: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, organizationId: this.orgId() },

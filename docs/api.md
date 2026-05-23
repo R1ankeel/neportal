@@ -219,9 +219,19 @@
 |-------|------|----------|
 | GET | `/budget-expenses/:expenseId/attachments` | Список вложений расхода |
 | POST | `/budget-expenses/:expenseId/attachments` | Прикрепить чек (метаданные Telegram) |
-| GET | `/budget-expense-attachments/:id/preview` | Предпросмотр чека (прокси из Telegram, `Content-Disposition: inline`) |
-| GET | `/budget-expense-attachments/:id/download` | Скачать чек (прокси из Telegram, `Content-Disposition: attachment`) |
+| POST | `/budget-expenses/:expenseId/receipt` | Загрузить чек из Web (`multipart/form-data`) |
+| GET | `/budget-expense-attachments/:id/preview` | Предпросмотр чека (Telegram или локальный файл) |
+| GET | `/budget-expense-attachments/:id/download` | Скачать чек |
 | GET | `/budget-expense-attachments/:id/open` | **Deprecated** — redirect на Telegram URL |
+
+**POST /budget-expenses/:expenseId/receipt** — `multipart/form-data`:
+
+- `file` — JPEG, PNG, WebP или PDF (до 10 MB)
+- `uploadedById` — пользователь с доступом к бюджету (OWNER/MANAGER или `BudgetAccess`)
+
+Логика: бюджет `ACTIVE`; файл сохраняется в `UPLOAD_DIR` (по умолчанию `uploads/receipts/{orgId}/…`), создаётся `BudgetExpenseAttachment` с `storageKey`; расход `PENDING_RECEIPT` → `APPROVED`, `spentAmount` увеличивается. Ответ — расход с `attachments`.
+
+Переменная окружения: `UPLOAD_DIR` (опционально, абсолютный или относительный путь от cwd API).
 
 **POST attachment** — пример для бота:
 

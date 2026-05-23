@@ -13,6 +13,7 @@ import {
 import type { ApiBudget, ApiUser } from "@/lib/types";
 import { AddExpenseForm } from "./AddExpenseForm";
 import { ExpenseAttachments } from "./ExpenseAttachments";
+import { UploadReceiptForm } from "./UploadReceiptForm";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
   const totals = budgetTotalsOrFallback(budget);
   const expenses = budget.expenses ?? [];
   const isArchived = budget.status === "ARCHIVED";
+  const uploaderId = users.find((u) => u.role === "OWNER")?.id ?? users[0]?.id ?? "";
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -131,7 +133,11 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
                       <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">{e.description}</p>
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">{e.user?.fullName ?? "—"}</p>
-                    <ExpenseAttachments attachments={attachments} />
+                    {e.status === "PENDING_RECEIPT" && !isArchived && uploaderId ? (
+                      <UploadReceiptForm expenseId={e.id} budgetId={id} uploadedById={uploaderId} />
+                    ) : (
+                      <ExpenseAttachments attachments={attachments} />
+                    )}
                   </div>
                   <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                     <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">

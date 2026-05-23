@@ -10,11 +10,28 @@ import { BudgetStatus, PrismaService } from "@neportal/database";
 import { BudgetsService } from "../budgets/budgets.service";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-attachment.dto";
+import { ReceiptStorageService } from "./receipt-storage.service";
 
-export type TelegramFileData = {
+export type AttachmentFileData = {
   buffer: Buffer;
   contentType: string;
   filename: string;
+};
+
+const WEB_RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
+const WEB_RECEIPT_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+
+const expenseWithAttachmentsInclude = {
+  user: { select: { id: true, fullName: true, email: true } },
+  attachments: {
+    orderBy: { createdAt: "desc" as const },
+    include: { uploadedBy: { select: { id: true, fullName: true } } },
+  },
 };
 
 @Injectable()
@@ -23,6 +40,7 @@ export class BudgetExpensesService {
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
     private readonly budgetsService: BudgetsService,
+    private readonly receiptStorage: ReceiptStorageService,
   ) {}
 
   private orgId() {
@@ -39,9 +57,23 @@ export class BudgetExpensesService {
     });
   }
 
-  async fetchTelegramFile(attachmentId: string): Promise<TelegramFileData> {
+  async fetchAttachmentFile(attachmentId: string): Promise<AttachmentFileData> {
     const attachment = await this.getAttachmentInOrg(attachmentId);
-    const filePath = await this.getTelegramFilePath(attachment.telegramFileId!);
+
+    if (attachment.storageKey) {
+      const buffer = await this.receiptStorage.read(attachment.storageKey);
+      return {
+        buffer,
+        contentType: this.resolveContentType(attachment.mimeType, null),
+        filename: this.resolveFilename(attachment, ""),
+      };
+    }
+
+    if (!attachment.telegramFileId) {
+      throw new BadRequestException("This attachment has no file reference");
+    }
+
+    const filePath = await this.getTelegramFilePath(attachment.telegramFileId);
     const { buffer, contentType: telegramContentType } = await this.downloadTelegramFile(filePath);
 
     return {
@@ -51,9 +83,17 @@ export class BudgetExpensesService {
     };
   }
 
+  /** @deprecated Используйте fetchAttachmentFile */
+  async fetchTelegramFile(attachmentId: string): Promise<AttachmentFileData> {
+    return this.fetchAttachmentFile(attachmentId);
+  }
+
   /** @deprecated Используйте preview/download — прокси без redirect на Telegram URL. */
   async resolveAttachmentOpenUrl(attachmentId: string): Promise<string> {
     const attachment = await this.getAttachmentInOrg(attachmentId);
+    if (attachment.storageKey) {
+      return `/budget-expense-attachments/${attachmentId}/preview`;
+    }
     const filePath = await this.getTelegramFilePath(attachment.telegramFileId!);
     const token = this.getTelegramBotToken();
     return `https://api.telegram.org/file/bot${token}/${filePath}`;
@@ -91,6 +131,60 @@ export class BudgetExpensesService {
     return attachment;
   }
 
+  async uploadWebReceipt(
+    expenseId: string,
+    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    uploadedById: string,
+  ) {
+    const org = this.orgId();
+    const expense = await this.ensureExpenseInOrg(expenseId);
+
+    if (expense.budget.status !== BudgetStatus.ACTIVE) {
+      throw new BadRequestException("Cannot upload receipts to an archived budget");
+    }
+
+    await this.budgetsService.assertBudgetAccess(expense.budgetId, uploadedById);
+
+    const uploader = await this.prisma.user.findFirst({
+      where: { id: uploadedById, organizationId: org },
+    });
+    if (!uploader) {
+      throw new NotFoundException(`User with id "${uploadedById}" not found in this organization`);
+    }
+
+    if (!file?.buffer?.length) {
+      throw new BadRequestException("File is required");
+    }
+    if (file.size > WEB_RECEIPT_MAX_BYTES) {
+      throw new BadRequestException("File is too large (max 10 MB)");
+    }
+
+    const mimeType = (file.mimetype || "application/octet-stream").split(";")[0]?.trim().toLowerCase();
+    if (!WEB_RECEIPT_MIME_TYPES.has(mimeType)) {
+      throw new BadRequestException("Allowed file types: JPEG, PNG, WebP, PDF");
+    }
+
+    const storageKey = await this.receiptStorage.save(org, file.buffer, file.originalname || "receipt");
+
+    await this.prisma.budgetExpenseAttachment.create({
+      data: {
+        expenseId,
+        storageKey,
+        telegramFileId: null,
+        originalFilename: file.originalname || "receipt",
+        mimeType,
+        uploadedById,
+      },
+    });
+
+    await this.budgetsService.approveExpenseReceipt(expenseId);
+
+    return this.prisma.budgetExpense.findFirstOrThrow({
+      where: { id: expenseId, organizationId: org },
+      include: expenseWithAttachmentsInclude,
+    });
+  }
+
   private async getAttachmentInOrg(attachmentId: string) {
     const org = this.orgId();
     const attachment = await this.prisma.budgetExpenseAttachment.findFirst({
@@ -104,10 +198,6 @@ export class BudgetExpensesService {
 
     if (!attachment || attachment.expense.budget.organizationId !== org) {
       throw new NotFoundException(`Attachment with id "${attachmentId}" not found`);
-    }
-
-    if (!attachment.telegramFileId) {
-      throw new BadRequestException("This attachment has no Telegram file reference");
     }
 
     return attachment;
@@ -184,7 +274,9 @@ export class BudgetExpensesService {
   private async ensureExpenseInOrg(expenseId: string) {
     const expense = await this.prisma.budgetExpense.findFirst({
       where: { id: expenseId, organizationId: this.orgId() },
-      include: { budget: { select: { status: true, organizationId: true } } },
+      include: {
+        budget: { select: { id: true, status: true, organizationId: true } },
+      },
     });
     if (!expense) {
       throw new NotFoundException(`Expense with id "${expenseId}" not found`);

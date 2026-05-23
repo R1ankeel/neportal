@@ -31,5 +31,8 @@ pnpm-debug.log*
 # Turbo
 .turbo
 
+# Uploaded receipts (Web)
+uploads/
+
 # Testing
 coverage
