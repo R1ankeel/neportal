@@ -1,6 +1,6 @@
 "use client";
 
-import { getApiBaseUrl } from "@/lib/api";
+import { getPublicApiBaseUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -43,7 +43,7 @@ export function UploadReceiptForm({
     body.append("uploadedById", uploadedById);
 
     try {
-      const res = await fetch(`${getApiBaseUrl()}/budget-expenses/${expenseId}/receipt`, {
+      const res = await fetch(`${getPublicApiBaseUrl()}/budget-expenses/${expenseId}/receipt`, {
         method: "POST",
         body,
       });

@@ -1,16 +1,7 @@
 /**
- * Базовый URL API. На сервере доступны `API_URL` и `NEXT_PUBLIC_API_URL`;
- * для клиентского fetch из браузера задайте `NEXT_PUBLIC_API_URL`.
- */
-/**
- * Базовый URL API.
- * - В браузере: `/api` (прокси через Next.js rewrites → без CORS).
- * - На сервере (RSC): прямой URL из env.
+ * Абсолютный URL API для server-side fetch (RSC, Server Actions).
  */
 export function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return "/api";
-  }
   const raw =
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
@@ -18,17 +9,25 @@ export function getApiBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
+/**
+ * Относительный префикс API для ссылок и fetch из браузера.
+ * Проксируется Next.js (`/api/*` → API_URL). Одинаков на SSR и клиенте — без hydration mismatch.
+ */
+export function getPublicApiBaseUrl(): string {
+  return "/api";
+}
+
 export function getAttachmentPreviewUrl(attachmentId: string): string {
-  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/preview`;
+  return `${getPublicApiBaseUrl()}/budget-expense-attachments/${attachmentId}/preview`;
 }
 
 export function getAttachmentDownloadUrl(attachmentId: string): string {
-  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/download`;
+  return `${getPublicApiBaseUrl()}/budget-expense-attachments/${attachmentId}/download`;
 }
 
 /** @deprecated Используйте getAttachmentPreviewUrl / getAttachmentDownloadUrl */
 export function getAttachmentOpenUrl(attachmentId: string): string {
-  return `${getApiBaseUrl()}/budget-expense-attachments/${attachmentId}/open`;
+  return `${getPublicApiBaseUrl()}/budget-expense-attachments/${attachmentId}/open`;
 }
 
 export async function apiGet<T>(path: string, query?: Record<string, string | undefined>): Promise<T> {
