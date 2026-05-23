@@ -1,4 +1,5 @@
 import type { AiIntent } from "./ai-contracts";
+import { devLog } from "./dev-log";
 
 type CreateTaskPayload = Extract<AiIntent, { intent: "create_task" }>["payload"];
 import {
@@ -48,4 +49,19 @@ export function normalizeCreateTaskPayload(
   }
 
   return { ...rest, title, description, deadlineDate };
+}
+
+/** Dev-предупреждение, если модель свалила всё в title без description. */
+export function warnLongCreateTaskTitleWithoutDescription(
+  title: string,
+  description?: string,
+): void {
+  if (description?.trim()) return;
+  const t = title.trim();
+  if (t.length <= 80) return;
+  const hasAnd = /\sи\s/i.test(t);
+  const sentences = t.split(/[.!?…]+/).filter((s) => s.trim().length > 0);
+  if (hasAnd || sentences.length > 1) {
+    devLog("[create_task] long title without description", { titleLength: t.length });
+  }
 }

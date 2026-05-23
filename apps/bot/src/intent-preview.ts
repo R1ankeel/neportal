@@ -18,8 +18,8 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         lines.push(`Дедлайн: ${formatIsoDateRu(resolved.deadlineDate)}`);
       }
       lines.push(`Задача: ${resolved.title}`);
-      if (resolved.description) {
-        lines.push(`Описание: ${resolved.description}`);
+      if (resolved.description?.trim()) {
+        lines.push("Описание:", resolved.description.trim());
       }
       return lines.join("\n") + CONFIRM_FOOTER;
     }
