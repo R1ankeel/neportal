@@ -27,6 +27,7 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 *.log
+logs/yandex-gpt/
 
 # Turbo
 .turbo

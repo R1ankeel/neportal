@@ -15,13 +15,10 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { executeResolvedIntent } from "./intent-executor";
-import { buildIntentPreview } from "./intent-preview";
-import { resolveIntent } from "./intent-resolver";
 import { executeAbsenceDelegationDistribution } from "./absence-impact-flow";
 import {
   clearPendingConfirmation,
   getPendingConfirmation,
-  setPendingConfirmation,
 } from "./pending-intent";
 import { fetchUsers } from "./api";
 import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-comment-details";
@@ -29,32 +26,20 @@ import { handlePendingTaskMentionDetailsMessage } from "./handle-pending-task-me
 import { handlePendingTaskStatusDetailsMessage } from "./handle-pending-task-status-details";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
-import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
-import { fetchProjects } from "./api";
-import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
 import { handlePendingCreateTaskAssigneeMessage } from "./handle-pending-create-task-assignee";
-import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
-import { findProjectByHint } from "./hint-matchers";
-import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
-import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-transfer-comment";
 import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-transfer-decision";
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
 import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
-import { beginCreateExpenseFromAiIntent } from "./create-expense-flow";
-import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
-import { handleReassignTaskIntent } from "./handle-reassign-intent";
-import { handleTransferTaskIntent } from "./handle-transfer-intent";
-import { handleTaskActionIntent } from "./handle-task-intent";
-import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { parseExpenseQuery } from "./parse-expense-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
+import { routeParsedAiIntent } from "./route-parsed-intent";
+import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
-
-const CONFIDENCE_THRESHOLD = 0.7;
 
 export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   const text = ctx.message?.text?.trim();
@@ -232,7 +217,13 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   const expenseIntent = parseExpenseQuery(text);
   if (expenseIntent) {
-    await beginCreateExpenseFromAiIntent(ctx, telegramUserId, linked, expenseIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, text, expenseIntent);
+    return;
+  }
+
+  const createTaskIntent = parseCreateTaskQuery(text);
+  if (createTaskIntent) {
+    await routeParsedAiIntent(ctx, linked, telegramUserId, text, createTaskIntent);
     return;
   }
 
@@ -256,114 +247,5 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const { intent } = parsed;
-  if (intent.intent === "unknown" || intent.confidence < CONFIDENCE_THRESHOLD) {
-    await ctx.reply("Не понял команду. Попробуйте переформулировать или используйте /demo.");
-    return;
-  }
-
-  if (
-    intent.intent === "complete_task" ||
-    intent.intent === "cancel_task" ||
-    intent.intent === "start_task" ||
-    intent.intent === "set_task_deadline"
-  ) {
-    await handleTaskActionIntent(ctx, linked, telegramUserId, intent);
-    return;
-  }
-
-  if (intent.intent === "add_task_comment") {
-    await handleAddTaskCommentIntent(ctx, linked, telegramUserId, intent);
-    return;
-  }
-
-  if (intent.intent === "mention_in_task") {
-    await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
-    return;
-  }
-
-  if (intent.intent === "transfer_task") {
-    await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
-    return;
-  }
-
-  if (intent.intent === "reassign_task") {
-    await handleReassignTaskIntent(ctx, linked, telegramUserId, intent);
-    return;
-  }
-
-  if (intent.intent === "cancel_absence") {
-    await handleCancelAbsenceIntent(ctx, linked, telegramUserId, intent, text);
-    return;
-  }
-
-  if (intent.intent === "list_my_tasks") {
-    try {
-      const reply = await formatMyTasksReply(linked.id, 5);
-      await ctx.reply(reply);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[bot] list_my_tasks error: ${msg}`);
-      await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
-    }
-    return;
-  }
-
-  if (intent.intent === "list_user_tasks") {
-    try {
-      await replyWithTasksForHint(
-        ctx,
-        linked,
-        telegramUserId,
-        intent.payload.userHint,
-        5,
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[bot] list_user_tasks error: ${msg}`);
-      await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
-    }
-    return;
-  }
-
-  if (intent.intent === "create_expense") {
-    await beginCreateExpenseFromAiIntent(ctx, telegramUserId, linked, intent);
-    return;
-  }
-
-  if (intent.intent === "create_task" && !intent.payload.assigneeHint?.trim()) {
-    const projects = await fetchProjects();
-    const project = findProjectByHint(projects, intent.payload.projectHint);
-    if (!project) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
-      return;
-    }
-    startPendingCreateTaskAssignee(telegramUserId, {
-      projectHint: intent.payload.projectHint,
-      title: intent.payload.title,
-      description: intent.payload.description,
-      deadlineDate: intent.payload.deadlineDate,
-      creatorId: linked.id,
-    });
-    await ctx.reply(questionForCreateTaskAssignee(intent.payload.title));
-    return;
-  }
-
-  const users = await fetchUsers();
-  if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {
-    return;
-  }
-
-  const resolvedResult = await resolveIntent(intent, telegramUserId, text);
-  if (!resolvedResult.ok) {
-    await ctx.reply(resolvedResult.message);
-    return;
-  }
-
-  setPendingConfirmation(telegramUserId, {
-    type: "ai_intent",
-    intent,
-    resolved: resolvedResult.resolved,
-  });
-  await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+  await routeParsedAiIntent(ctx, linked, telegramUserId, text, parsed.intent);
 }

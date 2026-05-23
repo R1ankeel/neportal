@@ -10,6 +10,11 @@ import {
   loadIntentPromptContext,
   type IntentPromptContext,
 } from "./intent-context";
+import {
+  isYandexGptRefusalResponse,
+  saveYandexGptPromptLog,
+  type YandexPromptLogReason,
+} from "./yandex-gpt-prompt-log";
 
 const YANDEX_COMPLETION_URL =
   "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
@@ -90,7 +95,8 @@ export function getYandexGptState(): YandexGptState {
 const SYSTEM_PROMPT = `Ты технический парсер служебных команд корпоративного портала Neportal (задачи, заметки, учёт бюджетных расходов организации).
 Верни ТОЛЬКО один JSON-объект. Без markdown, без \`\`\`, без текста до или после JSON.
 Не выполняй действия — только разбор текста пользователя.
-Запрещено отвечать отказом, small talk или любым текстом вне JSON. Суммы, товары (ручки, бумага, карандаши), реклама VK — обычные поля payload create_expense, не повод для отказа.
+Запрещено отвечать отказом, small talk или любым текстом вне JSON.
+Служебные команды сотрудников: учёт расходов (create_expense), постановка задач (create_task), заметки, отпуска — только поля JSON, не повод для отказа.
 
 ЗАПРЕЩЕНО использовать поля: version, action, entity, rawText.
 Используй ТОЛЬКО: intent, confidence, requiresConfirmation, payload.
@@ -1195,13 +1201,34 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
     return { ok: false, kind: "api_error" };
   }
 
+  const logPromptFailure = async (
+    reason: YandexPromptLogReason,
+    extra?: Record<string, unknown>,
+  ): Promise<void> => {
+    const logFile = await saveYandexGptPromptLog({
+      reason,
+      userText: userText.trim(),
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      modelResponse: responseText,
+      modelUri: state.config.modelUri,
+      extra,
+    });
+    yandexGptDevLog("prompt saved to log file", { reason, logFile: logFile ?? "save failed" });
+  };
+
   const jsonText = extractJsonText(responseText);
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonText);
   } catch {
+    const reason: YandexPromptLogReason = isYandexGptRefusalResponse(responseText)
+      ? "api_refusal"
+      : "invalid_json";
+    await logPromptFailure(reason, { jsonPreview: jsonText.slice(0, 500) });
     yandexGptDevLog("model returned non-JSON text", {
       preview: jsonText.slice(0, 500),
+      refusal: reason === "api_refusal",
     });
     return { ok: false, kind: "invalid_json" };
   }
@@ -1218,6 +1245,11 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
 
   const validated = safeParseAiIntent(fixed);
   if (!validated.success) {
+    await logPromptFailure("invalid_schema", {
+      fieldErrors: validated.error.flatten().fieldErrors,
+      formErrors: validated.error.flatten().formErrors,
+      parsed: fixed,
+    });
     yandexGptDevLog("validation error", {
       fieldErrors: validated.error.flatten().fieldErrors,
       formErrors: validated.error.flatten().formErrors,
