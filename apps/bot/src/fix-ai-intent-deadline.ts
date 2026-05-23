@@ -2,6 +2,7 @@ import { preprocessAiIntentInput } from "./ai-contracts";
 import { applyCreateAbsenceUserSelfFix } from "./fix-ai-intent-absence-user";
 import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-user";
 import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
+import { applyCreateTaskPayloadCompatibilityFix } from "./fix-ai-intent-create-task";
 import {
   coerceDeadlineDateLoose,
   correctNextCalendarMonthMisparse,
@@ -71,6 +72,7 @@ export function fixAiIntentBeforeValidation(
   const p = { ...(payload as Record<string, unknown>) };
 
   if (intent === "create_task") {
+    applyCreateTaskPayloadCompatibilityFix(p);
     applyCreateTaskAssigneeSelfFix(p, opts.userText);
     applyDeadlineFields(p, intent as string, opts);
   } else if (intent === "create_absence") {

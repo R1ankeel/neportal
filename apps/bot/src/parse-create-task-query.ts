@@ -20,6 +20,14 @@ const CREATE_TASK_PATTERNS: Array<{
   pick: (m: RegExpMatchArray) => PatternMatch | null;
 }> = [
   {
+    re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+для\s+(\p{L}+)\s+(.+)$/iu,
+    pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
+  },
+  {
+    re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+на\s+(\p{L}+)\s+(.+)$/iu,
+    pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
+  },
+  {
     re: /^(?:поставь|назначь|дай)(?:те)?\s+(\p{L}+)\s+(?:задачу|хадачу)\s+(.+)$/iu,
     pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
   },

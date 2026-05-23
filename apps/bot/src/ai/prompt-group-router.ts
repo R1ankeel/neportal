@@ -5,6 +5,7 @@ export type PromptGroup =
   | "collaboration"
   | "task-list"
   | "create-task"
+  | "create-note"
   | "classifier";
 
 function normalizeForRouting(text: string): string {
@@ -90,11 +91,14 @@ export function resolvePromptGroup(userText: string): PromptGroup {
   }
 
   if (
-    /(?:создай|поставь|назначь|дай)(?:те)?\s+(?:мне\s+)?(?:задачу|хадачу)/.test(t) ||
+    /(?:создай|поставь|заведи|завести|назначь|дай)(?:те)?\s+(?:задачу|хадачу)/.test(t) ||
+    /(?:нужно|надо)\s+завести\s+задачу/.test(t) ||
+    /(?:задачу|задача)\s+на\s+\p{L}/u.test(t) ||
+    /(?:задачу|задача)\s+для\s+\p{L}/u.test(t) ||
     /(?:создай|поставь|назначь|дай)(?:те)?\s+\p{L}+\s+(?:задачу|хадачу)/u.test(t) ||
     /(?:создай|поставь|назначь|дай)(?:те)?\s+мне(?:\s|$)/.test(t) ||
     /^поручи(?:те)?\s+/u.test(t) ||
-    /^пусть\s+/u.test(t) ||
+    /^пусть\s+\p{L}/u.test(t) ||
     /запиши(?:те)?\s+мне\s+(?:в\s+)?задач/i.test(t)
   ) {
     return "create-task";
