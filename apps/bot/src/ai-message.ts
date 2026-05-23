@@ -43,6 +43,7 @@ import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
+import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
@@ -246,6 +247,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "transfer_task") {
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "reassign_task") {
+    await handleReassignTaskIntent(ctx, linked, telegramUserId, intent);
     return;
   }
 

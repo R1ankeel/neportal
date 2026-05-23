@@ -117,6 +117,17 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         transferPreviewNote(resolved.requestedByRole),
       ].join("\n") + CONFIRM_FOOTER;
 
+    case "reassign_task": {
+      const was = resolved.currentAssigneeName?.trim() || "не назначен";
+      return [
+        `Переназначить задачу «${resolved.taskTitle}»?`,
+        "",
+        `Было: ${was}`,
+        `Стало: ${resolved.toUserName}`,
+        `Комментарий: ${resolved.comment?.trim() || "не указан"}`,
+      ].join("\n") + CONFIRM_FOOTER;
+    }
+
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;
   }

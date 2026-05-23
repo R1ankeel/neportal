@@ -131,6 +131,22 @@ export type ResolvedTransferTask = {
   currentAssigneeId: string | null;
 };
 
+export type ResolvedReassignTask = {
+  intent: "reassign_task";
+  taskId: string;
+  taskTitle: string;
+  comment?: string;
+  toUserId: string;
+  toUserName: string;
+  toUserTelegramId: string | null;
+  fromUserId?: string;
+  fromUserName?: string;
+  currentAssigneeId: string | null;
+  currentAssigneeName: string | null;
+  creatorId: string;
+  projectName?: string;
+};
+
 export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
@@ -143,7 +159,8 @@ export type ResolvedIntent =
   | ResolvedStartTask
   | ResolvedAddTaskComment
   | ResolvedMentionInTask
-  | ResolvedTransferTask;
+  | ResolvedTransferTask
+  | ResolvedReassignTask;
 
 export type ResolveResult =
   | { ok: true; resolved: ResolvedIntent }

@@ -21,6 +21,12 @@ import {
   buildResolvedTransferTask,
   startPendingTaskTransferComment,
 } from "./task-transfer-flow";
+import {
+  assigneeMismatchMessage,
+  buildResolvedReassignTask,
+  MANAGER_REASSIGN_ONLY_MESSAGE,
+} from "./task-reassign-flow";
+import { isManagerOrOwner } from "./task-transfer-flow";
 import { fetchUsers } from "./api";
 import { getLinkedUserByTelegramId } from "./current-user";
 import { buildResolvedStartTask } from "./task-start-flow";
@@ -246,5 +252,65 @@ export async function continueAfterTaskSelection(
 
     const question = startPendingTaskTransferComment(telegramUserId, task, toUser);
     await ctx.reply(question);
+    return;
+  }
+
+  if (selectionType === "select_task_for_reassign" && payload.toUserId) {
+    const users = await fetchUsers();
+    const toUser = users.find((u) => u.id === payload.toUserId);
+    if (!toUser) {
+      await ctx.reply("Сотрудник не найден. Повторите команду.");
+      return;
+    }
+
+    const linked = await getLinkedUserByTelegramId(telegramUserId);
+    if (!linked) {
+      await ctx.reply("Вы не привязаны ни к какому проекту.");
+      return;
+    }
+
+    if (!isManagerOrOwner(linked.role)) {
+      await ctx.reply(MANAGER_REASSIGN_ONLY_MESSAGE);
+      return;
+    }
+
+    if (
+      payload.fromUserId &&
+      task.assigneeId !== payload.fromUserId
+    ) {
+      const actualName = task.assignee?.fullName ?? "не назначен";
+      const fromName = payload.fromUserName ?? "сотрудника";
+      await ctx.reply(assigneeMismatchMessage(task.title, fromName, actualName));
+      return;
+    }
+
+    if (task.assigneeId === toUser.id) {
+      await ctx.reply("Сотрудник уже назначен на эту задачу.");
+      return;
+    }
+
+    const resolved = buildResolvedReassignTask(
+      task,
+      toUser,
+      payload.reassignComment,
+      payload.fromUserId,
+      payload.fromUserName,
+    );
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "reassign_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          fromUserHint: payload.fromUserName,
+          toUserHint: toUser.fullName,
+          comment: resolved.comment,
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
   }
 }

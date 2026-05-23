@@ -42,6 +42,7 @@ import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
+import { handleReassignSlashCommand } from "./task-reassign-flow";
 import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleStartTaskSlashCommand } from "./task-start-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
@@ -85,6 +86,7 @@ bot.command("start", async (ctx) => {
       "/comment <задача> — <комментарий> — комментарий к задаче",
       "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
       "/transfer <задача> | <исполнитель> | <комментарий> — передать задачу",
+      "/reassign <задача> | <старый?> | <новый> | <комментарий> — переназначить (OWNER/MANAGER)",
       "/tasks — мои ближайшие задачи",
       "/tasks <сотрудник> — задачи сотрудника (OWNER/MANAGER)",
       "/me — статус привязки",
@@ -115,6 +117,7 @@ bot.command("demo", async (ctx) => {
       "/comment Проверить склад — склад закрыт до завтра — комментарий к задаче",
       "/mention Вася | Проверить склад | нужны его комментарии — призвать в задачу",
       "/transfer Проверить склад | Вася | потому что он отвечает за склад — передать задачу",
+      "/reassign Проверить склад | Вася | Маша | из-за больничного — переназначить задачу",
       "/tasks — показать мои ближайшие задачи",
       "/tasks Вася — задачи сотрудника (OWNER/MANAGER)",
       "/link Вася Пупкин — привязка по ФИО (dev)",
@@ -138,6 +141,7 @@ bot.command("demo", async (ctx) => {
       "- Напиши комментарий к задаче Проверить склад: склад закрыт до завтра",
       "- Позови Васю в задачу Проверить склад, нужны его комментарии",
       "- Передай задачу Проверить склад Васе, потому что он отвечает за склад",
+      "- Перекинь задачу Проверить склад с Васи на Машу (OWNER/MANAGER)",
       "- покажи мои задачи",
       "- Какие задачи у Васи? (OWNER/MANAGER)",
       "",
@@ -674,6 +678,50 @@ bot.command("transfer", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] transfer command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command("reassign", async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  const telegramUserId = ctx.from?.id;
+  try {
+    const currentUser = await requireLinkedUser(ctx);
+    if (!currentUser || !telegramUserId) return;
+
+    const result = await handleReassignSlashCommand(
+      currentUser,
+      telegramUserId,
+      payload,
+      ctx,
+    );
+    if (result.kind === "reply" || result.kind === "user_selection_started") {
+      if (result.kind !== "user_selection_started") {
+        await ctx.reply(result.message);
+      }
+      return;
+    }
+
+    const resolved = result.resolved;
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: {
+        intent: "reassign_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: resolved.taskTitle,
+          fromUserHint: resolved.fromUserName,
+          toUserHint: resolved.toUserName,
+          comment: resolved.comment,
+        },
+      },
+      resolved,
+    });
+    await ctx.reply(buildIntentPreview(resolved));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] reassign command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

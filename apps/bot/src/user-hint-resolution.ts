@@ -89,6 +89,9 @@ export function extractUserHintFromIntent(intent: AiIntent): string | undefined 
     case "transfer_task":
       raw = intent.payload.toUserHint;
       break;
+    case "reassign_task":
+      raw = intent.payload.toUserHint;
+      break;
     case "list_user_tasks":
       raw = intent.payload.userHint;
       break;
@@ -112,6 +115,8 @@ export function selectionTypeForIntent(intent: AiIntent): PendingUserSelectionTy
       return "select_user_for_mention";
     case "transfer_task":
       return "select_user_for_transfer";
+    case "reassign_task":
+      return "select_user_for_reassign_to";
     default:
       return null;
   }
@@ -158,6 +163,16 @@ export function buildUserSelectionPayload(
         intent: "transfer_task",
         taskTitle: intent.payload.taskTitle,
         comment: intent.payload.comment,
+        aiIntentPayload: intent.payload as Record<string, unknown>,
+      };
+    case "reassign_task":
+      return {
+        intent: "reassign_task",
+        taskTitle: intent.payload.taskTitle,
+        comment: intent.payload.comment,
+        toUserHint: intent.payload.toUserHint,
+        fromUserId: undefined,
+        fromUserName: undefined,
         aiIntentPayload: intent.payload as Record<string, unknown>,
       };
     default:

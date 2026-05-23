@@ -61,7 +61,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -86,6 +86,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `add_task_comment` | `taskTitle`, `text?` |
 | `mention_in_task` | `userHint`, `taskTitle`, `text?` |
 | `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
+| `reassign_task` | `taskTitle`, `fromUserHint?`, `toUserHint`, `comment?` |
 | `list_my_tasks` | `{}` (пустой) |
 | `list_user_tasks` | `userHint` (имя сотрудника; `__self__` → свои задачи) |
 | `unknown` | `reason?` |
@@ -248,6 +249,25 @@ Confirmation: *«Позвать Вася Пупкин в задачу «…»? �
 ```
 
 OWNER/MANAGER: задача передаётся сразу после «да». EMPLOYEE: запрос на принятие новому исполнителю.
+
+### Пример: переназначение задачи (reassign_task)
+
+> Перекинь задачу по поездке к подрядчику с Васи на Машу
+
+```json
+{
+  "intent": "reassign_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "по поездке к подрядчику",
+    "fromUserHint": "Вася",
+    "toUserHint": "Маша"
+  }
+}
+```
+
+Только OWNER/MANAGER. Отличие от `transfer_task`: формулировка «с X на Y» / «перекинь» / «переназначь». После «да» — сразу смена исполнителя и уведомления старому, новому и постановщику.
 
 ### Пример: мои задачи (без confirmation)
 

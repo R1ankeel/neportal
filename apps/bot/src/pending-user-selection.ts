@@ -14,6 +14,8 @@ import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 export type PendingUserSelectionType =
   | "select_user_for_task_assignee"
   | "select_user_for_transfer"
+  | "select_user_for_reassign_from"
+  | "select_user_for_reassign_to"
   | "select_user_for_mention"
   | "select_user_for_absence"
   | "select_user_for_absence_cancel"
@@ -43,6 +45,16 @@ export type TransferUserSelectionPayload = {
   intent: "transfer_task";
   taskTitle: string;
   comment?: string;
+  aiIntentPayload?: Record<string, unknown>;
+};
+
+export type ReassignUserSelectionPayload = {
+  intent: "reassign_task";
+  taskTitle: string;
+  comment?: string;
+  fromUserId?: string;
+  fromUserName?: string;
+  toUserHint: string;
   aiIntentPayload?: Record<string, unknown>;
 };
 
@@ -93,6 +105,7 @@ export type TaskListUserSelectionPayload = {
 export type UserSelectionPayload =
   | CreateTaskUserSelectionPayload
   | TransferUserSelectionPayload
+  | ReassignUserSelectionPayload
   | MentionUserSelectionPayload
   | AbsenceUserSelectionPayload
   | CancelAbsenceUserSelectionPayload

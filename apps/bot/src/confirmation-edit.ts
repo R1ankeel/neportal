@@ -11,6 +11,7 @@ import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
+import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
@@ -95,6 +96,16 @@ export function getConfirmationEditHint(intent: AiIntent): string {
         header,
         "задача: название задачи",
         "исполнитель: кому передать",
+        "комментарий: новый текст",
+      ].join("\n");
+    case "reassign_task":
+      return [
+        header,
+        "задача: название задачи",
+        "с кого: имя",
+        "старый исполнитель: имя",
+        "кому: имя",
+        "исполнитель: имя",
         "комментарий: новый текст",
       ].join("\n");
     case "create_expense":
@@ -228,6 +239,31 @@ function applyEditToIntent(intent: AiIntent, parsed: ParsedEdit): ApplyEditResul
         return {
           ok: true,
           intent: { ...intent, payload: { ...intent.payload, toUserHint: value } },
+        };
+      }
+      if (key === "комментарий" || key === "причина") {
+        return { ok: true, intent: { ...intent, payload: { ...intent.payload, comment: value } } };
+      }
+      if (key === "задача" || key === "название") {
+        return {
+          ok: true,
+          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
+        };
+      }
+      break;
+    }
+
+    case "reassign_task": {
+      if (key === "кому" || key === "исполнитель") {
+        return {
+          ok: true,
+          intent: { ...intent, payload: { ...intent.payload, toUserHint: value } },
+        };
+      }
+      if (key === "с кого" || key === "старый исполнитель" || key === "от") {
+        return {
+          ok: true,
+          intent: { ...intent, payload: { ...intent.payload, fromUserHint: value } },
         };
       }
       if (key === "комментарий" || key === "причина") {
@@ -385,6 +421,10 @@ async function reconfirmAfterEdit(
 
     case "transfer_task":
       await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+      return getPendingConfirmation(telegramUserId)?.type === "ai_intent";
+
+    case "reassign_task":
+      await handleReassignTaskIntent(ctx, linked, telegramUserId, intent);
       return getPendingConfirmation(telegramUserId)?.type === "ai_intent";
 
     case "cancel_absence":

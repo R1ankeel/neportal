@@ -11,6 +11,7 @@ import {
 import { getLinkedUserByTelegramId } from "./current-user";
 import { executeTaskComment } from "./task-comment-flow";
 import { executeMentionInTask } from "./task-mention-flow";
+import { executeReassignTask } from "./task-reassign-flow";
 import { executeTransferTask } from "./task-transfer-flow";
 import { executeStartTask } from "./task-start-flow";
 import { executeTaskStatusChange } from "./task-status-flow";
@@ -191,6 +192,18 @@ export async function executeResolvedIntent(
         return "Не удалось отправить уведомление.";
       }
       return executeTransferTask(botApi, linked, resolved);
+    }
+
+    case "reassign_task": {
+      const linked =
+        telegramUserId != null ? await getLinkedUserByTelegramId(telegramUserId) : null;
+      if (!linked) {
+        return "Вы не привязаны ни к какому проекту.";
+      }
+      if (!botApi) {
+        return "Не удалось отправить уведомление.";
+      }
+      return executeReassignTask(botApi, linked, resolved);
     }
 
     default:

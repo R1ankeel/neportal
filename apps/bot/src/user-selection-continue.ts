@@ -20,6 +20,9 @@ import { findProjectByHint } from "./hint-matchers";
 import { todayIsoDate } from "./parse-ru-date";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
+import { handleReassignTaskIntent } from "./handle-reassign-intent";
+import { continueReassignAfterUsersResolved } from "./task-reassign-flow";
+import type { ReassignUserSelectionPayload } from "./pending-user-selection";
 import { linkTelegramUser } from "./api";
 import {
   advanceAfterAssignment,
@@ -182,6 +185,51 @@ export async function continueAfterUserSelection(
       },
     };
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (payload.intent === "reassign_task") {
+    const reassignPayload = payload as ReassignUserSelectionPayload;
+    if (_selectionType === "select_user_for_reassign_from") {
+      const intent: AiIntent = {
+        intent: "reassign_task",
+        confidence: 1,
+        requiresConfirmation: true,
+        payload: {
+          taskTitle: reassignPayload.taskTitle,
+          fromUserHint: selectedUser.fullName,
+          toUserHint: reassignPayload.toUserHint,
+          comment: reassignPayload.comment,
+        },
+      };
+      await handleReassignTaskIntent(ctx, linked, telegramUserId, intent);
+      return;
+    }
+
+    const intent: AiIntent = {
+      intent: "reassign_task",
+      confidence: 1,
+      requiresConfirmation: true,
+      payload: {
+        taskTitle: reassignPayload.taskTitle,
+        fromUserHint: reassignPayload.fromUserName,
+        toUserHint: selectedUser.fullName,
+        comment: reassignPayload.comment,
+      },
+    };
+    const users = await fetchUsers();
+    const fromUser = reassignPayload.fromUserId
+      ? users.find((u) => u.id === reassignPayload.fromUserId)
+      : undefined;
+    await continueReassignAfterUsersResolved(
+      ctx,
+      linked,
+      telegramUserId,
+      intent,
+      reassignPayload.taskTitle,
+      selectedUser,
+      { fromUser, comment: reassignPayload.comment },
+    );
     return;
   }
 

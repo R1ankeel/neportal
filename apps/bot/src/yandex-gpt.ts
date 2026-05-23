@@ -100,13 +100,13 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
 }
 
-Обработка речевого шума и голосовых сообщений (для всех intent, особенно create_task, add_task_comment, create_note, create_expense, transfer_task, mention_in_task):
+Обработка речевого шума и голосовых сообщений (для всех intent, особенно create_task, add_task_comment, create_note, create_expense, transfer_task, reassign_task, mention_in_task):
 - Убирай слова-паразиты и речевой мусор, если они не несут смысла: «ну», «это», «короче», «типа», «как бы», «в общем», «значит», «там», «вот», «наверное», «получается», «эээ», «ммм», «к этому», «как его», «я не помню» и похожие.
 - Исправляй устную речь в короткий деловой текст.
 - Сохраняй все важные факты: имена людей, адреса, даты, сроки, суммы, названия компаний, объекты, товары, причины, условия.
@@ -115,7 +115,7 @@ JSON Schema ответа:
 - Сомнения и причины переноси в description (create_task) или text (комментарии, заметки): например «есть сомнения по качеству».
 - Не добавляй в title мусорные слова; title — короткое главное действие.
 - create_task: title = главное действие; description = очищенные детали, доп. действия, условия, причины, ожидаемый результат.
-- create_note / add_task_comment / mention_in_task / transfer_task (comment): text = очищенный смысл без речевого мусора, факты сохранены.
+- create_note / add_task_comment / mention_in_task / transfer_task / reassign_task (comment): text = очищенный смысл без речевого мусора, факты сохранены.
 
 payload по intent:
 
@@ -701,6 +701,59 @@ Output:
   "confidence": 0.85,
   "requiresConfirmation": true,
   "payload": { "taskTitle": "Заключить договор", "toUserHint": "Петр" }
+}
+
+reassign_task.payload:
+{ "taskTitle": string, "fromUserHint"?: string, "toUserHint": string, "comment"?: string }
+
+reassign_task — переназначение между сотрудниками (руководитель/менеджер):
+- Фразы «перекинь», «перенеси», «переназначь», «сними с X и назначь Y», «передай от X Y», «с X на Y», «от X к Y» → intent reassign_task (НЕ transfer_task).
+- transfer_task — когда один новый исполнитель без «с X на Y» (инициатор передаёт задачу).
+- taskTitle — название задачи.
+- fromUserHint — старый исполнитель, если указан («с Васи», «от Васи»).
+- toUserHint — новый исполнитель.
+- comment — причина, если указана.
+
+Пример reassign_task:
+Input: «Перекинь задачу по поездке к подрядчику с Васи на Машу»
+Output:
+{
+  "intent": "reassign_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "по поездке к подрядчику",
+    "fromUserHint": "Вася",
+    "toUserHint": "Маша"
+  }
+}
+
+Пример reassign_task с комментарием:
+Input: «Сними задачу проверить склад с Пети и назначь Маше, потому что Петя заболел»
+Output:
+{
+  "intent": "reassign_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "проверить склад",
+    "fromUserHint": "Петя",
+    "toUserHint": "Маша",
+    "comment": "потому что Петя заболел"
+  }
+}
+
+Пример reassign_task без fromUserHint:
+Input: «Переназначь задачу проверить склад Маше»
+Output:
+{
+  "intent": "reassign_task",
+  "confidence": 0.85,
+  "requiresConfirmation": true,
+  "payload": {
+    "taskTitle": "проверить склад",
+    "toUserHint": "Маша"
+  }
 }
 
 complete_task — результат:

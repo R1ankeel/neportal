@@ -17,7 +17,8 @@ export type PendingTaskSelectionType =
   | "select_task_for_deadline"
   | "select_task_for_comment"
   | "select_task_for_mention"
-  | "select_task_for_transfer";
+  | "select_task_for_transfer"
+  | "select_task_for_reassign";
 
 export type TaskSelectionPayload = {
   completionResult?: string;
@@ -31,6 +32,9 @@ export type TaskSelectionPayload = {
   toUserId?: string;
   toUserName?: string;
   transferComment?: string;
+  fromUserId?: string;
+  fromUserName?: string;
+  reassignComment?: string;
 };
 
 export type TaskCandidate = {

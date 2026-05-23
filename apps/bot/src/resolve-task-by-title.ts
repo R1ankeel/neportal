@@ -18,7 +18,8 @@ export type TaskResolvePurpose =
   | "deadline"
   | "comment"
   | "mention"
-  | "transfer";
+  | "transfer"
+  | "reassign";
 
 export type ResolveTaskByTitleResult =
   | { kind: "found"; task: ApiTask }
@@ -48,6 +49,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_mention";
     case "transfer":
       return "select_task_for_transfer";
+    case "reassign":
+      return "select_task_for_reassign";
   }
 }
 
@@ -63,7 +66,7 @@ function filterTasksForPurpose(
   return tasks.filter((task) => {
     if (!canModifyTask(user, task)) return false;
     if (purpose === "comment" || purpose === "mention") return true;
-    if (purpose === "transfer") {
+    if (purpose === "transfer" || purpose === "reassign") {
       return task.status === "NEW" || task.status === "IN_PROGRESS";
     }
     if (purpose === "start") {
@@ -88,6 +91,9 @@ function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   }
   if (purpose === "transfer") {
     return "Использование: /transfer <задача> | <новый исполнитель> | <комментарий>";
+  }
+  if (purpose === "reassign") {
+    return "Использование: /reassign <задача> | <старый исполнитель?> | <новый исполнитель> | <комментарий>";
   }
   return "Укажите название задачи.";
 }
@@ -142,6 +148,8 @@ export async function resolveTaskByTitle(
   options?: {
     telegramUserId?: number;
     selectionPayload?: TaskSelectionPayload;
+    assigneeFilterUserId?: string;
+    assigneeFilterUserName?: string;
   },
 ): Promise<ResolveTaskByTitleResult> {
   const trimmed = titleQuery.trim();
@@ -157,7 +165,19 @@ export async function resolveTaskByTitle(
   }
 
   const matchedTasks = match.kind === "found" ? [match.task] : match.tasks;
-  const filtered = filterTasksForPurpose(matchedTasks, user, purpose);
+  let filtered = filterTasksForPurpose(matchedTasks, user, purpose);
+
+  const assigneeFilterId = options?.assigneeFilterUserId;
+  if (assigneeFilterId && purpose === "reassign") {
+    filtered = filtered.filter((task) => task.assigneeId === assigneeFilterId);
+    if (filtered.length === 0) {
+      const fromName = options.assigneeFilterUserName ?? "сотрудника";
+      return {
+        kind: "no_modifiable",
+        message: `Не нашёл активную задачу «${trimmed}» у сотрудника ${fromName}.`,
+      };
+    }
+  }
 
   if (filtered.length === 0) {
     if (matchedTasks.length === 1 && !canModifyTask(user, matchedTasks[0])) {
@@ -168,7 +188,9 @@ export async function resolveTaskByTitle(
             ? "Вы не можете комментировать эту задачу."
             : purpose === "transfer"
               ? "Вы не можете передать эту задачу."
-              : "Вы не можете изменить эту задачу.",
+              : purpose === "reassign"
+                ? "Вы не можете переназначить эту задачу."
+                : "Вы не можете изменить эту задачу.",
       };
     }
     if (purpose === "comment" || purpose === "mention") {
@@ -176,6 +198,9 @@ export async function resolveTaskByTitle(
     }
     if (purpose === "transfer") {
       return { kind: "no_modifiable", message: "Вы не можете передать найденные задачи." };
+    }
+    if (purpose === "reassign") {
+      return { kind: "no_modifiable", message: "Не нашёл подходящих активных задач." };
     }
     return noModifiableMessage(matchedTasks, purpose);
   }

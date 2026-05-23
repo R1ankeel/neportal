@@ -81,6 +81,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
 | `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
 | `/transfer <задача> \| <исполнитель> \| <комментарий>` | `POST /tasks/:id/transfers` |
+| `/reassign <задача> \| <старый?> \| <новый> \| <комментарий>` | `POST /tasks/:id/transfers` (только OWNER/MANAGER) |
 | `/tasks` | `GET /tasks/my?userId=…&limit=5` — мои задачи |
 | `/tasks <сотрудник>` | то же API; только **OWNER** / **MANAGER** |
 
@@ -203,6 +204,22 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Порядок текста:** после mention details — transfer comment → transfer rejection reason → transfer decision → selection.
 
+### Переназначение задачи (reassign, OWNER/MANAGER)
+
+**Slash:** `/reassign Проверить склад | Вася | Маша | из-за больничного` (2 части: задача и новый исполнитель; 3+: старый и новый). Разделители `|`, `—`, `-`.
+
+**AI:** «Перекинь задачу Проверить склад с Васи на Машу» → confirmation с полями *Было / Стало* → `да` → `POST /tasks/:id/transfers` (сразу `ACCEPTED`, без согласия нового исполнителя).
+
+**Права:** только **OWNER** / **MANAGER**. Иначе: *«Только руководитель или менеджер может менять задачи сотрудников.»*
+
+**fromUserHint:** если указан («с Васи»), задачи фильтруются по `assigneeId`; при несовпадении с фактическим исполнителем — ошибка без confirmation.
+
+**Уведомления:** новому исполнителю, старому (если другой), постановщику (если не инициатор); без дубля на один `telegramId`.
+
+**Selection:** `select_user_for_reassign_from`, `select_user_for_reassign_to`, `select_task_for_reassign` (payload: `fromUserId?`, `toUserId`, `reassignComment?`).
+
+**Edit на confirmation:** `задача:`, `с кого:`, `старый исполнитель:`, `кому:`, `исполнитель:`, `комментарий:`.
+
 ### Взятие задачи в работу (start_task)
 
 **Slash:** `/start-task <название>` или `/work <название>` → confirmation *«Взять задачу «…» в работу?»* → `да` → `PATCH` `IN_PROGRESS`, ответ *«Задача взята в работу: …»*.
@@ -281,7 +298,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Не найден:** *«Не нашёл сотрудника «{hint}». Проверьте имя.»*
 
-**Где используется:** `create_task` (assignee после уточнения или из `assigneeHint`), `transfer_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/mention`, `/link` (dev).
+**Где используется:** `create_task` (assignee после уточнения или из `assigneeHint`), `transfer_task`, `reassign_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/reassign`, `/mention`, `/link` (dev).
 
 **create_task без исполнителя в AI:** если `assigneeHint` пустой, бот спрашивает (TTL 30 мин):
 

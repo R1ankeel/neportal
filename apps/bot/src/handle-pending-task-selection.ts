@@ -9,7 +9,7 @@ import {
 import { continueAfterTaskSelection } from "./task-selection-continue";
 import { candidateToApiTask } from "./pending-task-selection";
 import { canCommentTask } from "./task-comment-flow";
-import { canTransferTask } from "./task-transfer-flow";
+import { canTransferTask, isManagerOrOwner } from "./task-transfer-flow";
 import { canModifyTask } from "./task-status-flow";
 
 function parseSelectionNumber(text: string): number | null {
@@ -64,7 +64,9 @@ export async function handlePendingTaskSelectionMessage(
       ? canCommentTask(linked, task)
       : pending.type === "select_task_for_transfer"
         ? canTransferTask(linked, task)
-        : canModifyTask(linked, task);
+        : pending.type === "select_task_for_reassign"
+          ? isManagerOrOwner(linked.role)
+          : canModifyTask(linked, task);
   if (!canAct) {
     clearPendingTaskSelection(telegramUserId);
     const msg =
@@ -72,7 +74,9 @@ export async function handlePendingTaskSelectionMessage(
         ? "Вы не можете комментировать эту задачу."
         : pending.type === "select_task_for_transfer"
           ? "Вы не можете передать эту задачу."
-          : "Вы не можете изменить эту задачу.";
+          : pending.type === "select_task_for_reassign"
+            ? "Только руководитель или менеджер может менять задачи сотрудников."
+            : "Вы не можете изменить эту задачу.";
     await ctx.reply(msg);
     return true;
   }

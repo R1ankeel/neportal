@@ -25,6 +25,7 @@ export const AiIntentNameSchema = z.enum([
   "add_task_comment",
   "mention_in_task",
   "transfer_task",
+  "reassign_task",
   "list_my_tasks",
   "list_user_tasks",
   "unknown",
@@ -113,6 +114,13 @@ export const TransferTaskPayloadSchema = z.object({
   comment: optionalAiStringMin1,
 });
 
+export const ReassignTaskPayloadSchema = z.object({
+  taskTitle: z.string().min(1),
+  fromUserHint: optionalAiStringMin1,
+  toUserHint: z.string().min(1),
+  comment: optionalAiStringMin1,
+});
+
 export const ListMyTasksPayloadSchema = z.object({});
 
 export const ListUserTasksPayloadSchema = z.object({
@@ -191,6 +199,11 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: TransferTaskPayloadSchema,
   }),
   z.object({
+    intent: z.literal("reassign_task"),
+    ...intentFields,
+    payload: ReassignTaskPayloadSchema,
+  }),
+  z.object({
     intent: z.literal("list_my_tasks"),
     ...intentFields,
     payload: ListMyTasksPayloadSchema,
@@ -220,6 +233,7 @@ export type StartTaskPayload = z.infer<typeof StartTaskPayloadSchema>;
 export type AddTaskCommentPayload = z.infer<typeof AddTaskCommentPayloadSchema>;
 export type MentionInTaskPayload = z.infer<typeof MentionInTaskPayloadSchema>;
 export type TransferTaskPayload = z.infer<typeof TransferTaskPayloadSchema>;
+export type ReassignTaskPayload = z.infer<typeof ReassignTaskPayloadSchema>;
 export type ListMyTasksPayload = z.infer<typeof ListMyTasksPayloadSchema>;
 export type ListUserTasksPayload = z.infer<typeof ListUserTasksPayloadSchema>;
 export type UnknownPayload = z.infer<typeof UnknownPayloadSchema>;

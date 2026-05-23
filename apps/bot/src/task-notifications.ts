@@ -265,6 +265,79 @@ export async function notifyTransferAccepted(
   );
 }
 
+/** OWNER/MANAGER: переназначение задачи между сотрудниками. */
+export async function notifyReassign(
+  api: Api,
+  params: {
+    taskTitle: string;
+    projectName?: string | null;
+    comment: string;
+    author: ApiUser;
+    toUser: { id: string; fullName: string; telegramId: string | null };
+    oldAssignee: { id: string; fullName: string; telegramId: string | null } | null;
+    creator: { id: string; fullName: string; telegramId: string | null } | null;
+    oldAssigneeName: string | null;
+  },
+): Promise<void> {
+  const sentTelegramIds = new Set<string>();
+  const sentUserIds = new Set<string>();
+
+  const markSent = (userId: string, telegramId: string) => {
+    sentUserIds.add(userId);
+    sentTelegramIds.add(telegramId);
+  };
+
+  const shouldSend = (userId: string, telegramId: string | null): telegramId is string => {
+    if (!telegramId) return false;
+    if (sentTelegramIds.has(telegramId)) return false;
+    if (sentUserIds.has(userId)) return false;
+    return true;
+  };
+
+  if (shouldSend(params.toUser.id, params.toUser.telegramId)) {
+    const lines = [
+      `Вам передали задачу «${params.taskTitle}».`,
+      "",
+      params.projectName ? `Проект: ${params.projectName}` : null,
+      `Передал: ${params.author.fullName}`,
+      `Комментарий: ${params.comment}`,
+    ].filter((line): line is string => line != null);
+    await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+    markSent(params.toUser.id, params.toUser.telegramId);
+  }
+
+  if (
+    params.oldAssignee &&
+    params.oldAssignee.id !== params.toUser.id &&
+    shouldSend(params.oldAssignee.id, params.oldAssignee.telegramId)
+  ) {
+    await sendTelegramMessage(
+      api,
+      params.oldAssignee.telegramId,
+      `Задачу «${params.taskTitle}» перенесли на ${params.toUser.fullName}.`,
+    );
+    markSent(params.oldAssignee.id, params.oldAssignee.telegramId);
+  }
+
+  if (
+    params.creator &&
+    params.creator.id !== params.author.id &&
+    shouldSend(params.creator.id, params.creator.telegramId)
+  ) {
+    const was = params.oldAssigneeName?.trim() || "не назначен";
+    const lines = [
+      `Задача «${params.taskTitle}» передана новому исполнителю.`,
+      "",
+      `Было: ${was}`,
+      `Стало: ${params.toUser.fullName}`,
+      `Передал: ${params.author.fullName}`,
+      `Комментарий: ${params.comment}`,
+    ];
+    await sendTelegramMessage(api, params.creator.telegramId, lines.join("\n"));
+    markSent(params.creator.id, params.creator.telegramId);
+  }
+}
+
 /** Уведомление инициатору об отказе. */
 export async function notifyTransferRejected(
   api: Api,
