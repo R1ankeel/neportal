@@ -36,6 +36,7 @@ import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
 import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
+import { parseCreateBudgetCommand } from "./parse-create-budget-command";
 import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { parseExpenseQuery } from "./parse-expense-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
@@ -247,6 +248,12 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  const createBudgetIntent = parseCreateBudgetCommand(text);
+  if (createBudgetIntent) {
+    await routeParsedAiIntent(ctx, linked, telegramUserId, text, createBudgetIntent);
+    return;
+  }
+
   const expenseIntent = parseExpenseQuery(text);
   if (expenseIntent) {
     await routeParsedAiIntent(ctx, linked, telegramUserId, text, expenseIntent);
@@ -272,7 +279,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       return;
     }
     if (parsed.kind === "invalid_json" || parsed.kind === "invalid_schema") {
-      await ctx.reply("Не смог разобрать команду. Попробуйте ещё раз.");
+      await ctx.reply("Не смог разобрать команду. Попробуйте сформулировать иначе.");
       return;
     }
     await ctx.reply("Не удалось обратиться к AI. Попробуйте позже или используйте /demo.");

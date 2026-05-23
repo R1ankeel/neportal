@@ -1,6 +1,7 @@
 import { executeCancelAbsence } from "./absence-cancel-flow";
 import { createAbsenceWithImpact } from "./absence-impact-flow";
 import {
+  createBudget,
   createBudgetExpense,
   createNote,
   createTask,
@@ -63,6 +64,23 @@ export async function executeResolvedIntent(
         source: "TELEGRAM_TEXT",
       });
       return `Заметка создана в проекте «${resolved.project.name}»: ${note.text}`;
+    }
+
+    case "create_budget": {
+      const budget = await createBudget({
+        projectId: resolved.project.id,
+        name: resolved.name,
+        amount: resolved.amount,
+        createdById: resolved.creatorId,
+        requiresReceipt: resolved.requiresReceipt,
+        matchingKeywords: resolved.matchingKeywords,
+      });
+      const receiptLabel = resolved.requiresReceipt ? "да" : "нет";
+      return [
+        `Бюджет создан в проекте «${resolved.project.name}»: ${budget.title}`,
+        `Сумма: ${resolved.amount} ₽`,
+        `Чек обязателен: ${receiptLabel}`,
+      ].join("\n");
     }
 
     case "create_expense": {

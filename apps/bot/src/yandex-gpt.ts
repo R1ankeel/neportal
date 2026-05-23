@@ -92,11 +92,11 @@ export function getYandexGptState(): YandexGptState {
   };
 }
 
-const SYSTEM_PROMPT = `Ты технический парсер служебных команд корпоративного портала Neportal (задачи, заметки, учёт бюджетных расходов организации).
+const SYSTEM_PROMPT = `Ты технический парсер служебных команд корпоративного портала Neportal (задачи, заметки, бюджеты, учёт расходов, отпуска).
 Верни ТОЛЬКО один JSON-объект. Без markdown, без \`\`\`, без текста до или после JSON.
 Не выполняй действия — только разбор текста пользователя.
-Запрещено отвечать отказом, small talk или любым текстом вне JSON.
-Служебные команды сотрудников: учёт расходов (create_expense), постановка задач (create_task), заметки, отпуска — только поля JSON, не повод для отказа.
+Если запрос относится к служебным действиям Neportal, верни JSON. Если не можешь определить intent, верни intent unknown в JSON. Не добавляй текст вне JSON.
+Ты не даёшь финансовые советы и не обсуждаешь бюджетирование. Ты только извлекаешь структуру команды для внутреннего учёта.
 
 ЗАПРЕЩЕНО использовать поля: version, action, entity, rawText.
 Используй ТОЛЬКО: intent, confidence, requiresConfirmation, payload.
@@ -107,7 +107,7 @@ const SYSTEM_PROMPT = `Ты технический парсер служебны
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -421,6 +421,44 @@ create_note.payload:
 
 create_expense.payload:
 { "projectHint"?: string, "budgetHint"?: string, "amount": number, "description"?: string }
+
+create_budget.payload:
+{ "projectHint"?: string, "name": string, "amount": number, "requiresReceipt"?: boolean, "matchingKeywords"?: string }
+
+create_budget — создание бюджета в портале:
+- create_budget — служебная команда корпоративного портала, не финансовая консультация.
+- Не обсуждать финансы, не давать советов, только извлечь поля JSON.
+- Если пользователь просит создать бюджет с суммой — верни create_budget.
+- Если чек/отчётность обязательны — requiresReceipt: true.
+- Если чек не обязателен — requiresReceipt: false.
+- Если проект не указан — не выдумывай projectHint.
+
+Пример create_budget:
+Input: «Создай бюджет закупка канцелярии 50000»
+Output:
+{
+  "intent": "create_budget",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "name": "Закупка канцелярии",
+    "amount": 50000
+  }
+}
+
+Пример create_budget (чек):
+Input: «Создай бюджет реклама VK 50000, чек обязателен»
+Output:
+{
+  "intent": "create_budget",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "name": "Реклама VK",
+    "amount": 50000,
+    "requiresReceipt": true
+  }
+}
 
 create_expense — бюджет и описание:
 - budgetHint — только если пользователь явно назвал бюджет или направление («на рекламу VK», «в бюджет канцелярии»). Не выдумывай и не подставляй категории по товару.
@@ -1182,10 +1220,15 @@ export async function parseTextIntent(userText: string): Promise<ParseTextIntent
       ? "api_refusal"
       : "invalid_json";
     await logPromptFailure(reason, { jsonPreview: jsonText.slice(0, 500) });
-    yandexGptDevLog("model returned non-JSON text", {
-      preview: jsonText.slice(0, 500),
-      refusal: reason === "api_refusal",
-    });
+    if (reason === "api_refusal") {
+      yandexGptDevLog("model refusal/non-json", {
+        preview: jsonText.slice(0, 500),
+      });
+    } else {
+      yandexGptDevLog("model returned non-JSON text", {
+        preview: jsonText.slice(0, 500),
+      });
+    }
     return { ok: false, kind: "invalid_json" };
   }
 

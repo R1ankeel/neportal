@@ -118,6 +118,13 @@ export function getConfirmationEditHint(intent: AiIntent): string {
         "описание: новый текст",
         "бюджет: название бюджета",
       ].join("\n");
+    case "create_budget":
+      return [
+        header,
+        "название: новое название",
+        "сумма: 50000",
+        "чек: да / нет",
+      ].join("\n");
     case "create_absence":
       return [
         header,
@@ -304,6 +311,36 @@ function applyEditToIntent(intent: AiIntent, parsed: ParsedEdit): ApplyEditResul
       break;
     }
 
+    case "create_budget": {
+      if (key === "название" || key === "имя") {
+        return { ok: true, intent: { ...intent, payload: { ...intent.payload, name: value } } };
+      }
+      if (key === "сумма") {
+        const amount = parseAmount(value.replace(/\s/g, "").replace(",", "."));
+        if (amount <= 0) {
+          return { ok: false, message: "Укажите положительную сумму, например: сумма: 50000" };
+        }
+        return { ok: true, intent: { ...intent, payload: { ...intent.payload, amount } } };
+      }
+      if (key === "чек") {
+        const v = value.toLowerCase();
+        const requiresReceipt =
+          v === "да" || v === "yes" || v === "true" || v.includes("обязател");
+        const notRequired = v === "нет" || v === "no" || v === "false" || v.includes("не");
+        if (!requiresReceipt && !notRequired) {
+          return { ok: false, message: "Укажите «да» или «нет», например: чек: да" };
+        }
+        return {
+          ok: true,
+          intent: {
+            ...intent,
+            payload: { ...intent.payload, requiresReceipt: requiresReceipt && !notRequired },
+          },
+        };
+      }
+      break;
+    }
+
     case "create_absence": {
       if (key === "сотрудник") {
         return {
@@ -406,6 +443,7 @@ async function reconfirmAfterEdit(
 
     case "create_task":
     case "create_note":
+    case "create_budget":
     case "create_absence": {
       const users = await fetchUsers();
       if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {

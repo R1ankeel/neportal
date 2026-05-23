@@ -192,6 +192,35 @@ export function formatMoney(amount: number, currency = "RUB"): string {
   }).format(amount);
 }
 
+export async function createBudget(body: {
+  projectId: string;
+  name: string;
+  amount: number;
+  createdById: string;
+  requiresReceipt?: boolean;
+  matchingKeywords?: string;
+  currency?: string;
+}): Promise<ApiBudget> {
+  const res = await fetch(`${getApiBaseUrl()}/budgets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      projectId: body.projectId,
+      name: body.name,
+      amount: body.amount,
+      currency: body.currency ?? "RUB",
+      createdById: body.createdById,
+      requiresReceipt: body.requiresReceipt ?? false,
+      matchingKeywords: body.matchingKeywords,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /budgets → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiBudget>;
+}
+
 /** Alias for AI intent execution. */
 export const createExpense = createBudgetExpense;
 

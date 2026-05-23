@@ -48,6 +48,16 @@ export type ResolvedCreateExpense = {
   description?: string;
 };
 
+export type ResolvedCreateBudget = {
+  intent: "create_budget";
+  project: ApiProject;
+  creatorId: string;
+  name: string;
+  amount: number;
+  requiresReceipt: boolean;
+  matchingKeywords?: string;
+};
+
 export type ResolvedCreateAbsence = {
   intent: "create_absence";
   user: ApiUser;
@@ -152,6 +162,7 @@ export type ResolvedIntent =
   | ResolvedCreateTask
   | ResolvedCreateNote
   | ResolvedCreateExpense
+  | ResolvedCreateBudget
   | ResolvedCreateAbsence
   | ResolvedCancelAbsence
   | ResolvedSetTaskDeadline
@@ -241,6 +252,26 @@ export async function resolveIntent(
           project,
           creatorId,
           text: replaceIsoDatesInText(intent.payload.text),
+        },
+      };
+    }
+
+    case "create_budget": {
+      const project = findProjectByHint(projects, intent.payload.projectHint);
+      if (!project) {
+        return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
+      }
+
+      return {
+        ok: true,
+        resolved: {
+          intent: "create_budget",
+          project,
+          creatorId: currentUser.id,
+          name: intent.payload.name.trim(),
+          amount: intent.payload.amount,
+          requiresReceipt: intent.payload.requiresReceipt ?? false,
+          matchingKeywords: intent.payload.matchingKeywords?.trim() || undefined,
         },
       };
     }

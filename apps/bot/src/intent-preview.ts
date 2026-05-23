@@ -30,6 +30,17 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         `Текст: ${resolved.text}`,
       ].join("\n") + CONFIRM_FOOTER;
 
+    case "create_budget": {
+      const receiptLabel = resolved.requiresReceipt ? "да" : "нет";
+      return [
+        "Создать бюджет?",
+        `Проект: ${resolved.project.name}`,
+        `Название: ${resolved.name}`,
+        `Сумма: ${formatMoney(resolved.amount, "RUB")}`,
+        `Чек обязателен: ${receiptLabel}`,
+      ].join("\n") + CONFIRM_FOOTER;
+    }
+
     case "create_expense":
       return [
         "Создать расход?",
