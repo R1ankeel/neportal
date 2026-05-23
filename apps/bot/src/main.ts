@@ -27,6 +27,7 @@ import { requireLinkedUser } from "./current-user";
 import { devLog } from "./dev-log";
 import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user";
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
+import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { getLastExpense, setLastExpense } from "./last-expense";
 import { handlePlainTextMessage } from "./ai-message";
@@ -847,6 +848,7 @@ async function main() {
   devLogRelativeMonthDeadlineChecks();
   devLogCreateTaskAssigneeSelfChecks();
   devLogCreateAbsenceUserSelfChecks();
+  devLogResolveUsersByHintChecks();
   startTaskNotificationScheduler(bot);
 
   if (mode === "webhook") {
