@@ -83,6 +83,7 @@ export class ProjectsService {
             where: {
               organizationId: this.orgId(),
               userId: { in: memberUserIds },
+              status: { not: AbsenceStatus.CANCELLED },
             },
           }),
       memberUserIds.length === 0

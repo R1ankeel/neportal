@@ -715,3 +715,44 @@ export async function fetchAbsences(projectId: string): Promise<ApiAbsence[]> {
   }
   return res.json() as Promise<ApiAbsence[]>;
 }
+
+export async function fetchAbsencesByUserId(userId: string): Promise<ApiAbsence[]> {
+  const url = new URL(`${getApiBaseUrl()}/absences`);
+  url.searchParams.set("userId", userId);
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /absences → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiAbsence[]>;
+}
+
+export async function cancelAbsence(
+  absenceId: string,
+  body: { cancelledById: string; cancellationReason?: string },
+): Promise<ApiAbsence> {
+  const payload = {
+    cancelledById: body.cancelledById,
+    ...(body.cancellationReason != null ? { cancellationReason: body.cancellationReason } : {}),
+  };
+
+  devLog("POST /absences/:id/cancel payload", { absenceId, ...payload });
+
+  const res = await fetch(`${getApiBaseUrl()}/absences/${absenceId}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`POST /absences/${absenceId}/cancel`, res.status, text);
+    if (res.status === 403) {
+      throw new Error("Вы не можете удалить это отсутствие.");
+    }
+    if (res.status === 409) {
+      throw new Error("Отсутствие уже удалено.");
+    }
+    throw new Error(`Не удалось отменить отсутствие (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiAbsence>;
+}

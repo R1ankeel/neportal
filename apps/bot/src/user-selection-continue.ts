@@ -35,6 +35,7 @@ import {
   ONLY_OWN_TASKS_MESSAGE,
   replyWithTasksForUser,
 } from "./my-tasks-flow";
+import { continueCancelAbsenceForUser } from "./absence-cancel-flow";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -107,6 +108,18 @@ export async function continueAfterUserSelection(
       resolved: resolvedResult.resolved,
     });
     await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+    return;
+  }
+
+  if (payload.intent === "cancel_absence") {
+    await continueCancelAbsenceForUser(
+      ctx,
+      telegramUserId,
+      linked,
+      selectedUser,
+      payload.type,
+      payload.cancellationReason,
+    );
     return;
   }
 

@@ -70,6 +70,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `/expense <сумма> <описание>` | `POST /budgets/:id/expenses` |
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
+| `/cancel-absence` | `POST /absences/:id/cancel` — своё отсутствие |
+| `/cancel-absence <сотрудник>` | то же для сотрудника (OWNER/MANAGER или своё) |
+| `/delete-absence` | алиас `/cancel-absence` |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
 | `/start-task <название>` | `PATCH /tasks/:id/status` → `IN_PROGRESS` |
 | `/work <название>` | то же, что `/start-task` |
@@ -365,6 +368,8 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 | Запиши заметку: клиент попросил завтра проверить статистику VK | `create_note` |
 | Потратил 1500 рублей на рекламу VK | `create_expense` |
 | Вася заболел до 25 мая, больничный 123456 | `create_absence` |
+| удали мой больничный | `cancel_absence` |
+| отмени отпуск Васи | `cancel_absence` |
 | Взял задачу Проверить склад в работу | `start_task` |
 | Беру в работу задачу Заключить договор | `start_task` |
 | Закрой задачу Проверить склад | `complete_task` |
@@ -426,6 +431,22 @@ Pending confirmation хранится **в памяти** процесса (`pen
 При неверной дате — подсказка по использованию команды.
 
 Отображение в Web: вкладка **Отсутствия** проекта (`GET /absences?projectId=…`).
+
+### Отмена больничного / отпуска
+
+AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence`).
+
+1. Поиск отсутствия: `GET /absences?userId=…` (без `CANCELLED`), опционально фильтр `type` из AI.
+2. Сортировка: текущее (сегодня в периоде) → ближайшее будущее → прошлые по `startDate` desc.
+3. 0 записей — «Не нашёл активный больничный или отпуск…»; несколько — **Absence Selection Flow** (`select_absence_for_cancel`, номер из списка).
+4. Confirmation: «Удалить больничный/отпуск … с … по …?» → `да` / `нет`.
+5. `POST /absences/:id/cancel` с `cancelledById` = привязанный пользователь, `cancellationReason` из AI (опционально).
+
+**Права:** OWNER/MANAGER — любое отсутствие; сотрудник — только своё. Иначе: «Вы не можете удалить это отсутствие.»
+
+**Pending order** (текстовые сообщения): confirmation → absence selection → absence delegation → task selection → …
+
+Файлы: `absence-cancel-flow.ts`, `absence-cancel-slash-flow.ts`, `pending-absence-selection.ts`, `handle-pending-absence-selection.ts`, `fix-ai-intent-cancel-absence-user.ts`.
 
 ### Дедлайн задачи
 

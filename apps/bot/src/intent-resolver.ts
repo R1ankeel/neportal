@@ -56,6 +56,18 @@ export type ResolvedCreateAbsence = {
   documentNumber?: string;
 };
 
+export type ResolvedCancelAbsence = {
+  intent: "cancel_absence";
+  absenceId: string;
+  absenceUserId: string;
+  absenceUserName: string;
+  type: "SICK_LEAVE" | "VACATION";
+  startDate: string;
+  endDate: string;
+  cancellationReason?: string;
+  cancelledById: string;
+};
+
 export type ResolvedSetTaskDeadline = {
   intent: "set_task_deadline";
   taskId: string;
@@ -124,6 +136,7 @@ export type ResolvedIntent =
   | ResolvedCreateNote
   | ResolvedCreateExpense
   | ResolvedCreateAbsence
+  | ResolvedCancelAbsence
   | ResolvedSetTaskDeadline
   | ResolvedCompleteTask
   | ResolvedCancelTask

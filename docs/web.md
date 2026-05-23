@@ -47,7 +47,7 @@ pnpm --filter @neportal/web dev
 | `/projects/[id]/tasks` | Задачи проекта: название — ссылка на карточку, дедлайн, смена статуса |
 | `/projects/[id]/notes` | Заметки |
 | `/projects/[id]/budgets` | Бюджеты проекта |
-| `/projects/[id]/absences` | Больничные и отпуска участников проекта, затронутые задачи |
+| `/projects/[id]/absences` | Больничные и отпуска участников проекта, затронутые задачи; кнопка «Удалить» (отмена через API) |
 | `/employees` | Сотрудники: список, Telegram username, статус привязки, форма добавления |
 | `/tasks` | Глобальный список задач (название — ссылка на карточку) |
 | `/tasks/[id]` | Карточка задачи: статус, проект, автор, исполнитель, дедлайн, «В работе с» (`startedAt`), описание, результат/причина отмены, комментарии, форма добавления |
@@ -84,6 +84,12 @@ pnpm --filter @neportal/web dev
 - **История передачи** — блок `transfers[]` из `GET /tasks/:id`: дата, инициатор, от кого → кому, статус (`transferStatusLabel`), комментарий, причина отказа для `REJECTED`.
 - Комментарии: автор, дата, метка источника (`noteSourceLabel`: Web / Telegram / Голос Telegram). Если у комментария есть `mentions[]` — строка *«Упомянуты: …»* (ФИО приглашённых).
 - Добавление: Server Action `POST /tasks/:id/comments`, автор — `findWebAuthor` (`src/lib/webAuthor.ts`): **Иван Иванов** OWNER из сида, иначе первый OWNER.
+
+## Отсутствия проекта (`/projects/[id]/absences`)
+
+- Список: `GET /absences?projectId=…` (без отменённых).
+- На карточке — кнопка **Удалить** (`CancelAbsenceButton`): `window.confirm`, затем Server Action `POST /absences/:id/cancel` с автором `findWebAuthor` (как у комментариев к задаче) и `cancellationReason`: «Удалено через Web».
+- После успеха — `revalidatePath` вкладки и обзора проекта.
 
 ## Паттерны UI
 

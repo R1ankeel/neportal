@@ -1,12 +1,19 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   AbsenceStatus,
   AbsenceType,
   PrismaService,
   TaskStatus,
+  UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
-import { CreateAbsenceDto, UpdateAbsenceStatusDto } from "./dto/absence.dto";
+import { CancelAbsenceDto, CreateAbsenceDto, UpdateAbsenceStatusDto } from "./dto/absence.dto";
 import { RecordAbsenceNotificationDto } from "./dto/absence-notification.dto";
 
 export type AbsenceAffectedTask = {
@@ -27,9 +34,13 @@ export type AbsenceListItem = {
   endDate: Date;
   documentNumber: string | null;
   comment: string | null;
+  cancelledAt: Date | null;
+  cancelledById: string | null;
+  cancellationReason: string | null;
   createdAt: Date;
   updatedAt: Date;
   user: { id: string; fullName: string; role: string };
+  cancelledBy: { id: string; fullName: string; role: string } | null;
   affectedTasks: AbsenceAffectedTask[];
 };
 
@@ -114,9 +125,13 @@ export class AbsencesService {
       endDate: Date;
       documentNumber: string | null;
       comment: string | null;
+      cancelledAt: Date | null;
+      cancelledById: string | null;
+      cancellationReason: string | null;
       createdAt: Date;
       updatedAt: Date;
       user: { id: string; fullName: string; role: string };
+      cancelledBy: { id: string; fullName: string; role: string } | null;
     },
     projectId?: string,
     affectedTasksOverride?: AbsenceAffectedTask[],
@@ -135,20 +150,35 @@ export class AbsencesService {
       endDate: absence.endDate,
       documentNumber: absence.documentNumber,
       comment: absence.comment,
+      cancelledAt: absence.cancelledAt,
+      cancelledById: absence.cancelledById,
+      cancellationReason: absence.cancellationReason,
       createdAt: absence.createdAt,
       updatedAt: absence.updatedAt,
       user: absence.user,
+      cancelledBy: absence.cancelledBy,
       affectedTasks,
     };
   }
 
   private userSelect = { id: true, fullName: true, role: true } as const;
 
+  private canCancelAbsence(
+    cancelledBy: { id: string; role: UserRole },
+    absenceUserId: string,
+  ): boolean {
+    if (cancelledBy.role === UserRole.OWNER || cancelledBy.role === UserRole.MANAGER) {
+      return true;
+    }
+    return cancelledBy.id === absenceUserId;
+  }
+
   async findAll(filters: {
     projectId?: string;
     userId?: string;
     type?: AbsenceType;
     status?: AbsenceStatus;
+    includeCancelled?: boolean;
   }) {
     const org = this.orgId();
     let memberUserIds: string[] | undefined;
@@ -171,11 +201,17 @@ export class AbsencesService {
         ...(filters.userId ? { userId: filters.userId } : {}),
         ...(filters.type ? { type: filters.type } : {}),
         ...(filters.status ? { status: filters.status } : {}),
+        ...(!filters.includeCancelled && !filters.status
+          ? { status: { not: AbsenceStatus.CANCELLED } }
+          : {}),
         ...(memberUserIds ? { userId: { in: memberUserIds } } : {}),
       },
       orderBy: { startDate: "desc" },
       take: 100,
-      include: { user: { select: this.userSelect } },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
     });
 
     return Promise.all(
@@ -186,7 +222,10 @@ export class AbsencesService {
   async findOne(id: string, projectId?: string) {
     const absence = await this.prisma.absence.findFirst({
       where: { id, organizationId: this.orgId() },
-      include: { user: { select: this.userSelect } },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
     });
     if (!absence) {
       throw new NotFoundException(`Absence with id "${id}" not found`);
@@ -250,7 +289,10 @@ export class AbsencesService {
         documentNumber: dto.documentNumber,
         comment: dto.comment,
       },
-      include: { user: { select: this.userSelect } },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
     });
 
     const affectedTasks = await this.getAffectedTasks(
@@ -261,6 +303,55 @@ export class AbsencesService {
     );
 
     return this.mapListItem(absence, dto.projectId, affectedTasks);
+  }
+
+  async cancel(id: string, dto: CancelAbsenceDto) {
+    const org = this.orgId();
+    const existing = await this.prisma.absence.findFirst({
+      where: { id, organizationId: org },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Absence with id "${id}" not found`);
+    }
+
+    if (existing.status === AbsenceStatus.CANCELLED) {
+      throw new ConflictException("Отсутствие уже удалено");
+    }
+
+    const cancelledBy = await this.prisma.user.findFirst({
+      where: { id: dto.cancelledById, organizationId: org },
+    });
+    if (!cancelledBy) {
+      throw new NotFoundException(
+        `User with id "${dto.cancelledById}" not found in this organization`,
+      );
+    }
+
+    if (!this.canCancelAbsence(cancelledBy, existing.userId)) {
+      throw new ForbiddenException("Вы не можете удалить это отсутствие");
+    }
+
+    const reason = dto.cancellationReason?.trim() || null;
+
+    const absence = await this.prisma.absence.update({
+      where: { id },
+      data: {
+        status: AbsenceStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledById: cancelledBy.id,
+        cancellationReason: reason,
+      },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
+    });
+
+    return this.mapListItem(absence);
   }
 
   async recordNotification(id: string, dto: RecordAbsenceNotificationDto) {
@@ -325,7 +416,10 @@ export class AbsencesService {
     const absence = await this.prisma.absence.update({
       where: { id },
       data: { status: dto.status },
-      include: { user: { select: this.userSelect } },
+      include: {
+        user: { select: this.userSelect },
+        cancelledBy: { select: this.userSelect },
+      },
     });
 
     return this.mapListItem(absence);

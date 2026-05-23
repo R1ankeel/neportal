@@ -1,3 +1,4 @@
+import { executeCancelAbsence } from "./absence-cancel-flow";
 import { createAbsenceWithImpact } from "./absence-impact-flow";
 import {
   createBudgetExpense,
@@ -114,6 +115,9 @@ export async function executeResolvedIntent(
       const label = resolved.type === "SICK_LEAVE" ? "Больничный" : "Отпуск";
       return `${label} добавлен для ${resolved.user.fullName}: с ${formatIsoDateRu(resolved.startDate)} по ${formatIsoDateRu(resolved.endDate)}.`;
     }
+
+    case "cancel_absence":
+      return executeCancelAbsence(resolved);
 
     case "set_task_deadline": {
       await setTaskDeadline(resolved.taskId, resolved.deadlineDate);

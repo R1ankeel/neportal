@@ -104,6 +104,7 @@ const absenceStatusRu: Record<string, string> = {
   PENDING: "На рассмотрении",
   APPROVED: "Одобрен",
   REJECTED: "Отклонён",
+  CANCELLED: "Отменён",
 };
 
 export function absenceStatusLabel(status: string): string {

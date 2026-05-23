@@ -80,6 +80,7 @@ export function extractUserHintFromIntent(intent: AiIntent): string | undefined 
       raw = intent.payload.assigneeHint;
       break;
     case "create_absence":
+    case "cancel_absence":
       raw = intent.payload.userHint;
       break;
     case "mention_in_task":
@@ -105,6 +106,8 @@ export function selectionTypeForIntent(intent: AiIntent): PendingUserSelectionTy
       return "select_user_for_task_assignee";
     case "create_absence":
       return "select_user_for_absence";
+    case "cancel_absence":
+      return "select_user_for_absence_cancel";
     case "mention_in_task":
       return "select_user_for_mention";
     case "transfer_task":
@@ -136,6 +139,12 @@ export function buildUserSelectionPayload(
         endDate: intent.payload.endDate,
         documentNumber: intent.payload.documentNumber,
         comment: intent.payload.comment,
+      };
+    case "cancel_absence":
+      return {
+        intent: "cancel_absence",
+        type: intent.payload.type,
+        cancellationReason: intent.payload.cancellationReason,
       };
     case "mention_in_task":
       return {

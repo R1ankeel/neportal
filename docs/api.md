@@ -224,12 +224,13 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?` | Список отсутствий |
+| GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?`, `includeCancelled?` | Список отсутствий (по умолчанию без `CANCELLED`) |
 | GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` — `affectedTasks` по проекту |
 | GET | `/absences/:id/affected-tasks` | `projectId?` | Затронутые задачи (по org или по проекту) |
 | POST | `/absences` | — | Создать отсутствие (+ `affectedTasks` в ответе) |
 | POST | `/absences/:id/notifications` | — | Идемпотентная запись отправленного уведомления |
 | PATCH | `/absences/:id/status` | — | Сменить статус |
+| POST | `/absences/:id/cancel` | — | Отменить отсутствие (soft delete, `status` = `CANCELLED`) |
 
 **POST /absences** (`CreateAbsenceDto`):
 
@@ -280,9 +281,22 @@
 { "status": "APPROVED" }
 ```
 
-Типы: `SICK_LEAVE`, `VACATION`. Статусы: `PENDING`, `APPROVED`, `REJECTED`.
+**POST /absences/:id/cancel** (`CancelAbsenceDto`):
 
-**GET /projects/:id/summary** — дополнительно `absencesTotal`, `absencesActiveNow` (одобренные отсутствия, пересекающиеся с сегодняшним днём).
+```json
+{
+  "cancelledById": "cuid",
+  "cancellationReason": "Удалено через Web"
+}
+```
+
+Права: `OWNER` / `MANAGER` — любое отсутствие организации; сотрудник — только своё (`userId` = его id). Устанавливает `status` = `CANCELLED`, `cancelledAt`, `cancelledById`, `cancellationReason` (trimmed или `null`). Ответ включает `user`, `cancelledBy`. Если уже `CANCELLED` — **409** «Отсутствие уже удалено». Нет прав — **403**.
+
+**GET /absences** — по умолчанию записи со статусом `CANCELLED` скрыты. Query `includeCancelled=true` возвращает все статусы.
+
+Типы: `SICK_LEAVE`, `VACATION`. Статусы: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`.
+
+**GET /projects/:id/summary** — `absencesTotal` без `CANCELLED`; `absencesActiveNow` — одобренные (`APPROVED`) отсутствия, пересекающиеся с сегодняшним днём.
 
 ## Коды ошибок
 

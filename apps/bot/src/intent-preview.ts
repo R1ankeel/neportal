@@ -52,6 +52,17 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
       return lines.join("\n") + CONFIRM_FOOTER;
     }
 
+    case "cancel_absence": {
+      const typeLabel = resolved.type === "SICK_LEAVE" ? "больничный" : "отпуск";
+      const lines = [
+        `Удалить ${typeLabel} ${resolved.absenceUserName} с ${formatIsoDateRu(resolved.startDate)} по ${formatIsoDateRu(resolved.endDate)}?`,
+      ];
+      if (resolved.cancellationReason) {
+        lines.push(`Причина: ${resolved.cancellationReason}`);
+      }
+      return lines.join("\n") + CONFIRM_FOOTER;
+    }
+
     case "set_task_deadline":
       return [
         "Установить дедлайн задачи?",

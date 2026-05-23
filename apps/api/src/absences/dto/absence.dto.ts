@@ -48,3 +48,15 @@ export class UpdateAbsenceStatusDto {
   @IsEnum(AbsenceStatus)
   status!: AbsenceStatus;
 }
+
+export class CancelAbsenceDto {
+  @ApiProperty({ description: "Кто отменяет (сотрудник той же организации)" })
+  @IsString()
+  @IsNotEmpty()
+  cancelledById!: string;
+
+  @ApiPropertyOptional({ example: "Удалено через Web" })
+  @IsOptional()
+  @IsString()
+  cancellationReason?: string;
+}

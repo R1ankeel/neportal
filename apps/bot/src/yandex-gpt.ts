@@ -95,7 +95,7 @@ const SYSTEM_PROMPT = `Ты парсер команд для Neportal.
 
 JSON Schema ответа:
 {
-  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  "intent": "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   "confidence": number,
   "requiresConfirmation": boolean,
   "payload": object
@@ -336,6 +336,54 @@ Output:
     "type": "VACATION",
     "startDate": "2026-06-01",
     "endDate": "2026-06-10"
+  }
+}
+
+cancel_absence.payload:
+{ "userHint"?: string, "type"?: "SICK_LEAVE" | "VACATION", "cancellationReason"?: string }
+
+cancel_absence — сотрудник (userHint):
+- «удали мой больничный», «отмени мой отпуск», «у меня» → userHint = "__self__".
+- «удали больничный Васи», «отмени отпуск Маши» → userHint = имя из текста.
+- type: SICK_LEAVE при больничном, VACATION при отпуске; если тип неясен — не добавляй type.
+
+Пример cancel_absence (я):
+Input: «удали мой больничный»
+Output:
+{
+  "intent": "cancel_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "__self__",
+    "type": "SICK_LEAVE"
+  }
+}
+
+Пример cancel_absence (другой):
+Input: «отмени отпуск Васи»
+Output:
+{
+  "intent": "cancel_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "Вася",
+    "type": "VACATION"
+  }
+}
+
+Пример cancel_absence (с причиной):
+Input: «удали больничный Маши, ошибочно добавили»
+Output:
+{
+  "intent": "cancel_absence",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "userHint": "Маша",
+    "type": "SICK_LEAVE",
+    "cancellationReason": "ошибочно добавили"
   }
 }
 

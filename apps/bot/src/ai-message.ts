@@ -31,6 +31,8 @@ import { handlePendingTaskTransferCommentMessage } from "./handle-pending-task-t
 import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-transfer-decision";
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
+import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
+import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
@@ -150,6 +152,10 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  if (await handlePendingAbsenceSelectionMessage(ctx, telegramUserId, text)) {
+    return;
+  }
+
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) {
     return;
   }
@@ -220,6 +226,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
   if (intent.intent === "transfer_task") {
     await handleTransferTaskIntent(ctx, linked, telegramUserId, intent);
+    return;
+  }
+
+  if (intent.intent === "cancel_absence") {
+    await handleCancelAbsenceIntent(ctx, linked, telegramUserId, intent, text);
     return;
   }
 

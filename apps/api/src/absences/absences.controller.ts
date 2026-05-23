@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { AbsenceStatus, AbsenceType } from "@neportal/database";
 import {
+  CancelAbsenceDto,
   CreateAbsenceDto,
   UpdateAbsenceStatusDto,
 } from "./dto/absence.dto";
@@ -19,13 +20,25 @@ export class AbsencesController {
   @ApiQuery({ name: "userId", required: false })
   @ApiQuery({ name: "type", required: false, enum: AbsenceType })
   @ApiQuery({ name: "status", required: false, enum: AbsenceStatus })
+  @ApiQuery({
+    name: "includeCancelled",
+    required: false,
+    description: "Если true — включить отменённые (CANCELLED) в список",
+  })
   findAll(
     @Query("projectId") projectId?: string,
     @Query("userId") userId?: string,
     @Query("type") type?: AbsenceType,
     @Query("status") status?: AbsenceStatus,
+    @Query("includeCancelled") includeCancelled?: string,
   ) {
-    return this.absencesService.findAll({ projectId, userId, type, status });
+    return this.absencesService.findAll({
+      projectId,
+      userId,
+      type,
+      status,
+      includeCancelled: includeCancelled === "true",
+    });
   }
 
   @Get(":id/affected-tasks")
@@ -76,5 +89,12 @@ export class AbsencesController {
   @ApiParam({ name: "id" })
   updateStatus(@Param("id") id: string, @Body() dto: UpdateAbsenceStatusDto) {
     return this.absencesService.updateStatus(id, dto);
+  }
+
+  @Post(":id/cancel")
+  @ApiOperation({ summary: "Отменить отсутствие (soft delete, status CANCELLED)" })
+  @ApiParam({ name: "id" })
+  cancel(@Param("id") id: string, @Body() dto: CancelAbsenceDto) {
+    return this.absencesService.cancel(id, dto);
   }
 }

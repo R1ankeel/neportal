@@ -1,5 +1,6 @@
 import { Bot, type Context } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
+import { handleCancelAbsenceSlashCommand } from "./absence-cancel-slash-flow";
 import {
   handleSickSlashCommand,
   handleVacationSlashCommand,
@@ -75,6 +76,8 @@ bot.command("start", async (ctx) => {
       "/expense <сумма> <описание> — расход",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/cancel-absence — отменить своё отсутствие",
+      "/cancel-absence Вася — отменить отсутствие сотрудника",
       "/start-task <название> — взять задачу в работу",
       "/work <название> — взять задачу в работу",
       "/done <название> — закрыть задачу",
@@ -102,6 +105,8 @@ bot.command("demo", async (ctx) => {
       "/expense <сумма> <описание> — добавить расход в бюджет проекта",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
+      "/cancel-absence — отменить своё отсутствие",
+      "/cancel-absence Вася — отменить отсутствие сотрудника",
       "/deadline Подготовить отчет 22.05.2026 — дедлайн задачи",
       "/start-task Проверить склад — взять задачу в работу",
       "/work Проверить склад — взять задачу в работу",
@@ -120,6 +125,8 @@ bot.command("demo", async (ctx) => {
       "- Запиши заметку: клиент попросил проверить статистику",
       "- Потратил 1500 рублей на рекламу VK",
       "- Вася заболел до 25 мая, больничный 123456",
+      "- удали мой больничный / отмени мой отпуск",
+      "- удали больничный Васи",
       "- Взял задачу Проверить склад в работу",
       "- Беру в работу задачу Заключить договор",
       "- Закрой задачу Проверить склад",
@@ -703,6 +710,19 @@ bot.command("vacation", async (ctx) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] vacation command error: ${msg}`);
+    await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
+  }
+});
+
+bot.command(["cancel-absence", "delete-absence"], async (ctx) => {
+  const payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+  devLog("parsed cancel-absence command", { payload });
+
+  try {
+    await handleCancelAbsenceSlashCommand(ctx, payload);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] cancel-absence command error: ${msg}`);
     await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
   }
 });

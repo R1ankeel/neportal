@@ -77,8 +77,8 @@ erDiagram
 ### Absence
 
 - Типы: `SICK_LEAVE`, `VACATION` (`AbsenceType`).
-- Статусы: `PENDING`, `APPROVED`, `REJECTED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`.
-- Поля: `userId`, `startDate`, `endDate`, опционально `documentNumber`, `comment`.
+- Статусы: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`. Отмена через Web/Telegram — `CANCELLED` (запись в БД сохраняется).
+- Поля: `userId`, `startDate`, `endDate`, опционально `documentNumber`, `comment`; при отмене: `cancelledAt`, `cancelledById`, `cancellationReason`, связь `cancelledBy` → `User`.
 - REST: модуль `AbsencesModule` — см. [api.md](api.md).
 - В выдаче по проекту — `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия, статус `NEW` / `IN_PROGRESS`).
 - `AbsenceNotificationLog` — идемпотентный лог Telegram-уведомлений (`AbsenceNotificationType`: employee summary per task, creator warning, creator notified on delegation).
@@ -101,7 +101,7 @@ erDiagram
 | BudgetStatus | ACTIVE, EXHAUSTED, ARCHIVED |
 | ExpenseStatus | PENDING, APPROVED, REJECTED, CANCELLED |
 | AbsenceType | SICK_LEAVE, VACATION |
-| AbsenceStatus | PENDING, APPROVED, REJECTED |
+| AbsenceStatus | PENDING, APPROVED, REJECTED, CANCELLED |
 | AbsenceNotificationType | ABSENCE_AFFECTED_TASKS_EMPLOYEE, ABSENCE_AFFECTED_TASK_CREATOR, ABSENCE_TASK_DELEGATED_CREATOR |
 | ReminderStatus | SCHEDULED, SENT, CANCELLED |
 

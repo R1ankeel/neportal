@@ -5,7 +5,9 @@ import {
   formatDate,
   taskStatusLabel,
 } from "@/lib/format";
-import type { ApiAbsence } from "@/lib/types";
+import type { ApiAbsence, ApiUser } from "@/lib/types";
+import { findWebAuthor } from "@/lib/webAuthor";
+import { CancelAbsenceButton } from "./CancelAbsenceButton";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +15,18 @@ export default async function ProjectAbsencesPage({ params }: { params: Promise<
   const { id } = await params;
 
   let absences: ApiAbsence[] = [];
+  let users: ApiUser[] = [];
   let error: string | null = null;
   try {
-    absences = await apiGet<ApiAbsence[]>("/absences", { projectId: id });
+    [absences, users] = await Promise.all([
+      apiGet<ApiAbsence[]>("/absences", { projectId: id }),
+      apiGet<ApiUser[]>("/users"),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
+
+  const webAuthor = findWebAuthor(users);
 
   return (
     <div className="space-y-4">
@@ -44,9 +52,20 @@ export default async function ProjectAbsencesPage({ params }: { params: Promise<
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-xl font-semibold">{a.user.fullName}</h3>
-                <span className="text-base text-zinc-600 dark:text-zinc-400">
-                  {absenceTypeLabel(a.type)}
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-base text-zinc-600 dark:text-zinc-400">
+                    {absenceTypeLabel(a.type)}
+                  </span>
+                  {webAuthor ? (
+                    <CancelAbsenceButton
+                      projectId={id}
+                      absenceId={a.id}
+                      employeeFullName={a.user.fullName}
+                      absenceKind={a.type === "SICK_LEAVE" ? "больничный" : "отпуск"}
+                      cancelledById={webAuthor.id}
+                    />
+                  ) : null}
+                </div>
               </div>
 
               <dl className="mt-3 grid gap-2 text-base sm:grid-cols-2">

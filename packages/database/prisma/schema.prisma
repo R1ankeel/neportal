@@ -77,6 +77,7 @@ enum AbsenceStatus {
   PENDING
   APPROVED
   REJECTED
+  CANCELLED
 }
 
 enum ReminderStatus {
@@ -161,6 +162,7 @@ model User {
   approvedExpenses BudgetExpense[] @relation("ExpenseApprover")
   attachments      BudgetExpenseAttachment[]
   absences               Absence[]
+  cancelledAbsences      Absence[]                 @relation("AbsenceCancelledBy")
   reminders              Reminder[]
   taskNotificationLogs   TaskNotificationLog[]
   taskComments           TaskComment[]
@@ -473,6 +475,11 @@ model Absence {
   documentNumber String?
   comment        String?
 
+  cancelledAt          DateTime?
+  cancelledById      String?
+  cancelledBy        User?   @relation("AbsenceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancellationReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -481,6 +488,7 @@ model Absence {
 
   @@index([organizationId])
   @@index([userId])
+  @@index([cancelledById])
 }
 
 model AbsenceNotificationLog {

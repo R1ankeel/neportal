@@ -42,6 +42,7 @@ Zod-схемы для ответа **YandexGPT intent parser** (только р�
 | `create_note` | `text`, `projectHint?` |
 | `create_expense` | `amount`, `projectHint?`, `budgetHint?`, `description?` |
 | `create_absence` | `type`, `endDate`, `userHint?`, `startDate?`, … |
+| `cancel_absence` | `userHint?`, `type?`, `cancellationReason?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` |
 | `unknown` | `reason?` |
 

@@ -61,7 +61,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "list_my_tasks" | "list_user_tasks" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -78,6 +78,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `create_note` | `projectHint?`, `text` (в тексте даты — **DD.MM.YYYY**) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
+| `cancel_absence` | `userHint?`, `type?`: `SICK_LEAVE` \| `VACATION`, `cancellationReason?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
 | `complete_task` | `taskTitle`, `completionResult?` |
 | `cancel_task` | `taskTitle`, `cancellationReason?` |

@@ -9,12 +9,14 @@ import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decisi
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
+import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 
 export type PendingUserSelectionType =
   | "select_user_for_task_assignee"
   | "select_user_for_transfer"
   | "select_user_for_mention"
   | "select_user_for_absence"
+  | "select_user_for_absence_cancel"
   | "select_user_for_absence_delegation_item"
   | "select_user_for_link"
   | "select_user_for_task_list"
@@ -60,6 +62,12 @@ export type AbsenceUserSelectionPayload = {
   comment?: string;
 };
 
+export type CancelAbsenceUserSelectionPayload = {
+  intent: "cancel_absence";
+  type?: "SICK_LEAVE" | "VACATION";
+  cancellationReason?: string;
+};
+
 export type AbsenceDelegationItemUserSelectionPayload = {
   intent: "absence_delegation_item";
   absenceId: string;
@@ -87,6 +95,7 @@ export type UserSelectionPayload =
   | TransferUserSelectionPayload
   | MentionUserSelectionPayload
   | AbsenceUserSelectionPayload
+  | CancelAbsenceUserSelectionPayload
   | AbsenceDelegationItemUserSelectionPayload
   | LinkUserSelectionPayload
   | TaskListUserSelectionPayload;
@@ -150,6 +159,7 @@ export function startPendingUserSelection(
   clearPendingTaskTransferRejection(telegramUserId);
   clearPendingCreateTaskAssignee(telegramUserId);
   clearPendingAbsenceDelegation(telegramUserId);
+  clearPendingAbsenceSelection(telegramUserId);
   setPendingUserSelection(telegramUserId, {
     type,
     candidates,

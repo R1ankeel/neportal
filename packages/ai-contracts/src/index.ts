@@ -17,6 +17,7 @@ export const AiIntentNameSchema = z.enum([
   "create_note",
   "create_expense",
   "create_absence",
+  "cancel_absence",
   "set_task_deadline",
   "complete_task",
   "cancel_task",
@@ -66,6 +67,12 @@ export const CreateAbsencePayloadSchema = z.object({
   endDate: z.string(),
   documentNumber: optionalAiString,
   comment: optionalAiString,
+});
+
+export const CancelAbsencePayloadSchema = z.object({
+  userHint: optionalAiString,
+  type: AbsenceTypeSchema.optional(),
+  cancellationReason: optionalAiString,
 });
 
 export const SetTaskDeadlinePayloadSchema = z.object({
@@ -144,6 +151,11 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: CreateAbsencePayloadSchema,
   }),
   z.object({
+    intent: z.literal("cancel_absence"),
+    ...intentFields,
+    payload: CancelAbsencePayloadSchema,
+  }),
+  z.object({
     intent: z.literal("set_task_deadline"),
     ...intentFields,
     payload: SetTaskDeadlinePayloadSchema,
@@ -200,6 +212,7 @@ export type CreateTaskPayload = z.infer<typeof CreateTaskPayloadSchema>;
 export type CreateNotePayload = z.infer<typeof CreateNotePayloadSchema>;
 export type CreateExpensePayload = z.infer<typeof CreateExpensePayloadSchema>;
 export type CreateAbsencePayload = z.infer<typeof CreateAbsencePayloadSchema>;
+export type CancelAbsencePayload = z.infer<typeof CancelAbsencePayloadSchema>;
 export type SetTaskDeadlinePayload = z.infer<typeof SetTaskDeadlinePayloadSchema>;
 export type CompleteTaskPayload = z.infer<typeof CompleteTaskPayloadSchema>;
 export type CancelTaskPayload = z.infer<typeof CancelTaskPayloadSchema>;
