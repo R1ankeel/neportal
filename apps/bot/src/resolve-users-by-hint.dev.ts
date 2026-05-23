@@ -48,8 +48,6 @@ const AMBIGUOUS_VASYA_CASES: Array<{ hint: string; expected: Expected }> = [
 ];
 
 export function devLogResolveUsersByHintChecks(): void {
-  if (process.env.BOT_DEV_LOG === "0") return;
-
   for (const { hint, expected } of RESOLVE_USER_HINT_DEV_CASES) {
     const result = resolveUsersByHint(TEST_USERS, hint, null);
     const ok = matchExpected(result, expected);

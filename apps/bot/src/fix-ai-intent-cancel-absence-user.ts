@@ -1,16 +1,19 @@
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
+const WB_START = "(?<![\\p{L}\\p{N}_])";
+const WB_END = "(?![\\p{L}\\p{N}_])";
+
 const CANCEL_ABSENCE_SELF_MARKER_PATTERNS: RegExp[] = [
-  /\bмой\s+больничн/iu,
-  /\bмой\s+отпуск\b/iu,
-  /\bмою\s+больничн/iu,
-  /\bмо[йё]\s+отпуск\b/iu,
-  /\bу\s+меня\s+больничн/iu,
-  /\bу\s+меня\s+отпуск\b/iu,
-  /\bотмени\s+мой\b/iu,
-  /\bудали\s+мой\b/iu,
-  /\bотменить\s+мой\b/iu,
-  /\bудалить\s+мой\b/iu,
+  new RegExp(`${WB_START}мой\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}мой\\s+отпуск${WB_END}`, "iu"),
+  new RegExp(`${WB_START}мою\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}мо[йё]\\s+отпуск${WB_END}`, "iu"),
+  new RegExp(`${WB_START}у\\s+меня\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}у\\s+меня\\s+отпуск${WB_END}`, "iu"),
+  new RegExp(`${WB_START}отмени\\s+мой${WB_END}`, "iu"),
+  new RegExp(`${WB_START}удали\\s+мой${WB_END}`, "iu"),
+  new RegExp(`${WB_START}отменить\\s+мой${WB_END}`, "iu"),
+  new RegExp(`${WB_START}удалить\\s+мой${WB_END}`, "iu"),
 ];
 
 export function cancelAbsenceTextHasSelfUserMarker(userText: string): boolean {

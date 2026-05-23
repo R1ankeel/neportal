@@ -845,10 +845,12 @@ bot.on("message:text", async (ctx) => {
 const mode = process.env.BOT_MODE ?? "polling";
 
 async function main() {
-  devLogRelativeMonthDeadlineChecks();
-  devLogCreateTaskAssigneeSelfChecks();
-  devLogCreateAbsenceUserSelfChecks();
-  devLogResolveUsersByHintChecks();
+  if (process.env.BOT_DEV_SELF_CHECKS === "true") {
+    devLogRelativeMonthDeadlineChecks();
+    devLogCreateTaskAssigneeSelfChecks();
+    devLogCreateAbsenceUserSelfChecks();
+    devLogResolveUsersByHintChecks();
+  }
   startTaskNotificationScheduler(bot);
 
   if (mode === "webhook") {

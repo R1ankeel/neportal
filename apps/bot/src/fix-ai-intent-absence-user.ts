@@ -1,14 +1,18 @@
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
+/** JS `\b` не учитывает кириллицу — граница слова через Unicode properties. */
+const WB_START = "(?<![\\p{L}\\p{N}_])";
+const WB_END = "(?![\\p{L}\\p{N}_])";
+
 /** Маркеры отсутствия от первого лица в исходном тексте create_absence. */
 const CREATE_ABSENCE_SELF_MARKER_PATTERNS: RegExp[] = [
-  /\bя\s+заболел[аи]?\b/iu,
-  /\bу\s+меня\s+больничн/iu,
-  /\bя\s+на\s+больничн/iu,
-  /\bмне\s+поставили\s+больничн/iu,
-  /\bя\s+ухожу\s+в\s+отпуск\b/iu,
-  /\bя\s+в\s+отпуске\b/iu,
-  /\bу\s+меня\s+отпуск\b/iu,
+  new RegExp(`${WB_START}я\\s+заболел[аи]?${WB_END}`, "iu"),
+  new RegExp(`${WB_START}у\\s+меня\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}я\\s+на\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}мне\\s+поставили\\s+больничн`, "iu"),
+  new RegExp(`${WB_START}я\\s+ухожу\\s+в\\s+отпуск${WB_END}`, "iu"),
+  new RegExp(`${WB_START}я\\s+в\\s+отпуске${WB_END}`, "iu"),
+  new RegExp(`${WB_START}у\\s+меня\\s+отпуск${WB_END}`, "iu"),
 ];
 
 export function createAbsenceTextHasSelfUserMarker(userText: string): boolean {
@@ -50,8 +54,6 @@ export function isResolvableNamedUserHint(hint: string | undefined): hint is str
 }
 
 export function devLogCreateAbsenceUserSelfChecks(): void {
-  if (process.env.BOT_DEV_LOG === "0") return;
-
   const cases = [
     { text: "Я заболел. Больничный до 25.05.2026", wrong: "Вася" },
     { text: "У меня больничный до 25.05.2026", wrong: null },

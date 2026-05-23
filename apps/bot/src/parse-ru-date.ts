@@ -339,12 +339,10 @@ const RELATIVE_MONTH_DEADLINE_SELF_CHECK_CASES: ReadonlyArray<{
   },
 ];
 
-/** Dev-проверка парсинга «следующий месяц» / «через месяц» (BOT_DEV_LOG=0 отключает). */
+/** Dev-проверка парсинга «следующий месяц» / «через месяц» (запуск из main при BOT_DEV_SELF_CHECKS=true). */
 export function devLogRelativeMonthDeadlineChecks(
   baseDate: string = RELATIVE_MONTH_DEADLINE_SELF_CHECK_BASE,
 ): void {
-  if (process.env.BOT_DEV_LOG === "0") return;
-
   for (const { text, expected } of RELATIVE_MONTH_DEADLINE_SELF_CHECK_CASES) {
     const got = resolveDeadlineFromUserMessage(text, baseDate);
     const ok = got === expected;

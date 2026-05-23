@@ -1,18 +1,22 @@
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 
+/** JS `\b` не учитывает кириллицу — граница слова через Unicode properties. */
+const WB_START = "(?<![\\p{L}\\p{N}_])";
+const WB_END = "(?![\\p{L}\\p{N}_])";
+
 /**
  * Явные маркеры «исполнитель = я» в исходном тексте create_task.
  * Только create_task — не transfer/mention.
  */
 const CREATE_TASK_SELF_MARKER_PATTERNS: RegExp[] = [
-  /поставь\s+мне\b/iu,
-  /поставь\s+задачу\s+мне\b/iu,
-  /поставь\s+мне\s+задачу\b/iu,
-  /запиши\s+мне\s+в\s+задач/iu,
-  /добавь\s+мне\s+задачу\b/iu,
-  /\bна\s+меня\b/iu,
-  /\bсебе\b/iu,
-  /\bдля\s+меня\b/iu,
+  new RegExp(`${WB_START}поставь\\s+мне${WB_END}`, "iu"),
+  new RegExp(`${WB_START}поставь\\s+задачу\\s+мне${WB_END}`, "iu"),
+  new RegExp(`${WB_START}поставь\\s+мне\\s+задачу${WB_END}`, "iu"),
+  new RegExp(`${WB_START}запиши\\s+мне\\s+в\\s+задач`, "iu"),
+  new RegExp(`${WB_START}добавь\\s+мне\\s+задачу${WB_END}`, "iu"),
+  new RegExp(`${WB_START}на\\s+меня${WB_END}`, "iu"),
+  new RegExp(`${WB_START}себе${WB_END}`, "iu"),
+  new RegExp(`${WB_START}для\\s+меня${WB_END}`, "iu"),
 ];
 
 export function createTaskTextHasSelfAssigneeMarker(userText: string): boolean {
@@ -53,8 +57,6 @@ export const CREATE_TASK_ASSIGNEE_SELF_CHECK_CASES: Array<{
 ];
 
 export function devLogCreateTaskAssigneeSelfChecks(): void {
-  if (process.env.BOT_DEV_LOG === "0") return;
-
   for (const { text, wrongAssigneeHint } of CREATE_TASK_ASSIGNEE_SELF_CHECK_CASES) {
     const payload: Record<string, unknown> = {
       assigneeHint: wrongAssigneeHint,
