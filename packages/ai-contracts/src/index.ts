@@ -111,8 +111,13 @@ export const StartTaskPayloadSchema = z.object({
 });
 
 export const AddTaskCommentPayloadSchema = z.object({
-  taskTitle: z.string().min(1),
+  taskQuery: optionalAiStringMin1,
+  taskId: optionalAiString,
+  taskTitle: optionalAiStringMin1,
+  comment: optionalAiStringMin1,
+  /** @deprecated use comment */
   text: optionalAiStringMin1,
+  mentionedUserId: optionalAiString,
 });
 
 export const MentionInTaskPayloadSchema = z.object({

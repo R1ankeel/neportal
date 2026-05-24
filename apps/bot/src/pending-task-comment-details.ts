@@ -1,4 +1,4 @@
-export type PendingTaskCommentDetails = {
+export type PendingTaskCommentText = {
   type: "awaiting_task_comment_text";
   taskId: string;
   taskTitle: string;
@@ -6,6 +6,16 @@ export type PendingTaskCommentDetails = {
   assigneeId: string | null;
   createdAt: number;
 };
+
+export type PendingTaskCommentMissingTask = {
+  type: "awaiting_task_for_comment";
+  commentText: string;
+  createdAt: number;
+};
+
+export type PendingTaskCommentDetails =
+  | PendingTaskCommentText
+  | PendingTaskCommentMissingTask;
 
 const pendingCommentByTelegramUserId = new Map<number, PendingTaskCommentDetails>();
 
@@ -19,9 +29,20 @@ export function getPendingTaskCommentDetails(
 
 export function setPendingTaskCommentDetails(
   telegramUserId: number,
-  pending: PendingTaskCommentDetails,
+  pending: PendingTaskCommentText,
 ): void {
   pendingCommentByTelegramUserId.set(telegramUserId, pending);
+}
+
+export function setPendingTaskCommentMissingTask(
+  telegramUserId: number,
+  commentText: string,
+): void {
+  pendingCommentByTelegramUserId.set(telegramUserId, {
+    type: "awaiting_task_for_comment",
+    commentText: commentText.trim(),
+    createdAt: Date.now(),
+  });
 }
 
 export function clearPendingTaskCommentDetails(telegramUserId: number): void {

@@ -2,6 +2,7 @@ import { preprocessAiIntentInput } from "./ai-contracts";
 import { applyCreateAbsenceUserSelfFix } from "./fix-ai-intent-absence-user";
 import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-user";
 import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
+import { applyAddTaskCommentPayloadFix } from "./fix-ai-intent-add-task-comment";
 import { applyCreateTaskPayloadCompatibilityFix } from "./fix-ai-intent-create-task";
 import {
   coerceDeadlineDateLoose,
@@ -81,6 +82,8 @@ export function fixAiIntentBeforeValidation(
     applyCancelAbsenceUserSelfFix(p, opts.userText);
   } else if (intent === "set_task_deadline") {
     applyDeadlineFields(p, intent as string, opts);
+  } else if (intent === "add_task_comment") {
+    applyAddTaskCommentPayloadFix(p, opts.userText);
   }
 
   return { ...obj, payload: p };

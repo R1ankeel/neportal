@@ -160,7 +160,7 @@ export async function continueAfterTaskSelection(
           requiresConfirmation: true,
           payload: {
             taskTitle: resolved.taskTitle,
-            text: resolved.text,
+            comment: resolved.text,
           },
         },
         resolved,

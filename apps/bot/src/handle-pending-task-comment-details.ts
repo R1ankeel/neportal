@@ -1,6 +1,8 @@
 import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
+import { buildAddTaskCommentPayload } from "./add-task-comment-payload";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
+import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { buildIntentPreview } from "./intent-preview";
 import {
   clearPendingConfirmation,
@@ -13,21 +15,22 @@ import {
 } from "./pending-task-comment-details";
 import { isPendingDetailsCancel } from "./pending-task-status-details";
 import type { ResolvedAddTaskComment } from "./intent-resolver";
+import { questionForMissingComment } from "./task-comment-flow";
 
 function syntheticCommentIntent(
   taskTitle: string,
-  text: string,
+  comment: string,
 ): AiIntent {
   return {
     intent: "add_task_comment",
     confidence: 1,
     requiresConfirmation: true,
-    payload: { taskTitle, text },
+    payload: buildAddTaskCommentPayload({ taskTitle, comment }),
   };
 }
 
 /**
- * Ожидание текста комментария. Возвращает true, если сообщение обработано.
+ * Ожидание текста комментария или уточнения задачи. Возвращает true, если сообщение обработано.
  */
 export async function handlePendingTaskCommentDetailsMessage(
   ctx: Context,
@@ -49,16 +52,37 @@ export async function handlePendingTaskCommentDetailsMessage(
     return true;
   }
 
-  const commentText = text.trim();
-  if (!commentText) {
-    await ctx.reply(questionForEmptyComment(pending.taskTitle));
-    return true;
-  }
-
   const linked = await getLinkedUserByTelegramId(telegramUserId);
   if (!linked) {
     clearPendingTaskCommentDetails(telegramUserId);
     await ctx.reply(NOT_LINKED_MESSAGE);
+    return true;
+  }
+
+  if (pending.type === "awaiting_task_for_comment") {
+    const taskQuery = text.trim();
+    if (!taskQuery) {
+      await ctx.reply("К какой задаче добавить комментарий?");
+      return true;
+    }
+
+    clearPendingTaskCommentDetails(telegramUserId);
+    const intent: AiIntent = {
+      intent: "add_task_comment",
+      confidence: 1,
+      requiresConfirmation: true,
+      payload: buildAddTaskCommentPayload({
+        taskQuery,
+        comment: pending.commentText,
+      }),
+    };
+    await handleAddTaskCommentIntent(ctx, linked, telegramUserId, intent);
+    return true;
+  }
+
+  const commentText = text.trim();
+  if (!commentText) {
+    await ctx.reply(questionForMissingComment());
     return true;
   }
 
@@ -81,8 +105,4 @@ export async function handlePendingTaskCommentDetailsMessage(
 
   await ctx.reply(buildIntentPreview(resolved));
   return true;
-}
-
-function questionForEmptyComment(taskTitle: string): string {
-  return `Что написать в комментарии к задаче «${taskTitle}»?`;
 }

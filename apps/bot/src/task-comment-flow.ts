@@ -20,6 +20,10 @@ import { notifyTaskCommentAdded } from "./task-notifications";
 
 export { canModifyTask as canCommentTask };
 
+export function questionForMissingComment(): string {
+  return "Какой комментарий добавить?";
+}
+
 export function questionForCommentText(taskTitle: string): string {
   return `Что написать в комментарии к задаче «${taskTitle}»?`;
 }
@@ -54,7 +58,7 @@ export function startPendingTaskCommentDetails(
     assigneeId: task.assigneeId,
     createdAt: Date.now(),
   });
-  return questionForCommentText(task.title);
+  return questionForMissingComment();
 }
 
 export type TaskCommentLookupResult =

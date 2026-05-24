@@ -558,7 +558,7 @@ bot.command("comment", async (ctx) => {
         requiresConfirmation: true,
         payload: {
           taskTitle: resolved.taskTitle,
-          text: resolved.text,
+          comment: resolved.text,
         },
       },
       resolved,

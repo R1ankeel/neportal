@@ -64,7 +64,10 @@ export async function applyFieldEdit(
 
     case "commentText": {
       if (intent.intent === "add_task_comment") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, text: value } } };
+        return {
+          ok: true,
+          intent: { ...intent, payload: { ...intent.payload, comment: value } },
+        };
       }
       if (intent.intent === "mention_in_task") {
         return { ok: true, intent: { ...intent, payload: { ...intent.payload, text: value } } };
@@ -77,7 +80,10 @@ export async function applyFieldEdit(
         case "add_task_comment":
           return {
             ok: true,
-            intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
+            intent: {
+              ...intent,
+              payload: { ...intent.payload, taskTitle: value, taskQuery: value },
+            },
           };
         case "mention_in_task":
           return {
