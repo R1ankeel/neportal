@@ -242,7 +242,8 @@ export function validateAddTaskCommentPayload(params: {
   }
 
   const commentLooksLikeFullUserMessage =
-    Boolean(comment) &&
+    comment != null &&
+    comment.length > 0 &&
     userText.length > 0 &&
     textsAlmostEqual(comment, userText) &&
     Boolean(taskQuery || payload.taskTitle?.trim());
