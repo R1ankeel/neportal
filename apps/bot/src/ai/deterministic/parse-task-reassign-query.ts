@@ -1,21 +1,15 @@
 import type { AiIntent } from "../../ai-contracts";
 import { normalizeTaskSearchText, tokenizeForTaskMatch } from "../../task-search-text";
-import { SELF_HINT_MARKER } from "../../resolve-users-by-hint";
+import type { ApiUser } from "../../api";
+import {
+  deterministicParseTransferCommand,
+  type ParsedTransferParts,
+} from "../../transfer-query-parse";
 
 export type TaskReassignLikeIntent = Extract<
   AiIntent,
   { intent: "transfer_task" } | { intent: "reassign_task" }
 >;
-
-function normalizeReassignInput(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/\s+/g, " ")
-    .replace(/[.!?]+$/g, "")
-    .trim();
-}
 
 function extractPreservingCase(original: string, normalizedNeedle: string): string {
   const needle = normalizedNeedle.trim();
@@ -56,107 +50,33 @@ export function cleanTaskTitleFromReassignPhrase(taskTitleNorm: string): string 
   return cleaned || taskTitleNorm.trim();
 }
 
-type ParsedReassign = {
-  taskTitleNorm: string;
-  toUserNorm?: string;
-  fromUserNorm?: string;
-  toSelf?: boolean;
-};
-
-const REASSIGN_FROM_TO_RE =
-  /^(?:перекинь|перенеси|переназначь)(?:те)?\s+задачу\s+(.+?)\s+с\s+(\p{L}+(?:\s+\p{L}+)?)\s+на\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
-
-const SELF_TO_PATTERNS: RegExp[] = [
-  /^(?:передай|перекинь|перенеси|переназначь|забери|назначь)(?:те)?\s+мне\s+задачу\s+(.+)$/iu,
-  /^(?:передай|перекинь|перенеси|переназначь|забери|назначь)(?:те)?\s+задачу\s+мне\s+(.+)$/iu,
-  /^(?:переведи|перекинь|перенеси|переназначь)(?:те)?\s+на\s+меня\s+(.+)$/iu,
-  /^(?:переведи|перекинь|перенеси|переназначь)(?:те)?\s+задачу\s+на\s+меня\s+(.+)$/iu,
-];
-
-const TASK_ON_USER_RE =
-  /^(?:перекинь|перенеси|переназначь|передай)(?:те)?\s+задачу\s+(.+?)\s+на\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
-
-const TASK_TO_USER_RE =
-  /^(?:передай)(?:те)?\s+задачу\s+(.+?)\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
-
-function matchReassignPhrase(normalized: string): ParsedReassign | null {
-  const fromTo = normalized.match(REASSIGN_FROM_TO_RE);
-  if (fromTo?.[1] && fromTo[2] && fromTo[3]) {
-    return {
-      taskTitleNorm: fromTo[1].trim(),
-      fromUserNorm: fromTo[2].trim(),
-      toUserNorm: fromTo[3].trim(),
-    };
-  }
-
-  for (const re of SELF_TO_PATTERNS) {
-    const m = normalized.match(re);
-    if (m?.[1]) {
-      return { taskTitleNorm: m[1].trim(), toSelf: true };
-    }
-  }
-
-  const onUser = normalized.match(TASK_ON_USER_RE);
-  if (onUser?.[1] && onUser[2]) {
-    const toNorm = onUser[2].trim();
-    if (toNorm === "меня" || toNorm === "мне") {
-      return { taskTitleNorm: onUser[1].trim(), toSelf: true };
-    }
-    return {
-      taskTitleNorm: onUser[1].trim(),
-      toUserNorm: toNorm,
-    };
-  }
-
-  const toUser = normalized.match(TASK_TO_USER_RE);
-  if (toUser?.[1] && toUser[2]) {
-    const toNorm = toUser[2].trim();
-    if (toNorm === "меня" || toNorm === "мне") {
-      return { taskTitleNorm: toUser[1].trim(), toSelf: true };
-    }
-    return {
-      taskTitleNorm: toUser[1].trim(),
-      toUserNorm: toNorm,
-    };
-  }
-
-  return null;
-}
-
 function preferReassign(role?: string): boolean {
   if (!role) return true;
   const r = role.toUpperCase();
   return r === "OWNER" || r === "MANAGER";
 }
 
-/**
- * Детерминированный разбор переназначения/передачи задачи до YandexGPT.
- */
-export function parseTaskReassignQuery(
-  text: string,
-  currentUserRole?: string,
+function buildIntent(
+  trimmed: string,
+  parts: ParsedTransferParts,
+  options: { useReassign: boolean; comment?: string },
 ): TaskReassignLikeIntent | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  const normalized = normalizeReassignInput(trimmed);
-  const parsed = matchReassignPhrase(normalized);
-  if (!parsed?.taskTitleNorm) return null;
-
-  const taskTitleRaw = extractPreservingCase(trimmed, parsed.taskTitleNorm);
+  const taskTitleRaw = extractPreservingCase(trimmed, parts.taskTitleNorm);
   const taskTitle = cleanTaskTitleFromReassignPhrase(taskTitleRaw);
   if (!taskTitle) return null;
 
-  const useReassign = preferReassign(currentUserRole) || Boolean(parsed.fromUserNorm);
+  const comment = options.comment?.trim();
+  const commentField = comment ? { comment } : {};
 
-  if (parsed.toSelf) {
+  if (parts.toSelf) {
     const payload: Extract<AiIntent, { intent: "reassign_task" }>["payload"] = {
       taskTitle,
-      toUserHint: SELF_HINT_MARKER,
+      toUserHint: "__self__",
+      ...commentField,
     };
-    if (parsed.fromUserNorm) {
+    if (parts.fromUserNorm) {
       payload.fromUserHint = capitalizeHint(
-        extractPreservingCase(trimmed, parsed.fromUserNorm),
+        extractPreservingCase(trimmed, parts.fromUserNorm),
       );
     }
     return {
@@ -167,19 +87,20 @@ export function parseTaskReassignQuery(
     };
   }
 
-  if (!parsed.toUserNorm) return null;
+  if (!parts.toUserNorm) return null;
 
-  const toUserHint = capitalizeHint(extractPreservingCase(trimmed, parsed.toUserNorm));
+  const toUserHint = capitalizeHint(extractPreservingCase(trimmed, parts.toUserNorm));
   if (!toUserHint) return null;
 
-  if (parsed.fromUserNorm || useReassign) {
+  if (parts.fromUserNorm || options.useReassign) {
     const payload: Extract<AiIntent, { intent: "reassign_task" }>["payload"] = {
       taskTitle,
       toUserHint,
+      ...commentField,
     };
-    if (parsed.fromUserNorm) {
+    if (parts.fromUserNorm) {
       payload.fromUserHint = capitalizeHint(
-        extractPreservingCase(trimmed, parsed.fromUserNorm),
+        extractPreservingCase(trimmed, parts.fromUserNorm),
       );
     }
     return {
@@ -197,6 +118,34 @@ export function parseTaskReassignQuery(
     payload: {
       taskTitle,
       toUserHint,
+      ...commentField,
     },
   };
+}
+
+/**
+ * Детерминированный разбор переназначения/передачи задачи до YandexGPT.
+ */
+export function parseTaskReassignQuery(
+  text: string,
+  currentUserRole?: string,
+  options?: { users?: ApiUser[]; currentUser?: ApiUser | null },
+): TaskReassignLikeIntent | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  if (!options?.users?.length) {
+    return null;
+  }
+
+  const deterministic = deterministicParseTransferCommand(trimmed, {
+    users: options.users,
+    currentUser: options.currentUser ?? null,
+  });
+  if (!deterministic) return null;
+
+  return buildIntent(trimmed, deterministic.parts, {
+    useReassign: preferReassign(currentUserRole) || Boolean(deterministic.parts.fromUserNorm),
+    comment: deterministic.comment,
+  });
 }

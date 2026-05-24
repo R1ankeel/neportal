@@ -1,21 +1,14 @@
 import type { AiIntent } from "./ai-contracts";
 import type { ApiUser } from "./api";
-import { resolveUsersByHint } from "./resolve-users-by-hint";
+import {
+  deterministicParseTransferCommand,
+  peelTransferTrailingComment,
+} from "./transfer-query-parse";
 
 export type TaskTransferLikeIntent = Extract<
   AiIntent,
   { intent: "transfer_task" } | { intent: "reassign_task" }
 >;
-
-function normalizeTransferInput(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/\s+/g, " ")
-    .replace(/[.!?]+$/g, "")
-    .trim();
-}
 
 function extractPreservingCase(original: string, normalizedNeedle: string): string {
   const needle = normalizedNeedle.trim();
@@ -39,138 +32,52 @@ function capitalizeName(value: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-type ParsedTransfer = {
-  taskTitleNorm: string;
-  toUserNorm: string;
-  fromUserNorm?: string;
-};
-
-const REASSIGN_FROM_TO_RE =
-  /^(?:перекинь|перенеси|переназначь)(?:те)?\s+задачу\s+(.+?)\s+с\s+(\p{L}+(?:\s+\p{L}+)?)\s+на\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
-
-const TASK_ON_USER_RE =
-  /^(?:перекинь|перенеси|переназначь|передай)(?:те)?\s+задачу\s+(.+?)\s+на\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
-
-/** «передай задачу … Васе» — один токен получателя в конце. */
-const TASK_TO_USER_RE =
-  /^(?:передай)(?:те)?\s+задачу\s+(.+?)\s+(\p{L}+)$/iu;
-
-/** «передай задачу по <task> <user>» — один токен получателя в конце. */
-const TASK_PO_TO_USER_RE =
-  /^(?:передай)(?:те)?\s+задачу\s+по\s+(.+?)\s+(\p{L}+)$/iu;
-
-const TRANSFER_TASK_PREFIX_RE =
-  /^(?:передай|перекинь|перенеси|переназначь)(?:те)?\s+задачу\s+/iu;
-
-/**
- * Отделяет taskQuery и toUserHint с конца, если resolver уверенно находит сотрудника.
- */
-function trySplitTransferWithResolver(
+function buildIntentFromParts(
   trimmed: string,
-  users: ApiUser[],
-  currentUser: ApiUser | null,
-): ParsedTransfer | null {
-  const prefix = trimmed.match(TRANSFER_TASK_PREFIX_RE);
-  if (!prefix) return null;
-
-  let tail = trimmed.slice(prefix[0].length).trim();
-  if (!tail) return null;
-
-  if (/^по\s+/iu.test(tail)) {
-    tail = tail.replace(/^по\s+/iu, "").trim();
-  }
-
-  const words = tail.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return null;
-
-  for (let take = 2; take >= 1; take--) {
-    if (words.length <= take) continue;
-    const userWords = words.slice(-take).join(" ");
-    const taskWords = words.slice(0, -take).join(" ");
-    if (!taskWords.trim() || !userWords.trim()) continue;
-
-    const resolved = resolveUsersByHint(users, userWords, currentUser);
-    if (resolved.kind !== "one") continue;
-
-    return {
-      taskTitleNorm: taskWords.trim(),
-      toUserNorm: userWords.trim(),
-    };
-  }
-
-  return null;
-}
-
-function matchTransfer(normalized: string): ParsedTransfer | null {
-  const fromTo = normalized.match(REASSIGN_FROM_TO_RE);
-  if (fromTo?.[1] && fromTo[2] && fromTo[3]) {
-    return {
-      taskTitleNorm: fromTo[1].trim(),
-      fromUserNorm: fromTo[2].trim(),
-      toUserNorm: fromTo[3].trim(),
-    };
-  }
-
-  const poUser = normalized.match(TASK_PO_TO_USER_RE);
-  if (poUser?.[1] && poUser[2]) {
-    return {
-      taskTitleNorm: poUser[1].trim(),
-      toUserNorm: poUser[2].trim(),
-    };
-  }
-
-  const onUser = normalized.match(TASK_ON_USER_RE);
-  if (onUser?.[1] && onUser[2]) {
-    return {
-      taskTitleNorm: onUser[1].trim(),
-      toUserNorm: onUser[2].trim(),
-    };
-  }
-
-  const toUser = normalized.match(TASK_TO_USER_RE);
-  if (toUser?.[1] && toUser[2]) {
-    return {
-      taskTitleNorm: toUser[1].trim(),
-      toUserNorm: toUser[2].trim(),
-    };
-  }
-
-  return null;
-}
-
-/**
- * Детерминированный разбор «перекинь задачу … на Ивана» до YandexGPT.
- * preferReassign: true для OWNER/MANAGER → reassign_task, иначе transfer_task.
- */
-export function parseTaskTransferLikeQuery(
-  text: string,
-  options?: {
-    preferReassign?: boolean;
-    users?: ApiUser[];
-    currentUser?: ApiUser | null;
+  parsed: {
+    taskTitleNorm: string;
+    toUserNorm: string;
+    fromUserNorm?: string;
+    toSelf?: boolean;
   },
+  options: { preferReassign?: boolean; comment?: string },
 ): TaskTransferLikeIntent | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  const normalized = normalizeTransferInput(trimmed);
-  const parsed =
-    (options?.users?.length
-      ? trySplitTransferWithResolver(trimmed, options.users, options.currentUser ?? null)
-      : null) ?? matchTransfer(normalized);
-  if (!parsed?.taskTitleNorm || !parsed.toUserNorm) return null;
-
   const taskTitle = extractPreservingCase(trimmed, parsed.taskTitleNorm);
-  const toUserHint = capitalizeName(extractPreservingCase(trimmed, parsed.toUserNorm));
-  if (!taskTitle || !toUserHint) return null;
+  if (!taskTitle) return null;
 
-  const preferReassign = options?.preferReassign === true;
+  const preferReassign = options.preferReassign === true;
   const hasFrom = Boolean(parsed.fromUserNorm?.trim());
+
+  const comment = options.comment?.trim();
+  const commentField = comment ? { comment } : {};
+
+  if (parsed.toSelf) {
+    const payload: Extract<AiIntent, { intent: "reassign_task" }>["payload"] = {
+      taskTitle,
+      toUserHint: "__self__",
+      ...commentField,
+    };
+    if (parsed.fromUserNorm) {
+      payload.fromUserHint = capitalizeName(
+        extractPreservingCase(trimmed, parsed.fromUserNorm),
+      );
+    }
+    return {
+      intent: "reassign_task",
+      confidence: 0.93,
+      requiresConfirmation: true,
+      payload,
+    };
+  }
+
+  const toUserHint = capitalizeName(extractPreservingCase(trimmed, parsed.toUserNorm));
+  if (!toUserHint) return null;
 
   if (hasFrom || preferReassign) {
     const payload: Extract<AiIntent, { intent: "reassign_task" }>["payload"] = {
       taskTitle,
       toUserHint,
+      ...commentField,
     };
     if (parsed.fromUserNorm) {
       payload.fromUserHint = capitalizeName(
@@ -192,6 +99,41 @@ export function parseTaskTransferLikeQuery(
     payload: {
       taskTitle,
       toUserHint,
+      ...commentField,
     },
   };
+}
+
+/**
+ * Детерминированный разбор «перекинь задачу … на Ивана» до YandexGPT.
+ * preferReassign: true для OWNER/MANAGER → reassign_task, иначе transfer_task.
+ */
+export function parseTaskTransferLikeQuery(
+  text: string,
+  options?: {
+    preferReassign?: boolean;
+    users?: ApiUser[];
+    currentUser?: ApiUser | null;
+  },
+): TaskTransferLikeIntent | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const { comment: peeledComment } = peelTransferTrailingComment(trimmed);
+
+  if (options?.users?.length) {
+    const deterministic = deterministicParseTransferCommand(trimmed, {
+      users: options.users,
+      currentUser: options.currentUser ?? null,
+    });
+    if (deterministic) {
+      return buildIntentFromParts(trimmed, deterministic.parts, {
+        preferReassign: options.preferReassign,
+        comment: deterministic.comment ?? peeledComment,
+      });
+    }
+    return null;
+  }
+
+  return null;
 }

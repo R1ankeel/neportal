@@ -24,6 +24,7 @@ const ALIAS_SMOKE_USERS: ApiUser[] = [
   withAliases("Мария Иванова", "maria"),
   withAliases("Петр Сидоров", "petr"),
   withAliases("Сабир Махмудов", "sabir"),
+  withAliases("Вася Пупкин", "vasya"),
 ];
 
 function devCheckPromptGroupRoutes(): void {
@@ -128,11 +129,38 @@ function devCheckTransferSabir(): void {
   const ok =
     intent?.intent === "transfer_task" &&
     intent.payload.toUserHint.toLowerCase().includes("сабир") &&
+    !intent.payload.toUserHint.toLowerCase().includes("склад") &&
     intent.payload.taskTitle.toLowerCase().includes("склад");
   devLog(`transfer по складу Сабирчику ${ok ? "OK" : "FAIL"}`, {
     intent: intent?.intent,
-    taskTitle: intent?.payload.taskTitle,
+    taskTitle: intent?.intent === "transfer_task" ? intent.payload.taskTitle : undefined,
     toUserHint: intent?.intent === "transfer_task" ? intent.payload.toUserHint : undefined,
+  });
+
+  const withComment = parseTaskTransferLikeQuery("перекинь отчет на Машу, я не успеваю", {
+    users: ALIAS_SMOKE_USERS,
+    currentUser: null,
+  });
+  const commentOk =
+    withComment?.intent === "transfer_task" &&
+    withComment.payload.taskTitle.toLowerCase().includes("отчет") &&
+    withComment.payload.toUserHint.toLowerCase().startsWith("маш") &&
+    withComment.payload.comment?.toLowerCase().includes("не успеваю");
+  devLog(`transfer comment comma ${commentOk ? "OK" : "FAIL"}`, {
+    taskTitle: withComment?.intent === "transfer_task" ? withComment.payload.taskTitle : undefined,
+    toUserHint: withComment?.intent === "transfer_task" ? withComment.payload.toUserHint : undefined,
+    comment: withComment?.intent === "transfer_task" ? withComment.payload.comment : undefined,
+  });
+
+  const withBecause = parseTaskTransferLikeQuery(
+    "передай задачу по складу Васе потому что он отвечает за склад",
+    { users: ALIAS_SMOKE_USERS, currentUser: null },
+  );
+  const becauseOk =
+    withBecause?.intent === "transfer_task" &&
+    withBecause.payload.comment?.toLowerCase().includes("отвечает за склад");
+  devLog(`transfer comment потому что ${becauseOk ? "OK" : "FAIL"}`, {
+    comment: withBecause?.intent === "transfer_task" ? withBecause.payload.comment : undefined,
   });
 }
 

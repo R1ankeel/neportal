@@ -11,15 +11,27 @@ import { extractLeadingAssigneeFromCreateTaskMessage } from "./create-task-assig
 import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
 import { parseBasicCreateTask } from "./ai/deterministic/parse-basic-create-task";
 import { parseTaskReassignQuery } from "./ai/deterministic/parse-task-reassign-query";
+import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
 import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-text";
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import { scoreTaskTitleMatch } from "./task-search-text";
 
+function withAliases(fullName: string, id: string): ApiUser {
+  return {
+    id,
+    fullName,
+    role: "EMPLOYEE",
+    systemAliases: systemAliasesToString(generateSystemAliases(fullName)),
+  };
+}
+
 const USER_HINT_TEST_USERS: ApiUser[] = [
-  { id: "1", fullName: "Вася Пупкин", role: "EMPLOYEE" },
-  { id: "2", fullName: "Иван Иванов", role: "EMPLOYEE" },
-  { id: "3", fullName: "Иван Петров", role: "EMPLOYEE" },
+  withAliases("Вася Пупкин", "1"),
+  withAliases("Иван Иванов", "2"),
+  withAliases("Иван Петров", "3"),
+  withAliases("Мария Соколова", "4"),
+  withAliases("Сабир Махмудов", "5"),
 ];
 
 const TASK_MATCH_FIXTURES: ApiTask[] = [
@@ -124,7 +136,10 @@ function devCheckReassignParser(): void {
     "переведи на меня квартальный отчет",
   ];
   for (const text of selfCases) {
-    const parsed = parseTaskReassignQuery(text, "OWNER");
+    const parsed = parseTaskReassignQuery(text, "OWNER", {
+      users: USER_HINT_TEST_USERS,
+      currentUser: null,
+    });
     const ok =
       parsed?.intent === "reassign_task" &&
       parsed.payload.toUserHint === SELF_HINT_MARKER &&
@@ -132,7 +147,10 @@ function devCheckReassignParser(): void {
     devLog(`reassign parser self ${ok ? "OK" : "FAIL"}`, { text, parsed });
   }
 
-  const toOther = parseTaskReassignQuery("перекинь задачу купить бумагу на Машу", "OWNER");
+  const toOther = parseTaskReassignQuery("перекинь задачу купить бумагу на Машу", "OWNER", {
+    users: USER_HINT_TEST_USERS,
+    currentUser: null,
+  });
   const toOtherOk =
     toOther?.intent === "reassign_task" &&
     toOther.payload.taskTitle.toLowerCase().includes("бумаг") &&
@@ -141,27 +159,29 @@ function devCheckReassignParser(): void {
 }
 
 function devCheckTransferParser(): void {
-  const parsed = parseTaskTransferLikeQuery(
+  const ambiguousIvan = parseTaskTransferLikeQuery(
     "перекинь задачу поехать к поставщикам на Ивана",
-    { preferReassign: true },
+    {
+      preferReassign: true,
+      users: USER_HINT_TEST_USERS,
+      currentUser: null,
+    },
   );
-  const ok =
-    parsed?.intent === "reassign_task" &&
-    parsed.payload.taskTitle.toLowerCase().includes("поехать") &&
-    parsed.payload.taskTitle.toLowerCase().includes("поставщик") &&
-    parsed.payload.toUserHint.toLowerCase().startsWith("иван");
-
-  devLog(`transfer parser ${ok ? "OK" : "FAIL"}`, { parsed });
+  devLog(`transfer parser ambiguous null ${ambiguousIvan === null ? "OK" : "FAIL"}`, {
+    parsed: ambiguousIvan,
+  });
 
   const withFrom = parseTaskTransferLikeQuery(
     "перекинь задачу поехать к поставщикам с Васи на Ивана",
-    { preferReassign: true },
+    {
+      preferReassign: true,
+      users: USER_HINT_TEST_USERS,
+      currentUser: null,
+    },
   );
-  const fromOk =
-    withFrom?.intent === "reassign_task" &&
-    withFrom.payload.fromUserHint?.toLowerCase().startsWith("вас") &&
-    withFrom.payload.toUserHint.toLowerCase().startsWith("иван");
-  devLog(`transfer parser from/to ${fromOk ? "OK" : "FAIL"}`, { withFrom });
+  devLog(`transfer parser from/to ambiguous null ${withFrom === null ? "OK" : "FAIL"}`, {
+    parsed: withFrom,
+  });
 }
 
 function devCheckBudgetReceiptEdit(): void {

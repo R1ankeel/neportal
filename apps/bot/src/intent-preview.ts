@@ -120,14 +120,19 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         `Комментарий: ${resolved.text}`,
       ].join("\n") + CONFIRM_FOOTER;
 
-    case "transfer_task":
-      return [
+    case "transfer_task": {
+      const lines = [
         `Передать задачу «${resolved.taskTitle}» сотруднику ${resolved.toUserName}?`,
-        "",
-        `Комментарий: ${resolved.comment?.trim() || "не указан"}`,
-        "",
-        transferPreviewNote(resolved.requestedByRole),
-      ].join("\n") + CONFIRM_FOOTER;
+      ];
+      const reason = resolved.comment?.trim();
+      if (reason) {
+        lines.push("", `Причина: ${reason}`);
+      } else {
+        lines.push("", "Причина: не указана");
+      }
+      lines.push("", transferPreviewNote(resolved.requestedByRole));
+      return lines.join("\n") + CONFIRM_FOOTER;
+    }
 
     case "reassign_task": {
       const was = resolved.currentAssigneeName?.trim() || "не назначен";
@@ -136,7 +141,9 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
         "",
         `Было: ${was}`,
         `Стало: ${resolved.toUserName}`,
-        `Комментарий: ${resolved.comment?.trim() || "не указан"}`,
+        resolved.comment?.trim()
+          ? `Причина: ${resolved.comment.trim()}`
+          : "Причина: не указана",
       ].join("\n") + CONFIRM_FOOTER;
     }
 

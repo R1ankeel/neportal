@@ -25,6 +25,7 @@ import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import { devLogNaturalLanguageSelfChecks } from "./natural-language-self-checks.dev";
 import { devLogValidateAddTaskCommentChecks } from "./validate-add-task-comment-payload.dev";
 import { devLogAiStage2SelfChecks } from "./ai-stage2-self-checks.dev";
+import { devLogTransferCommentFixChecks } from "./fix-ai-intent-transfer-comment.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
@@ -882,6 +883,7 @@ async function main() {
     devLogNaturalLanguageSelfChecks();
     devLogValidateAddTaskCommentChecks();
     devLogAiStage2SelfChecks();
+    devLogTransferCommentFixChecks();
   }
   startTaskNotificationScheduler(bot);
 
