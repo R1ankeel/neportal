@@ -5,6 +5,7 @@ import {
   intentToExtractorGroup,
   type ExtractorPromptGroup,
 } from "./ai/intent-to-prompt-group";
+import { resolveCompletionMaxTokens } from "./ai/completion-max-tokens";
 import { resolvePromptGroup, type PromptGroup } from "./ai/prompt-group-router";
 import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
 import {
@@ -13,6 +14,7 @@ import {
   warnPossibleLostDetailsInDescription,
 } from "./normalize-create-task";
 import {
+  countPromptContextStats,
   formatPromptContextForModel,
   loadIntentPromptContext,
   type IntentPromptContext,
@@ -214,7 +216,7 @@ async function callYandexGpt(
 
 function buildUserPrompt(context: IntentPromptContext, group: PromptGroup, userText: string): string {
   return [
-    formatPromptContextForModel(context, group),
+    formatPromptContextForModel(context, group, userText),
     "",
     "Текст пользователя:",
     userText.trim(),
@@ -241,12 +243,19 @@ async function runGptJsonCall(params: {
 }): Promise<GptCallResult & { systemPrompt: string; userPrompt: string }> {
   const { config, promptGroup, systemPrompt, userPrompt, userText, validate, completionOptions } =
     params;
+  const maxTokens =
+    completionOptions?.maxTokens ?? resolveCompletionMaxTokens(promptGroup);
   const promptChars = systemPrompt.length + userPrompt.length;
-  yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars}`);
+  yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars} maxTokens=${maxTokens}`, {
+    modelUri: config.modelUri,
+  });
 
   let callResult: YandexGptCallResult;
   try {
-    callResult = await callYandexGpt(config, systemPrompt, userPrompt, completionOptions);
+    callResult = await callYandexGpt(config, systemPrompt, userPrompt, {
+      ...completionOptions,
+      maxTokens,
+    });
   } catch (e) {
     throw e;
   }
@@ -333,6 +342,10 @@ export async function requestYandexGptJson(params: {
   return { ok: true, parsed: gptResult.parsed, responseText: gptResult.responseText };
 }
 
+function logIntentParseMetrics(data: Record<string, unknown>): void {
+  yandexGptDevLog("intent-parse metrics", data);
+}
+
 async function runClassifier(
   config: YandexGptConfig,
   userText: string,
@@ -345,7 +358,10 @@ async function runClassifier(
   const promptGroup: PromptGroup = "classifier";
   let context: IntentPromptContext;
   try {
-    context = await loadIntentPromptContext(promptGroup, options);
+    context = await loadIntentPromptContext(promptGroup, {
+      ...options,
+      userText,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[yandex-gpt] failed to load classifier context: ${msg}`);
@@ -364,6 +380,7 @@ async function runClassifier(
       userPrompt,
       userText,
       validate: (parsed) => parseClassifierResult(parsed) !== null,
+      completionOptions: { maxTokens: resolveCompletionMaxTokens(promptGroup) },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -399,12 +416,21 @@ async function runExtractor(
   userText: string,
   options?: ParseTextIntentOptions,
 ): Promise<
-  | { ok: true; parsed: unknown; context: IntentPromptContext; usage: YandexGptTokenUsage | null }
+  | {
+      ok: true;
+      parsed: unknown;
+      context: IntentPromptContext;
+      contextStats: ReturnType<typeof countPromptContextStats>;
+      usage: YandexGptTokenUsage | null;
+    }
   | { ok: false; kind: "invalid_json" | "invalid_schema" | "api_error" }
 > {
   let context: IntentPromptContext;
   try {
-    context = await loadIntentPromptContext(extractorGroup, options);
+    context = await loadIntentPromptContext(extractorGroup, {
+      ...options,
+      userText,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[yandex-gpt] failed to load extractor context: ${msg}`);
@@ -413,6 +439,7 @@ async function runExtractor(
 
   const systemPrompt = buildSystemPrompt(extractorGroup);
   const userPrompt = buildUserPrompt(context, extractorGroup, userText);
+  const contextStats = countPromptContextStats(context, userText);
 
   let gptResult: GptCallResult & { systemPrompt: string; userPrompt: string };
   try {
@@ -422,6 +449,7 @@ async function runExtractor(
       systemPrompt,
       userPrompt,
       userText,
+      completionOptions: { maxTokens: resolveCompletionMaxTokens(extractorGroup) },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -438,7 +466,7 @@ async function runExtractor(
     parsed: gptResult.parsed,
   });
 
-  return { ok: true, parsed: gptResult.parsed, context, usage: gptResult.usage };
+  return { ok: true, parsed: gptResult.parsed, context, usage: gptResult.usage, contextStats };
 }
 
 export async function parseTextIntent(
@@ -452,26 +480,43 @@ export async function parseTextIntent(
     return { ok: false, kind: "disabled" };
   }
 
+  const startedAt = Date.now();
   const routeGroup = resolvePromptGroup(userText);
+  const classifierSkipped = routeGroup !== "classifier";
   let extractorGroup: ExtractorPromptGroup;
   let totalUsage: YandexGptTokenUsage | null = null;
 
-  if (routeGroup !== "classifier") {
+  if (classifierSkipped) {
     extractorGroup = routeGroup;
+    yandexGptDevLog("classifier skipped", { routeGroup });
   } else {
-    const classified = await runClassifier(state.config, userText, options);
+    const classified = await runClassifier(state.config, userText, {
+      ...options,
+      userText,
+    });
     if (!classified.ok) {
       return { ok: false, kind: classified.kind };
     }
     totalUsage = addTokenUsage(totalUsage, classified.usage);
     if ("intent" in classified) {
       logYandexGptTokenUsageTotal(totalUsage);
+      logIntentParseMetrics({
+        routeGroup,
+        classifierSkipped: false,
+        promptGroup: "classifier",
+        latencyMs: Date.now() - startedAt,
+        modelUri: state.config.modelUri,
+        maxTokens: resolveCompletionMaxTokens("classifier"),
+      });
       return { ok: true, intent: classified.intent };
     }
     extractorGroup = classified.extractorGroup;
   }
 
-  const extracted = await runExtractor(state.config, extractorGroup, userText, options);
+  const extracted = await runExtractor(state.config, extractorGroup, userText, {
+    ...options,
+    userText,
+  });
   totalUsage = addTokenUsage(totalUsage, extracted.ok ? extracted.usage : null);
   if (!extracted.ok) {
     return { ok: false, kind: extracted.kind };
@@ -526,6 +571,22 @@ export async function parseTextIntent(
   }
 
   logYandexGptTokenUsageTotal(totalUsage);
+
+  const contextStats = extracted.contextStats;
+  logIntentParseMetrics({
+    routeGroup,
+    classifierSkipped,
+    promptGroup: extractorGroup,
+    latencyMs: Date.now() - startedAt,
+    modelUri: state.config.modelUri,
+    maxTokens: resolveCompletionMaxTokens(extractorGroup),
+    contextUsers: contextStats.users,
+    contextAliases: contextStats.aliasCount,
+    contextTasks: contextStats.tasks,
+    contextBudgets: contextStats.budgets,
+    contextProjects: contextStats.projects,
+    usage: totalUsage,
+  });
 
   yandexGptDevLog("parsed intent", {
     promptGroup: extractorGroup,

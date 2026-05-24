@@ -1,5 +1,4 @@
 import {
-  fetchBudgets,
   fetchMyTasks,
   fetchProjects,
   fetchTasks,
@@ -8,12 +7,14 @@ import {
   type ApiUser,
 } from "./api";
 import type { PromptGroup } from "./ai/prompt-group-router";
-import { pickPromptAliases } from "@neportal/shared";
+import { loadPromptBudgetContext } from "./budget-context-cache";
+import { normalizeName, parseSystemAliasesString, pickPromptAliases } from "@neportal/shared";
 import { todayIsoDate } from "./parse-ru-date";
 
 const MAX_TASKS_IN_CONTEXT = 20;
 const MAX_EMPLOYEES_WITH_ALIASES = 30;
-const MAX_ALIASES_PER_EMPLOYEE = 8;
+const COMPACT_ALIASES_PER_EMPLOYEE = 5;
+const EXPANDED_ALIASES_PER_EMPLOYEE = 8;
 
 export type IntentPromptContext = {
   currentDate: string;
@@ -21,6 +22,14 @@ export type IntentPromptContext = {
   users: ApiUser[];
   budgets: Array<{ title: string; projectName: string }>;
   tasks: Array<{ title: string; projectName: string }>;
+};
+
+export type PromptContextStats = {
+  users: number;
+  aliasCount: number;
+  tasks: number;
+  budgets: number;
+  projects: number;
 };
 
 function isActiveTaskStatus(status: string): boolean {
@@ -60,21 +69,10 @@ async function loadActiveTasks(
     }));
 }
 
-async function loadBudgets(projects: ApiProject[]): Promise<
-  Array<{ title: string; projectName: string }>
-> {
-  const budgets: Array<{ title: string; projectName: string }> = [];
-  for (const project of projects) {
-    const projectBudgets = await fetchBudgets(project.id);
-    for (const budget of projectBudgets) {
-      budgets.push({ title: budget.title, projectName: project.name });
-    }
-  }
-  return budgets;
-}
-
 export type LoadIntentPromptContextOptions = {
   linkedUserId?: string;
+  /** Текст пользователя — для hint-based расширения aliases в prompt. */
+  userText?: string;
 };
 
 /** Загружает только контекст, нужный для выбранной группы промпта. */
@@ -99,7 +97,9 @@ export async function loadIntentPromptContext(
     }
     case "expense": {
       const projects = await fetchProjects();
-      const budgets = await loadBudgets(projects);
+      const { rows: budgets } = await loadPromptBudgetContext(projects, {
+        linkedUserId: options?.linkedUserId,
+      });
       return { ...empty, projects, budgets };
     }
     case "absence":
@@ -122,9 +122,59 @@ export async function loadIntentPromptContext(
   }
 }
 
+function aliasMentionedInUserText(alias: string, userText: string): boolean {
+  const a = normalizeName(alias);
+  const t = normalizeName(userText);
+  if (!a || !t) return false;
+  if (t.includes(a) || a.includes(t)) return true;
+
+  const minLen = Math.min(a.length, t.length);
+  if (minLen < 3) return false;
+  let common = 0;
+  while (common < minLen && a[common] === t[common]) common++;
+  return common >= 3;
+}
+
+/** Aliases для LLM: компактно, с расширением при упоминании в userText. */
+export function pickAliasesForPrompt(user: ApiUser, userText?: string): string[] {
+  const parsed = parseSystemAliasesString(user.systemAliases);
+  if (parsed.length === 0) return [];
+
+  const trimmedText = userText?.trim();
+  if (!trimmedText) {
+    return pickPromptAliases(user.systemAliases, COMPACT_ALIASES_PER_EMPLOYEE);
+  }
+
+  const mentioned = parsed.filter((alias) => aliasMentionedInUserText(alias, trimmedText));
+  if (mentioned.length === 0) {
+    return pickPromptAliases(user.systemAliases, COMPACT_ALIASES_PER_EMPLOYEE);
+  }
+
+  const rest = parsed.filter((alias) => !mentioned.includes(alias));
+  return [...mentioned, ...rest].slice(0, EXPANDED_ALIASES_PER_EMPLOYEE);
+}
+
+export function countPromptContextStats(
+  ctx: IntentPromptContext,
+  userText?: string,
+): PromptContextStats {
+  let aliasCount = 0;
+  for (const user of ctx.users) {
+    aliasCount += pickAliasesForPrompt(user, userText).length;
+  }
+  return {
+    users: ctx.users.length,
+    aliasCount,
+    tasks: ctx.tasks.length,
+    budgets: ctx.budgets.length,
+    projects: ctx.projects.length,
+  };
+}
+
 export function formatPromptContextForModel(
   ctx: IntentPromptContext,
   group: PromptGroup,
+  userText?: string,
 ): string {
   const lines: string[] = [`Текущая дата: ${ctx.currentDate}`];
 
@@ -145,7 +195,7 @@ export function formatPromptContextForModel(
     group === "classifier";
 
   if (includeUsers && ctx.users.length > 0) {
-    lines.push("", "Сотрудники:", ...formatEmployeesForPrompt(ctx.users));
+    lines.push("", "Сотрудники:", ...formatEmployeesForPrompt(ctx.users, userText));
   }
 
   if (group === "expense") {
@@ -172,20 +222,17 @@ export function formatPromptContextForModel(
   return lines.join("\n");
 }
 
-function formatEmployeesForPrompt(users: ApiUser[]): string[] {
+function formatEmployeesForPrompt(users: ApiUser[], userText?: string): string[] {
   const includeAliases = users.length <= MAX_EMPLOYEES_WITH_ALIASES;
 
   return users.map((user) => {
     const username = user.telegramUsername
       ? `@${user.telegramUsername.replace(/^@+/, "")}`
       : "";
-    const parts = [
-      `id=${user.id}`,
-      `name="${user.fullName}"`,
-    ];
+    const parts = [`id=${user.id}`, `name="${user.fullName}"`];
     if (username) parts.push(`username="${username}"`);
     if (includeAliases) {
-      const aliases = pickPromptAliases(user.systemAliases, MAX_ALIASES_PER_EMPLOYEE);
+      const aliases = pickAliasesForPrompt(user, userText);
       if (aliases.length > 0) {
         parts.push(`aliases="${aliases.join(", ")}"`);
       }
