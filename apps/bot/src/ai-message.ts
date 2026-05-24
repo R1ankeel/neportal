@@ -10,7 +10,6 @@ import {
 import { startBudgetSelectionFromExpenseConfirmation } from "./create-expense-confirmation";
 import {
   enterConfirmationEditMode,
-  getConfirmationEditHint,
   handlePendingConfirmationEditMessage,
 } from "./confirmation-edit";
 import {
@@ -114,8 +113,8 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     if (pending.type === "ai_intent" && isConfirmationEdit(text)) {
-      enterConfirmationEditMode(telegramUserId, pending);
-      await ctx.reply(getConfirmationEditHint(pending.intent));
+      const editMessage = enterConfirmationEditMode(telegramUserId, pending);
+      await ctx.reply(editMessage);
       return;
     }
 

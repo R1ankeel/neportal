@@ -1,12 +1,13 @@
 import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
-import { parseAmount, fetchUsers } from "./api";
+import { isConfirmationCancel, isConfirmationEdit, isConfirmationNo } from "./confirmation";
+import { applyFieldEdit } from "./confirmation/apply-field-edit";
 import {
-  CONFIRM_REPLY_PROMPT,
-  isConfirmationCancel,
-  isConfirmationEdit,
-  isConfirmationNo,
-} from "./confirmation";
+  formatFieldSelectionMessage,
+  getEditableFields,
+  getFieldValuePrompt,
+  legacyKeyToFieldKey,
+} from "./confirmation/editable-fields";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
@@ -19,6 +20,7 @@ import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
 import {
+  clearPendingConfirmation,
   getPendingConfirmation,
   setPendingConfirmation,
   type PendingAiIntent,
@@ -26,15 +28,10 @@ import {
 import {
   clearPendingConfirmationEdit,
   getPendingConfirmationEdit,
+  setConfirmationEditStep,
   startPendingConfirmationEdit,
 } from "./pending-confirmation-edit";
-import {
-  coerceDeadlineDateLoose,
-  parseRuDate,
-  resolveDeadlineFromUserMessage,
-  todayIsoDate,
-} from "./parse-ru-date";
-import { isSelfHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
+import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
 import {
   buildUserSelectionPayload,
   resolveUserHintWithSelection,
@@ -42,13 +39,11 @@ import {
   tryHandleAmbiguousUserHintBeforeResolve,
 } from "./user-hint-resolution";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
-import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
+import { fetchUsers } from "./api";
 
 type ParsedEdit = { key: string; value: string };
 
-type ApplyEditResult =
-  | { ok: true; intent: AiIntent }
-  | { ok: false; message: string };
+const EDIT_CANCEL_RE = /^(?:отмена|отмени|стоп)$/iu;
 
 function parseKeyValueEdit(text: string): ParsedEdit | null {
   const m = text.trim().match(/^([^:：]+)\s*[:：]\s*(.+)$/su);
@@ -59,328 +54,38 @@ function parseKeyValueEdit(text: string): ParsedEdit | null {
   return { key, value };
 }
 
-function parseDateEditValue(value: string): string | null {
-  const iso = parseRuDate(value);
-  if (iso) return iso;
-  return resolveDeadlineFromUserMessage(value, todayIsoDate());
+function parseFieldSelectionNumber(text: string): number | null {
+  const m = text.trim().match(/^(\d+)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 ? n : null;
 }
 
-function normalizeAssigneeHint(value: string): string {
-  const t = value.trim();
-  if (t === SELF_HINT_MARKER || isSelfHint(t)) return SELF_HINT_MARKER;
-  return t;
+function isEditFlowCancel(text: string): boolean {
+  return EDIT_CANCEL_RE.test(text.trim()) || isConfirmationCancel(text);
 }
 
-export function getConfirmationEditHint(intent: AiIntent): string {
-  const header = "Что изменить?\n\nМожно написать:";
+/** Запускает edit-flow; возвращает текст сообщения со списком полей или fallback-подсказку. */
+export function enterConfirmationEditMode(
+  telegramUserId: number,
+  pending: PendingAiIntent,
+): string {
+  const fields = getEditableFields(pending.intent);
+  startPendingConfirmationEdit(telegramUserId, pending, fields);
+  if (fields.length === 0) {
+    return getLegacyEditHint(pending.intent);
+  }
+  return formatFieldSelectionMessage(fields);
+}
+
+function getLegacyEditHint(intent: AiIntent): string {
+  const header = "Что изменить?\n\nМожно написать поле: значение, например:";
   switch (intent.intent) {
-    case "create_task":
-      return [
-        header,
-        "задача: новый текст",
-        "исполнитель: имя сотрудника или «мне»",
-        "дедлайн: дата",
-        "описание: новый текст",
-      ].join("\n");
-    case "add_task_comment":
-      return [header, "комментарий: новый текст", "задача: название задачи"].join("\n");
-    case "mention_in_task":
-      return [
-        header,
-        "сотрудник: имя",
-        "задача: название задачи",
-        "комментарий: новый текст",
-      ].join("\n");
-    case "complete_task":
-      return [header, "задача: название задачи", "результат: новый текст"].join("\n");
-    case "cancel_task":
-      return [header, "задача: название задачи", "причина: новый текст"].join("\n");
-    case "transfer_task":
-      return [
-        header,
-        "задача: название задачи",
-        "исполнитель: кому передать",
-        "комментарий: новый текст",
-      ].join("\n");
-    case "reassign_task":
-      return [
-        header,
-        "задача: название задачи",
-        "с кого: имя",
-        "старый исполнитель: имя",
-        "кому: имя",
-        "исполнитель: имя",
-        "комментарий: новый текст",
-      ].join("\n");
-    case "create_expense":
-      return [
-        header,
-        "сумма: 1500",
-        "описание: новый текст",
-        "бюджет: название бюджета",
-      ].join("\n");
-    case "create_budget":
-      return [
-        header,
-        "название: новое название",
-        "сумма: 50000",
-        "чек: да / нет",
-        "или: чек да, нужен чек, без чека",
-      ].join("\n");
-    case "create_absence":
-      return [
-        header,
-        "сотрудник: имя или «мне»",
-        "дата окончания: 25.05.2026",
-        "дата начала: 20.05.2026",
-        "номер: 123456",
-        "комментарий: текст",
-      ].join("\n");
+    case "create_note":
+      return `${header}\nтекст: новый текст`;
     default:
       return "Напишите исправленный текст одной строкой.";
   }
-}
-
-function invalidEditFormatMessage(intent: AiIntent): string {
-  const hint = getConfirmationEditHint(intent);
-  const firstLine = hint.split("\n").find((l) => l.includes(":"));
-  const example = firstLine ?? "задача: новый текст";
-  return `Не понял, что изменить. Напишите в формате:\n${example}`;
-}
-
-function applyEditToIntent(intent: AiIntent, parsed: ParsedEdit): ApplyEditResult {
-  const { key, value } = parsed;
-
-  switch (intent.intent) {
-    case "create_task": {
-      if (key === "задача" || key === "название") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, title: value } } };
-      }
-      if (key === "исполнитель" || key === "кому") {
-        return {
-          ok: true,
-          intent: {
-            ...intent,
-            payload: { ...intent.payload, assigneeHint: normalizeAssigneeHint(value) },
-          },
-        };
-      }
-      if (key === "дедлайн" || key === "срок") {
-        const deadlineDate =
-          parseDateEditValue(value) ?? coerceDeadlineDateLoose(value, todayIsoDate());
-        if (!deadlineDate) {
-          return { ok: false, message: "Не удалось разобрать дату. Пример: 25.05.2026" };
-        }
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, deadlineDate } },
-        };
-      }
-      if (key === "описание") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, description: value } },
-        };
-      }
-      break;
-    }
-
-    case "add_task_comment": {
-      if (key === "комментарий" || key === "текст") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, text: value } } };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "mention_in_task": {
-      if (key === "сотрудник" || key === "кого") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, userHint: value } } };
-      }
-      if (key === "комментарий" || key === "текст") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, text: value } } };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "complete_task": {
-      if (key === "результат") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, completionResult: value } },
-        };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "cancel_task": {
-      if (key === "причина") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, cancellationReason: value } },
-        };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "transfer_task": {
-      if (key === "исполнитель" || key === "кому") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, toUserHint: value } },
-        };
-      }
-      if (key === "комментарий" || key === "причина") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, comment: value } } };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "reassign_task": {
-      if (key === "кому" || key === "исполнитель") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, toUserHint: value } },
-        };
-      }
-      if (key === "с кого" || key === "старый исполнитель" || key === "от") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, fromUserHint: value } },
-        };
-      }
-      if (key === "комментарий" || key === "причина") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, comment: value } } };
-      }
-      if (key === "задача" || key === "название") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, taskTitle: value } },
-        };
-      }
-      break;
-    }
-
-    case "create_expense": {
-      if (key === "сумма") {
-        const amount = parseAmount(value.replace(/\s/g, "").replace(",", "."));
-        if (amount <= 0) {
-          return { ok: false, message: "Укажите положительную сумму, например: сумма: 1500" };
-        }
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, amount } } };
-      }
-      if (key === "описание" || key === "расход") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, description: value } },
-        };
-      }
-      if (key === "бюджет") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, budgetHint: value } },
-        };
-      }
-      break;
-    }
-
-    case "create_budget": {
-      if (key === "название" || key === "имя") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, name: value } } };
-      }
-      if (key === "сумма") {
-        const amount = parseAmount(value.replace(/\s/g, "").replace(",", "."));
-        if (amount <= 0) {
-          return { ok: false, message: "Укажите положительную сумму, например: сумма: 50000" };
-        }
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, amount } } };
-      }
-      if (key === "чек") {
-        const receipt = parseBudgetReceiptEdit(value) ?? parseBudgetReceiptEdit(`чек ${value}`);
-        if (receipt === null) {
-          return { ok: false, message: "Укажите «да» или «нет», например: чек: да" };
-        }
-        return {
-          ok: true,
-          intent: {
-            ...intent,
-            payload: { ...intent.payload, requiresReceipt: receipt },
-          },
-        };
-      }
-      break;
-    }
-
-    case "create_absence": {
-      if (key === "сотрудник") {
-        return {
-          ok: true,
-          intent: {
-            ...intent,
-            payload: { ...intent.payload, userHint: normalizeAssigneeHint(value) },
-          },
-        };
-      }
-      if (key === "дата окончания" || key === "до") {
-        const endDate = parseDateEditValue(value);
-        if (!endDate) {
-          return { ok: false, message: "Не удалось разобрать дату окончания. Пример: 25.05.2026" };
-        }
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, endDate } } };
-      }
-      if (key === "дата начала" || key === "с") {
-        const startDate = parseDateEditValue(value);
-        if (!startDate) {
-          return { ok: false, message: "Не удалось разобрать дату начала. Пример: 20.05.2026" };
-        }
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, startDate } } };
-      }
-      if (key === "номер") {
-        return {
-          ok: true,
-          intent: { ...intent, payload: { ...intent.payload, documentNumber: value } },
-        };
-      }
-      if (key === "комментарий") {
-        return { ok: true, intent: { ...intent, payload: { ...intent.payload, comment: value } } };
-      }
-      break;
-    }
-
-    default:
-      return { ok: false, message: "Для этого действия правка по ключу пока не поддерживается." };
-  }
-
-  return { ok: false, message: invalidEditFormatMessage(intent) };
 }
 
 async function reconfirmAfterEdit(
@@ -426,7 +131,6 @@ async function reconfirmAfterEdit(
             ambiguous: expenseResult.ambiguous,
           }),
         );
-        clearPendingConfirmationEdit(telegramUserId);
         return true;
       }
 
@@ -436,7 +140,6 @@ async function reconfirmAfterEdit(
         resolved: expenseResult.resolved,
       });
       await ctx.reply(buildIntentPreview(expenseResult.resolved));
-      clearPendingConfirmationEdit(telegramUserId);
       return true;
     }
 
@@ -446,7 +149,6 @@ async function reconfirmAfterEdit(
     case "create_absence": {
       const users = await fetchUsers();
       if (await tryHandleAmbiguousUserHintBeforeResolve(ctx, linked, telegramUserId, intent, users)) {
-        clearPendingConfirmationEdit(telegramUserId);
         return true;
       }
 
@@ -471,7 +173,6 @@ async function reconfirmAfterEdit(
               selectionType,
               payload,
             );
-            clearPendingConfirmationEdit(telegramUserId);
             return true;
           }
         }
@@ -521,11 +222,110 @@ async function reconfirmAfterEdit(
   }
 }
 
-export function enterConfirmationEditMode(
+async function applyEditAndReconfirm(
+  ctx: Context,
   telegramUserId: number,
-  pending: PendingAiIntent,
-): void {
-  startPendingConfirmationEdit(telegramUserId, pending);
+  editPending: NonNullable<ReturnType<typeof getPendingConfirmationEdit>>,
+  updatedIntent: AiIntent,
+): Promise<boolean> {
+  editPending.originalConfirmation.intent = updatedIntent;
+  const ok = await reconfirmAfterEdit(ctx, telegramUserId, updatedIntent);
+  if (ok) {
+    clearPendingConfirmationEdit(telegramUserId);
+  }
+  return ok;
+}
+
+async function tryLegacyKeyValueEdit(
+  ctx: Context,
+  telegramUserId: number,
+  editPending: NonNullable<ReturnType<typeof getPendingConfirmationEdit>>,
+  text: string,
+): Promise<boolean> {
+  const parsed = parseKeyValueEdit(text);
+  if (!parsed) return false;
+
+  const fieldKey = legacyKeyToFieldKey(parsed.key, editPending.intent);
+  if (!fieldKey) {
+    await ctx.reply(
+      `Не понял поле «${parsed.key}». Выберите номер из списка или напишите, например: ${parsed.key}: ${parsed.value}`,
+    );
+    return true;
+  }
+
+  const applyResult = await applyFieldEdit(
+    editPending.originalConfirmation.intent,
+    fieldKey,
+    parsed.value,
+  );
+  if (!applyResult.ok) {
+    await ctx.reply(applyResult.message);
+    return true;
+  }
+
+  await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
+  return true;
+}
+
+async function handleFieldSelection(
+  ctx: Context,
+  telegramUserId: number,
+  editPending: NonNullable<ReturnType<typeof getPendingConfirmationEdit>>,
+  index: number,
+): Promise<boolean> {
+  const field = editPending.fields[index - 1];
+  if (!field) {
+    await ctx.reply("Выберите номер из списка.");
+    return true;
+  }
+
+  if (field.key === "save") {
+    clearPendingConfirmationEdit(telegramUserId);
+    const confirmation = getPendingConfirmation(telegramUserId);
+    if (confirmation?.type === "ai_intent") {
+      await ctx.reply(buildIntentPreview(confirmation.resolved));
+    }
+    return true;
+  }
+
+  if (field.key === "cancel") {
+    clearPendingConfirmationEdit(telegramUserId);
+    clearPendingConfirmation(telegramUserId);
+    await ctx.reply("Ок, действие отменено.");
+    return true;
+  }
+
+  setConfirmationEditStep(telegramUserId, "await_value", field.key);
+  const prompt = getFieldValuePrompt(field.key, editPending.originalConfirmation.intent);
+  await ctx.reply(prompt);
+  return true;
+}
+
+async function handleAwaitValue(
+  ctx: Context,
+  telegramUserId: number,
+  editPending: NonNullable<ReturnType<typeof getPendingConfirmationEdit>>,
+  text: string,
+): Promise<boolean> {
+  const fieldKey = editPending.field;
+  if (!fieldKey) {
+    setConfirmationEditStep(telegramUserId, "select_field");
+    await ctx.reply(formatFieldSelectionMessage(editPending.fields));
+    return true;
+  }
+
+  const applyResult = await applyFieldEdit(
+    editPending.originalConfirmation.intent,
+    fieldKey,
+    text,
+  );
+  if (!applyResult.ok) {
+    await ctx.reply(applyResult.message);
+    return true;
+  }
+
+  await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
+  return true;
 }
 
 /** Обработка сообщения в режиме правки confirmation. Возвращает true, если обработано. */
@@ -545,56 +345,70 @@ export async function handlePendingConfirmationEditMessage(
 
   if (isConfirmationNo(text)) {
     clearPendingConfirmationEdit(telegramUserId);
-    return false; // ai-message обработает отмену confirmation
+    return false;
   }
 
-  if (isConfirmationCancel(text)) {
+  if (isEditFlowCancel(text)) {
     clearPendingConfirmationEdit(telegramUserId);
-    await ctx.reply(`Продолжаем подтверждение. ${CONFIRM_REPLY_PROMPT}`);
-    await ctx.reply(buildIntentPreview(confirmation.resolved));
+    clearPendingConfirmation(telegramUserId);
+    await ctx.reply("Ок, действие отменено.");
     return true;
   }
 
   if (isConfirmationEdit(text)) {
-    await ctx.reply(getConfirmationEditHint(editPending.originalConfirmation.intent));
+    if (editPending.fields.length > 0) {
+      setConfirmationEditStep(telegramUserId, "select_field");
+      await ctx.reply(formatFieldSelectionMessage(editPending.fields));
+    } else {
+      await ctx.reply(getLegacyEditHint(editPending.originalConfirmation.intent));
+    }
     return true;
   }
 
-  if (editPending.originalConfirmation.intent.intent === "create_budget") {
+  if (await tryLegacyKeyValueEdit(ctx, telegramUserId, editPending, text)) {
+    return true;
+  }
+
+  if (
+    editPending.intent === "create_budget" &&
+    editPending.step === "await_value" &&
+    editPending.field === "requiresReceipt"
+  ) {
     const receiptEdit = parseBudgetReceiptEdit(text);
     if (receiptEdit !== null) {
-      const updatedIntent: AiIntent = {
-        ...editPending.originalConfirmation.intent,
-        payload: {
-          ...editPending.originalConfirmation.intent.payload,
-          requiresReceipt: receiptEdit,
-        },
-      };
-      editPending.originalConfirmation.intent = updatedIntent;
-      const ok = await reconfirmAfterEdit(ctx, telegramUserId, updatedIntent);
-      if (ok) clearPendingConfirmationEdit(telegramUserId);
+      const base = editPending.originalConfirmation.intent;
+      if (base.intent === "create_budget") {
+        const updatedIntent: AiIntent = {
+          ...base,
+          payload: { ...base.payload, requiresReceipt: receiptEdit },
+        };
+        await applyEditAndReconfirm(ctx, telegramUserId, editPending, updatedIntent);
+      }
       return true;
     }
   }
 
-  const parsed = parseKeyValueEdit(text);
-  if (!parsed) {
-    await ctx.reply(invalidEditFormatMessage(editPending.originalConfirmation.intent));
+  if (editPending.step === "select_field") {
+    const num = parseFieldSelectionNumber(text);
+    if (num !== null) {
+      return handleFieldSelection(ctx, telegramUserId, editPending, num);
+    }
+    await ctx.reply("Не понял выбор. Напишите номер пункта из списка.");
     return true;
   }
 
-  const applyResult = applyEditToIntent(editPending.originalConfirmation.intent, parsed);
-  if (!applyResult.ok) {
-    await ctx.reply(applyResult.message);
-    return true;
+  if (editPending.step === "await_value") {
+    return handleAwaitValue(ctx, telegramUserId, editPending, text);
   }
 
-  const updatedIntent = applyResult.intent;
-  editPending.originalConfirmation.intent = updatedIntent;
+  return false;
+}
 
-  const ok = await reconfirmAfterEdit(ctx, telegramUserId, updatedIntent);
-  if (ok) {
-    clearPendingConfirmationEdit(telegramUserId);
+/** @deprecated Используйте enterConfirmationEditMode — возвращает текст списка полей. */
+export function getConfirmationEditHint(intent: AiIntent): string {
+  const fields = getEditableFields(intent);
+  if (fields.length > 0) {
+    return formatFieldSelectionMessage(fields);
   }
-  return true;
+  return getLegacyEditHint(intent);
 }
