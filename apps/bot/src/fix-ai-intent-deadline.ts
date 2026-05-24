@@ -5,7 +5,10 @@ import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-us
 import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
 import { applyAddTaskCommentPayloadFix } from "./fix-ai-intent-add-task-comment";
 import { applyTransferTaskCommentFix } from "./fix-ai-intent-transfer-comment";
-import { applyCreateTaskPayloadCompatibilityFix } from "./fix-ai-intent-create-task";
+import {
+  applyCreateTaskPayloadCompatibilityFix,
+  applyCreateTaskTitleDescriptionFix,
+} from "./fix-ai-intent-create-task";
 import {
   coerceDeadlineDateLoose,
   correctNextCalendarMonthMisparse,
@@ -76,6 +79,7 @@ export function fixAiIntentBeforeValidation(
 
   if (intent === "create_task") {
     applyCreateTaskPayloadCompatibilityFix(p);
+    applyCreateTaskTitleDescriptionFix(p);
     applyCreateTaskAssigneeSelfFix(p, opts.userText);
     applyDeadlineFields(p, intent as string, opts);
   } else if (intent === "create_absence") {

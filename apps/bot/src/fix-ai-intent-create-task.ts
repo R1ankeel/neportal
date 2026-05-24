@@ -1,4 +1,5 @@
 import { looksLikeAssigneeHintWord, splitCreateTaskActionText } from "./create-task-assignee-extract";
+import { normalizeCreateTaskTitleDescription } from "./normalize-create-task-title-description";
 
 const FOR_USER_TITLE_RE = /^для\s+(\p{L}+)\s+(.+)$/iu;
 const ON_USER_TITLE_RE = /^на\s+(\p{L}+)\s+(.+)$/iu;
@@ -86,4 +87,15 @@ export function applyCreateTaskPayloadCompatibilityFix(
   }
 
   return changed;
+}
+
+/** Восстанавливает description из длинного title, если модель не разделила. */
+export function applyCreateTaskTitleDescriptionFix(payload: Record<string, unknown>): void {
+  const normalized = normalizeCreateTaskTitleDescription({
+    title: typeof payload.title === "string" ? payload.title : null,
+    description: typeof payload.description === "string" ? payload.description : null,
+  });
+
+  if (normalized.title) payload.title = normalized.title;
+  if (normalized.description) payload.description = normalized.description;
 }
