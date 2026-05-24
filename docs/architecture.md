@@ -88,8 +88,8 @@ neportal/
 
 ## AI intent (реализовано в MVP)
 
-- **`@neportal/ai-contracts`** — Zod-контракт `intent` + `payload` для ответа YandexGPT.
-- **`apps/bot`** — текст без `/` → YandexGPT → подтверждение → REST API (те же обёртки, что slash-команды).
+- **`@neportal/ai-contracts`** — Zod-контракт `intent` + `payload` для ответа парсера.
+- **`apps/bot`** — текст без `/`: сначала **детерминированные парсеры** (списки задач, расходы, простые шаблоны create/transfer), затем при необходимости **двухэтапный YandexGPT** (classifier → extractor по группе промпта) → подтверждение → REST API (те же обёртки, что slash-команды).
 - Yandex Cloud **не хостит** приложение в MVP; вызывается только HTTP API Foundation Models.
 - SpeechKit (голос → текст) — env в `.env.example`, код не подключён.
 

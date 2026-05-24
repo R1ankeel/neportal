@@ -1,5 +1,7 @@
 # Быстрый старт
 
+**Описание продукта для нетехнической аудитории:** [корневой README.md](../README.md).
+
 Перед установкой полезно прочитать [Руководство разработчика](developer-guide.md) — там описаны архитектура и сквозные сценарии проверки.
 
 ## Требования
@@ -44,7 +46,13 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-Сид создаёт организацию **Neportal Demo** (`slug`: `neportal-demo`) с проектом «Реклама VK», бюджетом, задачей и пользователями (Иван, Вася, Петр, Мария). Подробнее — [database.md](database.md#демо-данные-seed).
+Сид создаёт организацию **Neportal Demo** (`slug`: `neportal-demo`) с проектом «Реклама VK», бюджетом, задачей и пользователями (Иван, Вася, Петр, Мария); для пользователей заполняется `systemAliases`. Подробнее — [database.md](database.md#демо-данные-seed).
+
+После миграции `user_system_aliases` на существующей БД без пересида:
+
+```bash
+pnpm users:aliases:backfill
+```
 
 ## 4. Запуск
 
@@ -81,6 +89,7 @@ pnpm --filter @neportal/bot dev
 | `pnpm format` | Prettier |
 | `pnpm db:studio` | Prisma Studio |
 | `pnpm db:push` | Синхронизация схемы без файлов миграций (прототипирование) |
+| `pnpm users:aliases:backfill` | Заполнить `User.systemAliases` из ФИО |
 
 ## Troubleshooting
 

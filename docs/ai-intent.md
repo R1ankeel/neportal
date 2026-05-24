@@ -2,7 +2,13 @@
 
 Локальный MVP: Yandex Cloud используется **только как внешний API** (YandexGPT для текста; SpeechKit — позже). Бот и API работают на `localhost`, без деплоя в Yandex.
 
-## Поток данных
+## Архитектура разбора текста
+
+Обычный текст в боте проходит **три слоя** (см. также [bot.md](bot.md#детерминированный-разбор-без-yandexgpt)):
+
+1. **Pending-состояния** — ответы «да/нет», номер задачи, уточнение комментария и т.д. (без GPT).
+2. **Детерминированные парсеры** — регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) — **без** YandexGPT.
+3. **YandexGPT** — двухэтапный разбор для остальных фраз (если env настроен).
 
 ```mermaid
 sequenceDiagram
@@ -12,10 +18,18 @@ sequenceDiagram
   participant A as apps/api
 
   U->>B: обычный текст
-  B->>A: GET projects, users, budgets, tasks
-  B->>Y: prompt + контекст + текст
-  Y-->>B: JSON intent
-  B->>B: Zod validate + resolve hints
+  B->>B: pending / deterministic parsers
+  alt deterministic match
+    B->>B: routeParsedAiIntent
+  else needs GPT
+    B->>A: GET projects, users, budgets, tasks
+    B->>Y: classifier (optional)
+    Y-->>B: intent name
+    B->>Y: extractor promptGroup + context
+    Y-->>B: JSON intent
+    B->>B: fixAiIntent + Zod + validateIntentForRouting
+  end
+  B->>B: resolve hints
   B-->>U: preview, да/нет?
   U->>B: да
   B->>A: POST notes / tasks / ...
@@ -23,6 +37,33 @@ sequenceDiagram
 ```
 
 Slash-команды (`/task`, `/note`, …) **не** проходят через YandexGPT.
+
+### Маршрутизация промптов (`resolvePromptGroup`)
+
+Файл: `apps/bot/src/ai/prompt-group-router.ts`.
+
+По тексту пользователя бот выбирает **группу промпта** (`expense`, `absence`, `task-status`, `collaboration`, `task-list`, `create-task-rich`, `create-note` или `classifier`). Если группа **не** `classifier`, шаг classifier в YandexGPT **пропускается** — сразу вызывается extractor этой группы.
+
+Примеры маршрутизации без classifier: фразы про «мои задачи», «расходы без чеков», явное «потратил …», «создай задачу …» (богатый шаблон).
+
+### Двухэтапный YandexGPT
+
+Реализация: `apps/bot/src/yandex-gpt.ts`, промпты: `apps/bot/src/ai/prompts/`.
+
+| Шаг | Что делает |
+|-----|------------|
+| 1. Classifier | Короткий JSON: только `intent` + `confidence` (если `resolvePromptGroup` вернул `classifier`) |
+| 2. Extractor | Полный JSON по группе (`expense`, `collaboration`, …) с контекстом из API |
+| Post-process | `fixAiIntentBeforeValidation` (даты, assignee «мне», …) |
+| Validate | Zod (`safeParseAiIntent`) + `validateIntentForRouting` (в т.ч. `add_task_comment`) |
+
+Группы extractor ↔ intent: `intentToExtractorGroup()` в `apps/bot/src/ai/intent-to-prompt-group.ts`.
+
+### Логирование токенов и отладка
+
+- В консоли бота: `[yandex-gpt] tokens promptGroup=… input=… output=…` и итог `parseTextIntent total` (`yandex-gpt-usage.ts`).
+- При отказе модели или невалидной схеме — сохранение промпта в `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt` в cwd бота).
+- `BOT_DEV_SELF_CHECKS=true` — self-checks при старте; `BOT_AI_CLEANUP_BASIC_TASKS` — опциональная LLM-очистка title для коротких deterministic `create_task`.
 
 ### Местоимения и `__self__`
 
@@ -61,7 +102,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "list_pending_expenses" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "list_pending_expenses" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -77,6 +118,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `create_task` | `projectHint?`, `assigneeHint?`, `title`, `description?`, `deadlineDate?` (ISO) |
 | `create_note` | `projectHint?`, `text` (в тексте даты — **DD.MM.YYYY**) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
+| `create_budget` | `projectHint?`, `name`, `amount`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
 | `cancel_absence` | `userHint?`, `type?`: `SICK_LEAVE` \| `VACATION`, `cancellationReason?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |

@@ -181,7 +181,9 @@
 | GET | `/budgets/:id/expenses` | — | Расходы бюджета |
 | POST | `/budgets/:id/expenses` | — | Добавить расход |
 
-**POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `accessUserIds?`, `createdById`.
+**POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `matchingKeywords?` (строка через запятую — для бота), `accessUserIds?`, `createdById`.
+
+**PATCH /budgets/:id** (`UpdateBudgetDto`): в т.ч. `matchingKeywords` (`string` или `null` для сброса).
 
 **POST /budgets/:id/archive**: `archivedById` (OWNER/MANAGER), `archiveReason?`.
 

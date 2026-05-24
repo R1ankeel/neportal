@@ -4,7 +4,7 @@
 
 ## Что это за проект
 
-**Neportal** — внутренний портал организации: проекты, задачи, заметки, бюджеты и расходы, сотрудники, отсутствия. Три клиента работают с **одним REST API** и **одной PostgreSQL**:
+**Neportal** — внутренний портал организации: проекты, задачи, заметки, бюджеты и расходы, сотрудники, отсутствия. Кратко для нетехнической аудитории — [корневой README.md](../README.md). Три клиента работают с **одним REST API** и **одной PostgreSQL**:
 
 | Клиент | Технология | Роль |
 |--------|------------|------|
@@ -37,7 +37,8 @@ flowchart TB
   W --> API
   T --> API
   API --> DB
-  Yandex[YandexGPT API] -.->|только бот, опционально| T
+  Det[Deterministic parsers] -.->|без GPT| T
+  Yandex[YandexGPT API] -.->|classifier + extractor, опционально| T
   TG[Telegram Bot API] <-->|чеки, уведомления| API
   TG <-->|polling| T
 ```
@@ -59,6 +60,11 @@ flowchart TB
 | Уведомление в Telegram с API | `apps/api/src/telegram/telegram-notify.service.ts` |
 | Страница / форма в Web | `apps/web/src/app/(app)/` + `src/lib/api.ts` → [web.md](web.md) |
 | Команда бота или AI | `apps/bot/src/main.ts`, `api.ts`, `ai-message.ts` → [bot.md](bot.md) |
+| Детерминированный parse текста | `parse-expense-query.ts`, `parse-create-budget-command.ts`, `ai/deterministic/` |
+| YandexGPT (2 шага) | `yandex-gpt.ts`, `ai/prompts/`, `ai/prompt-group-router.ts` |
+| Выбор бюджета по ключевым словам | `budget-resolver.ts`, поле `matchingKeywords` в Web/API |
+| Исполнитель в «создай задачу Маше…» | `create-task-assignee-extract.ts` |
+| Псевдонимы сотрудников | `packages/shared/src/name-aliases/`, `User.systemAliases`, `pnpm users:aliases:backfill` |
 | Контракт ответа YandexGPT | `packages/ai-contracts/src/index.ts` → [ai-intent.md](ai-intent.md) |
 | Загрузка `.env` | `packages/shared/src/env/load-root-env.ts` → [env.md](env.md) |
 | Общие enum вне Prisma | `packages/shared/src/enums.ts` |
@@ -97,7 +103,9 @@ apps/web/src/
 | `main.ts` | Регистрация `bot.command`, фото/документов, делегирование в handlers |
 | `api.ts` | HTTP-клиент к REST, выбор проекта/бюджета по умолчанию |
 | `start-binding.ts` | `/start`, привязка по username |
-| `ai-message.ts` | Текст без `/` → YandexGPT → preview → да/нет |
+| `ai-message.ts` | Текст без `/`: pending → deterministic → YandexGPT → preview |
+| `route-parsed-intent.ts` | Общий путь после parse (deterministic или GPT) |
+| `budget-resolver.ts` | Сопоставление расхода с бюджетом по `matchingKeywords` |
 | `intent-resolver.ts` / `intent-executor.ts` | hints → id → POST/PATCH API |
 | `pending-intent.ts` | In-memory очередь подтверждений |
 
@@ -147,6 +155,12 @@ apps/web/src/
 
 1. `/sick до 25.05.2026` от привязанного Ивана (в сиде есть задача с дедлайном 22.05.2026).
 2. Web: проект → «Отсутствия» — в карточке отсутствия список `affectedTasks`.
+
+### 5. Бюджет через бот (deterministic или Yandex)
+
+1. Фраза: «создай бюджет Тестовый 100000 с чеком» (или через Yandex, если deterministic не сработал).
+2. Preview → `да`.
+3. Web: проект → «Бюджеты» — новый бюджет; при необходимости допишите **ключевые слова** на карточке бюджета.
 
 ## Как вносить изменения
 

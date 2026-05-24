@@ -38,6 +38,7 @@
 | Переменная | Обязательно | По умолчанию | Назначение |
 |------------|-------------|--------------|------------|
 | `API_PORT` | нет | `4000` | Порт NestJS |
+| `UPLOAD_DIR` | нет | `uploads` (cwd API) | Локальное хранение чеков, загруженных из Web (`POST .../receipt`) |
 | `NEPORTAL_ORG_SLUG` | нет | `neportal-demo` | Slug организации для всех запросов (после `pnpm db:seed`) |
 | `NEPORTAL_ORGANIZATION_ID` | нет | — | Если задан — приоритет над slug (CUID из БД) |
 | `JWT_SECRET` | нет | — | **Не используется** в MVP; заготовка |
@@ -51,6 +52,16 @@
 | `TELEGRAM_WEBHOOK_URL` | для webhook | Публичный URL endpoint (сервер приёма в MVP не в репо) |
 
 API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` при отдаче вложений (`/preview`, `/download`).
+
+### Бот (отладка и AI)
+
+| Переменная | По умолчанию | Назначение |
+|------------|--------------|------------|
+| `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
+| `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
+| `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
+| `TASK_NOTIFICATION_SCHEDULER_ENABLED` | `true` | Scheduler уведомлений по задачам |
+| `TASK_NOTIFICATION_INTERVAL_MS` | `60000` | Интервал scheduler (мс) |
 
 ### Yandex Cloud (опционально)
 

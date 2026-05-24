@@ -260,26 +260,27 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Pending details** (в памяти, TTL 30 мин): `pending-task-status-details.ts`. Отмена уточнения: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
-**Порядок обработки обычного текста** (`ai-message.ts`):
+**Порядок обработки обычного текста** (`ai-message.ts`, после slash-команд grammY):
 
-1. Pending confirmation edit (правка полей) — **не** отправляется в YandexGPT
-2. Pending confirmation (да / нет / изменить)
-3. Pending details (результат/причина) — **не** отправляется в YandexGPT
-4. Pending comment details (текст комментария) — **не** отправляется в YandexGPT
-5. Pending mention details (текст призыва) — **не** отправляется в YandexGPT
-6. Pending transfer comment — **не** отправляется в YandexGPT
-7. Pending transfer rejection reason — **не** отправляется в YandexGPT
-8. Pending transfer decision (да/нет у получателя) — **не** отправляется в YandexGPT
-9. Pending task selection (номер задачи) — **не** отправляется в YandexGPT
-10. Pending create task assignee (имя или «мне») — **не** отправляется в YandexGPT
-11. Pending user selection (номер сотрудника) — **не** отправляется в YandexGPT
-12. Иначе AI parser (slash-команды обрабатываются grammY до `message:text`)
+1. Pending confirmation edit — **не** в YandexGPT
+2. Pending expense receipt upload / selection (чек к выбранному расходу)
+3. Pending confirmation (да / нет / изменить; для `create_expense` «нет» → выбор бюджета)
+4. Pending budget selection
+5. Pending task status / comment / mention / transfer details и decision
+6. Pending absence delegation / absence selection
+7. Pending task selection, create-task assignee, user selection
+8. Проверка привязки (`requireLinkedUser`)
+9. **Детерминированный блок** (см. ниже) — **не** в YandexGPT
+10. **YandexGPT** (`parseTextIntent`) — classifier (опционально) + extractor
+11. `routeParsedAiIntent` → resolver → preview → confirmation → API
+
+Подробнее про AI: [ai-intent.md](ai-intent.md#архитектура-разбора-текста).
 
 ### Поиск сотрудника (User Resolution Flow v1)
 
 Модуль: `resolve-users-by-hint.ts`, выбор: `pending-user-selection.ts`.
 
-**Подсказки (hint):** нормализация (trim, lower, `ё`→`е`, без `@`), совпадение по ФИО, имени, фамилии, `telegramUsername`, уменьшительным формам (Ваня, Ване, Ваньку → Иван и т.д.).
+**Подсказки (hint):** нормализация (trim, lower, `ё`→`е`, без `@`), совпадение по ФИО, имени, фамилии, `telegramUsername`, полю **`systemAliases`** (строка через запятую в БД; генерируется из ФИО при сиде, обновление: `pnpm users:aliases:backfill`), уменьшительным формам из `name_aliases.json` (Ваня, Ване, Ваньку → Иван и т.д.).
 
 **Себя / местоимения:** «мне», «меня», «себе», «на меня», `__self__` от AI → текущий привязанный пользователь.
 
@@ -365,19 +366,38 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 
 Для локальной отладки без username в Web: поиск сотрудника по подстроке `fullName` (case-insensitive), затем `PATCH /users/:id/telegram`. Не использовать в проде — позже заменится на invite-code.
 
+### Детерминированный разбор (без YandexGPT)
+
+Если фраза совпала с локальным парсером, бот строит тот же `AiIntent`, что и YandexGPT, и передаёт в `routeParsedAiIntent` (resolver → preview → confirmation). GPT **не вызывается**.
+
+| Модуль | Примеры фраз | Результат |
+|--------|--------------|-----------|
+| `parseTaskListQuery` | «покажи мои задачи», «какие задачи у Васи» | `GET /tasks/my` (без confirmation) |
+| `parsePendingExpensesQuery` | «расходы без чеков», «чеки к расходам» | flow `/pending-expenses` |
+| `parseExpenseQuery` | «потратил 1500 на рекламу» | `create_expense` → confirmation |
+| `parseCreateBudgetCommand` | «создай бюджет Реклама 50000 с чеком» | `create_budget` → confirmation |
+| `finalizeBasicCreateTask` / `parseBasicCreateTask` | «создай задачу проверить склад» | `create_task` → confirmation |
+| `create-task-assignee-extract` | «создай задачу **Маше** поехать к поставщику» | `assigneeHint` из дательного падежа в начале |
+| `parseTaskReassignQuery` | «перекинь задачу с Васи на Машу» | `reassign_task` (OWNER/MANAGER) |
+| `parseTaskTransferLikeQuery` | «передай задачу … Васе» | `transfer_task` |
+
+Каталог шаблонов: `apps/bot/src/ai/deterministic/`. Сопоставление бюджета по расходу: `budget-resolver.ts` + `matchingKeywords` из Web.
+
+**Edit-mode для бюджета:** в confirmation `create_budget` поле «чек» можно править фразами «чек да» / «нужен чек» (`parse-budget-receipt-edit.ts`).
+
 ### Обычный текст (YandexGPT)
 
-Сообщения **без** `/` в начале (не команда) обрабатываются AI-парсером, если заданы переменные Yandex.
+Сообщения **без** `/`, которые **не** разобрал детерминированный слой, обрабатываются YandexGPT (если заданы переменные Yandex). Двухэтапный поток: classifier → extractor по группе промпта — см. [ai-intent.md](ai-intent.md#двухэтапный-yandexgpt).
 
-**Поток:**
+**Поток после GPT:**
 
-1. Текст → YandexGPT → JSON intent (см. `@neportal/ai-contracts`).
-2. Валидация Zod; `confidence < 0.7` или `intent: unknown` → «Не понял команду…».
-3. Сопоставление hints с проектами/пользователями/бюджетами/задачами из API (`intent-resolver.ts`).
-4. Preview и вопрос: *«Ответьте: да / нет / изменить»*.
-5. Ответ `да` / `+` / `yes` (регистр не важен) → выполнение через те же REST-обёртки, что и slash-команды.
-6. `нет` / `-` / `no` → отмена; pending сбрасывается.
-7. `изменить` / `исправить` / `редактировать` / `поменять` → режим правки (TTL 30 мин, `pending-confirmation-edit.ts`): бот спрашивает, что изменить; ответ в формате `поле: значение` (например `задача: Подписать договор с ССК`) → обновлённый preview с тем же вопросом. Отмена правки: *отмена* / *отмени* / *стоп* — снова preview. Невалидная правка не сбрасывает pending.
+1. `fixAiIntentBeforeValidation` + Zod; `confidence < 0.7` или `intent: unknown` → «Не понял команду…».
+2. `validateIntentForRouting` (для `add_task_comment` — recovery текста комментария).
+3. Сопоставление hints (`intent-resolver.ts`, `budget-resolver.ts`).
+4. Preview: *«Ответьте: да / нет / изменить»*.
+5. `да` → `intent-executor.ts` (те же REST-обёртки, что slash).
+6. `нет` → для `create_expense` выбор другого бюджета; для остальных intent — отмена.
+7. `изменить` → `pending-confirmation-edit.ts` (TTL 30 мин), поля в формате `поле: значение`. Для `create_budget` — в т.ч. «чек да/нет».
 
 **Пример правки (create_task):**
 
@@ -398,6 +418,7 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 | Поставь Васе задачу подготовить отчет до 23 мая | `create_task` |
 | Запиши заметку: клиент попросил завтра проверить статистику VK | `create_note` |
 | Потратил 1500 рублей на рекламу VK | `create_expense` |
+| Создай бюджет Реклама 50000, чеки обязательны | `create_budget` |
 | Вася заболел до 25 мая, больничный 123456 | `create_absence` |
 | удали мой больничный | `cancel_absence` |
 | отмени отпуск Васи | `cancel_absence` |
@@ -412,7 +433,7 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 **Сопоставление hints** (`hint-matchers.ts`):
 
 - `projectHint` → проект по подстроке имени (без учёта регистра), иначе проект по умолчанию.
-- `assigneeHint` / `userHint` → пользователь по подстроке `fullName`.
+- `assigneeHint` / `userHint` → пользователь по `fullName`, `systemAliases`, уменьшительным формам (`resolve-users-by-hint.ts`).
 - `budgetHint` → сопоставление с названием бюджета и полем `matchingKeywords` (Web); при неуверенном совпадении — выбор из списка, без угадывания по товару.
 - `taskTitle` → точное совпадение `title` (без учёта регистра), иначе `includes`; несколько совпадений → просьба уточнить.
 
@@ -597,7 +618,14 @@ REST для scheduler (вызывает бот):
 | `main.ts` | Регистрация команд, фото/документов, `message:text` → `ai-message.ts` |
 | `yandex-gpt.ts` | Запрос в YandexGPT, prompt, auth, `extractJsonText`, валидация |
 | `ai-contracts.ts` | Загрузка Zod-схемы из `packages/ai-contracts/dist` (обход stale `node_modules`) |
-| `ai-message.ts` | Текст без `/`, confirmation, порог confidence |
+| `ai-message.ts` | Текст без `/`: pending → deterministic → YandexGPT |
+| `route-parsed-intent.ts` | Общий routing после parse (deterministic или GPT) |
+| `parse-expense-query.ts` | Детерминированный `create_expense` |
+| `parse-create-budget-command.ts` | Детерминированный `create_budget` |
+| `budget-resolver.ts` | Выбор бюджета по hint и `matchingKeywords` |
+| `create-task-assignee-extract.ts` | Исполнитель из «создай задачу Маше …» |
+| `validate-add-task-comment-payload.ts` | Recovery комментария после LLM |
+| `ai/deterministic/*` | Шаблоны create_task, reassign, разделители комментария |
 | `intent-context.ts` | Контекст для prompt: дата, проекты, пользователи, бюджеты, задачи |
 | `intent-resolver.ts` | hints → ID сущностей |
 | `intent-preview.ts` | Текст «Создать задачу? … Ответьте: да / нет / изменить» |

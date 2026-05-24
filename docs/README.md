@@ -2,6 +2,8 @@
 
 Neportal — монорепозиторий для внутреннего портала организации: проекты, задачи, заметки, бюджеты и расходы, сотрудники, отсутствия. В MVP веб-интерфейс и Telegram-бот работают с общим REST API и одной демо-организацией в базе.
 
+**Нетехническое описание продукта** (для HR и руководства): [корневой README.md](../README.md).
+
 **Новому разработчику:** начните с [Руководства разработчика](developer-guide.md) (онбординг за 30–60 минут), затем [Быстрый старт](getting-started.md).
 
 ## Содержание
@@ -15,11 +17,11 @@ Neportal — монорепозиторий для внутреннего пор
 | [REST API](api.md) | Эндпоинты, тела запросов, Swagger, ограничения MVP |
 | [База данных](database.md) | Prisma-модели, enum'ы, миграции, демо-данные |
 | [Веб-приложение](web.md) | Next.js, маршруты, серверный fetch к API |
-| [Telegram-бот](bot.md) | Команды, YandexGPT, подтверждение, чеки к расходам |
-| [AI intent](ai-intent.md) | Контракт JSON, YandexGPT, env, проверка |
+| [Telegram-бот](bot.md) | Команды, детерминированный разбор, YandexGPT (2 шага), чеки |
+| [AI intent](ai-intent.md) | Контракт JSON, classifier + extractor, `create_budget`, env |
 | [Пакеты](packages.md) | `@neportal/database`, `shared`, `permissions`, `ai-contracts` |
 
-Краткая шпаргалка по репозиторию — в корневом [README.md](../README.md).
+Корневой [README.md](../README.md) — описание для нетехнической аудитории; быстрый старт разработчика — [getting-started.md](getting-started.md).
 
 ## Порядок чтения для онбординга
 
@@ -53,5 +55,6 @@ Neportal — монорепозиторий для внутреннего пор
 - **Нет аутентификации** в API: все запросы обслуживаются в контексте одной организации (`NEPORTAL_ORG_SLUG` или `NEPORTAL_ORGANIZATION_ID`).
 - **Web** не реализует логин; страницы доверяют API и демо-данным сида.
 - **Отсутствия** — бот `/sick`, `/vacation`, API `GET/POST /absences`, вкладка проекта в Web — см. [api.md](api.md), [bot.md](bot.md).
-- **YandexGPT** — разбор обычного текста в боте (опционально, см. [ai-intent.md](ai-intent.md)); деплой в Yandex Cloud не нужен.
-- **S3 / SpeechKit** в `.env.example` — заготовки; в MVP чеки из Telegram — `telegramFileId`, preview через API.
+- **Разбор текста в боте** — сначала детерминированные парсеры (без GPT), затем опционально **двухэтапный YandexGPT** (classifier + extractor); см. [bot.md](bot.md), [ai-intent.md](ai-intent.md).
+- **Бюджеты** — intent `create_budget`, поле `matchingKeywords` для выбора бюджета при расходах; чеки из Telegram (`telegramFileId`) и загрузка из Web (`UPLOAD_DIR`, `POST .../receipt`).
+- **S3 / SpeechKit** в `.env.example` — заготовки; постоянное хранение вложений в S3 не в MVP.

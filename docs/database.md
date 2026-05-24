@@ -39,6 +39,7 @@ erDiagram
 - Роли org: `OWNER`, `MANAGER`, `EMPLOYEE`, `ACCOUNTANT` (`UserRole`).
 - Опционально `telegramId` (unique) — связь с Telegram после подтверждения в боте.
 - Опционально `telegramUsername` — для **первичной** привязки в боте (unique в рамках `organizationId`; несколько `NULL` допустимы). Нормализация: trim, без `@`, lowercase.
+- `systemAliases` — строка псевдонимов через запятую (генерация из ФИО: `generateSystemAliases` в `@neportal/shared`); используется ботом и YandexGPT-контекстом для распознавания имён. Backfill: `pnpm users:aliases:backfill`.
 - `telegramId` — постоянная связь после `/start`; отвязка (`DELETE /users/:id/telegram`) или архивация сотрудника обнуляет `telegramId` и `telegramUsername`.
 - `status` — `ARCHIVED` при soft delete (`DELETE /users/:id`).
 - Связи: проекты, задачи, бюджеты, расходы, отсутствия, напоминания.
@@ -62,6 +63,7 @@ erDiagram
 - `initialAmount`, `spentAmount` (подтверждённые расходы), `currency` (по умолчанию RUB).
 - Статус: `ACTIVE`, `ARCHIVED`.
 - `requiresReceipt` — обязательность чека для подтверждения расхода.
+- `matchingKeywords` — ключевые слова через запятую для сопоставления расходов в Telegram-боте (`budget-resolver.ts`); задаются в Web.
 - Архивация: `archivedAt`, `archivedById`, `archiveReason`.
 - `BudgetAccess` — доступ сотрудников к бюджету (`@@unique([budgetId, userId])`).
 

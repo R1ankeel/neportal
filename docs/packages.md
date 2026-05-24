@@ -17,8 +17,11 @@
 
 - **`loadRootEnv()`** — поиск `.env` от `process.cwd()` вверх (до 8 уровней), затем `dotenv.config`. Не логирует значения секретов.
 - **`EntityStatus`** и прочие enum'ы в `src/enums.ts` — подмножество, синхронизированное с доменом (не все Prisma-enum'ы).
+- **`name-aliases`** (`src/name-aliases/`): `generateSystemAliases(fullName)`, словарь `name_aliases.json`, `systemAliasesToString` — для поля `User.systemAliases` и поиска сотрудников в боте.
 
-Используют: `apps/api`, `apps/bot` при bootstrap.
+Используют: `apps/api`, `apps/bot` при bootstrap; сид и `packages/database/scripts/backfill-user-aliases.ts` — для aliases.
+
+Из корня репозитория: `pnpm users:aliases:backfill` — пересчитать `systemAliases` для пользователей без значения.
 
 ## `@neportal/permissions`
 
@@ -41,9 +44,20 @@ Zod-схемы для ответа **YandexGPT intent parser** (только р�
 | `create_task` | `title`, `assigneeHint?`, `projectHint?`, `deadlineDate?` (ISO) |
 | `create_note` | `text`, `projectHint?` |
 | `create_expense` | `amount`, `projectHint?`, `budgetHint?`, `description?` |
+| `create_budget` | `name`, `amount`, `projectHint?`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `type`, `endDate`, `userHint?`, `startDate?`, … |
 | `cancel_absence` | `userHint?`, `type?`, `cancellationReason?` |
 | `set_task_deadline` | `taskTitle`, `deadlineDate` |
+| `complete_task` | `taskTitle`, `completionResult?` |
+| `cancel_task` | `taskTitle`, `cancellationReason?` |
+| `start_task` | `taskTitle` |
+| `add_task_comment` | `taskTitle?`, `taskQuery?`, `comment?` |
+| `mention_in_task` | `userHint`, `taskTitle`, `text?` |
+| `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
+| `reassign_task` | `taskTitle`, `toUserHint`, `fromUserHint?`, `comment?` |
+| `list_my_tasks` | `{}` |
+| `list_user_tasks` | `userHint` |
+| `list_pending_expenses` | `{}` |
 | `unknown` | `reason?` |
 
 Общие поля ответа: `confidence` (0–1), `requiresConfirmation` (boolean).
