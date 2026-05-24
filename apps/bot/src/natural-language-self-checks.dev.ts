@@ -9,7 +9,9 @@ import {
 } from "./resolve-users-by-hint";
 import { extractLeadingAssigneeFromCreateTaskMessage } from "./create-task-assignee-extract";
 import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
+import { parseBasicCreateTask } from "./ai/deterministic/parse-basic-create-task";
 import { parseCreateTaskQuery } from "./parse-create-task-query";
+import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-text";
 import { scoreTaskTitleMatch } from "./task-search-text";
 
 const USER_HINT_TEST_USERS: ApiUser[] = [
@@ -143,15 +145,30 @@ function devCheckBudgetReceiptEdit(): void {
 }
 
 function devCheckCreateTaskAssignee(): void {
-  const text =
+  const multiStep =
     "создай задачу маше поехать в архив и собрать документацию по подрядчику";
-  const parsed = parseCreateTaskQuery(text);
-  const ok =
-    parsed?.payload.assigneeHint?.toLowerCase().startsWith("маш") &&
-    parsed.payload.title.toLowerCase().includes("архив");
-  devLog(`create_task assignee parse ${ok ? "OK" : "FAIL"}`, { parsed });
+  const basicRejected = parseBasicCreateTask(multiStep) === null;
+  devLog(`basic create_task multi-step null ${basicRejected ? "OK" : "FAIL"}`, {
+    parsed: parseBasicCreateTask(multiStep),
+  });
 
-  const leading = extractLeadingAssigneeFromCreateTaskMessage(text);
+  const simple = parseCreateTaskQuery("создай задачу Маше проверить архив");
+  const simpleOk =
+    simple?.payload.assigneeHint?.toLowerCase().startsWith("маш") &&
+    simple.payload.title.toLowerCase().includes("архив");
+  devLog(`basic create_task simple ${simpleOk ? "OK" : "FAIL"}`, { parsed: simple });
+
+  const noisy = parseBasicCreateTask("создай задачу Маше эээ проверить там архив");
+  const noisyOk =
+    noisy?.meta.needsCleanup === true && rawTitleHasNoiseMarkers(noisy.payload.rawTitle);
+  devLog(`basic create_task noise cleanup flag ${noisyOk ? "OK" : "FAIL"}`, { parsed: noisy });
+
+  const vague = parseBasicCreateTask(
+    "короче пусть Вася поедет там посмотрит ну и вот это вот все",
+  );
+  devLog(`basic create_task vague null ${vague === null ? "OK" : "FAIL"}`, { parsed: vague });
+
+  const leading = extractLeadingAssigneeFromCreateTaskMessage(multiStep);
   devLog(`create_task leading extract ${leading ? "OK" : "FAIL"}`, { leading });
 }
 

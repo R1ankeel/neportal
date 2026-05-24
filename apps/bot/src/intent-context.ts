@@ -92,7 +92,7 @@ export async function loadIntentPromptContext(
   };
 
   switch (group) {
-    case "create-task":
+    case "create-task-rich":
     case "create-note": {
       const [projects, users] = await Promise.all([fetchProjects(), fetchUsers()]);
       return { ...empty, projects, users };
@@ -129,14 +129,14 @@ export function formatPromptContextForModel(
   const lines: string[] = [`Текущая дата: ${ctx.currentDate}`];
 
   if (
-    (group === "create-task" || group === "create-note" || group === "expense") &&
+    (group === "create-task-rich" || group === "create-note" || group === "expense") &&
     ctx.projects.length > 0
   ) {
     lines.push("", "Проекты:", ...ctx.projects.map((p) => `- ${p.name}`));
   }
 
   const includeUsers =
-    group === "create-task" ||
+    group === "create-task-rich" ||
     group === "create-note" ||
     group === "absence" ||
     group === "task-list" ||

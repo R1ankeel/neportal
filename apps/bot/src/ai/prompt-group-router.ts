@@ -4,7 +4,7 @@ export type PromptGroup =
   | "task-status"
   | "collaboration"
   | "task-list"
-  | "create-task"
+  | "create-task-rich"
   | "create-note"
   | "classifier";
 
@@ -101,7 +101,7 @@ export function resolvePromptGroup(userText: string): PromptGroup {
     /^пусть\s+\p{L}/u.test(t) ||
     /запиши(?:те)?\s+мне\s+(?:в\s+)?задач/i.test(t)
   ) {
-    return "create-task";
+    return "create-task-rich";
   }
 
   return "classifier";

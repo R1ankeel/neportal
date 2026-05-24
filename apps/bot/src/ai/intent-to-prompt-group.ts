@@ -7,7 +7,7 @@ export type ExtractorPromptGroup = Exclude<PromptGroup, "classifier">;
 export function intentToExtractorGroup(intent: AiIntentName): ExtractorPromptGroup | null {
   switch (intent) {
     case "create_task":
-      return "create-task";
+      return "create-task-rich";
     case "create_note":
       return "create-note";
     case "create_expense":

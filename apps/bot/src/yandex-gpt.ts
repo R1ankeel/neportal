@@ -162,10 +162,16 @@ type GptCallResult =
   | { ok: true; responseText: string; parsed: unknown; usage: YandexGptTokenUsage | null }
   | { ok: false; kind: "invalid_json" | "invalid_schema" };
 
+export type YandexGptCompletionOptions = {
+  temperature?: number;
+  maxTokens?: number;
+};
+
 async function callYandexGpt(
   config: YandexGptConfig,
   systemPrompt: string,
   userPrompt: string,
+  completionOptions?: YandexGptCompletionOptions,
 ): Promise<YandexGptCallResult> {
   const res = await fetch(YANDEX_COMPLETION_URL, {
     method: "POST",
@@ -179,8 +185,8 @@ async function callYandexGpt(
       modelUri: config.modelUri,
       completionOptions: {
         stream: false,
-        temperature: 0.2,
-        maxTokens: 2000,
+        temperature: completionOptions?.temperature ?? 0.2,
+        maxTokens: completionOptions?.maxTokens ?? 2000,
       },
       messages: [
         { role: "system", text: systemPrompt },
@@ -226,19 +232,21 @@ function unknownIntent(confidence: number): AiIntent {
 
 async function runGptJsonCall(params: {
   config: YandexGptConfig;
-  promptGroup: PromptGroup;
+  promptGroup: string;
   systemPrompt: string;
   userPrompt: string;
   userText: string;
   validate?: (parsed: unknown) => boolean;
+  completionOptions?: YandexGptCompletionOptions;
 }): Promise<GptCallResult & { systemPrompt: string; userPrompt: string }> {
-  const { config, promptGroup, systemPrompt, userPrompt, userText, validate } = params;
+  const { config, promptGroup, systemPrompt, userPrompt, userText, validate, completionOptions } =
+    params;
   const promptChars = systemPrompt.length + userPrompt.length;
   yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars}`);
 
   let callResult: YandexGptCallResult;
   try {
-    callResult = await callYandexGpt(config, systemPrompt, userPrompt);
+    callResult = await callYandexGpt(config, systemPrompt, userPrompt, completionOptions);
   } catch (e) {
     throw e;
   }
@@ -289,6 +297,40 @@ async function runGptJsonCall(params: {
   }
 
   return { ok: true, responseText, parsed, usage: callResult.usage, systemPrompt, userPrompt };
+}
+
+/** Отдельный JSON-вызов YandexGPT (cleanup и др.). */
+export async function requestYandexGptJson(params: {
+  config: YandexGptConfig;
+  promptGroup: string;
+  systemPrompt: string;
+  userPrompt: string;
+  userText: string;
+  validate?: (parsed: unknown) => boolean;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<
+  | { ok: true; parsed: unknown; responseText: string }
+  | { ok: false; kind: "invalid_json" | "invalid_schema" }
+> {
+  const gptResult = await runGptJsonCall({
+    config: params.config,
+    promptGroup: params.promptGroup,
+    systemPrompt: params.systemPrompt,
+    userPrompt: params.userPrompt,
+    userText: params.userText,
+    validate: params.validate,
+    completionOptions: {
+      temperature: params.temperature,
+      maxTokens: params.maxTokens,
+    },
+  });
+
+  if (!gptResult.ok) {
+    return { ok: false, kind: gptResult.kind };
+  }
+
+  return { ok: true, parsed: gptResult.parsed, responseText: gptResult.responseText };
 }
 
 async function runClassifier(
