@@ -37,6 +37,7 @@ import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
 import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
 import { parseCreateBudgetCommand } from "./parse-create-budget-command";
+import { parseTaskReassignQuery } from "./ai/deterministic/parse-task-reassign-query";
 import { finalizeBasicCreateTask } from "./finalize-basic-create-task";
 import { parseTaskTransferLikeQuery } from "./parse-task-transfer-query";
 import { isManagerOrOwner } from "./task-transfer-flow";
@@ -284,6 +285,12 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   const expenseIntent = parseExpenseQuery(text);
   if (expenseIntent) {
     await routeParsedAiIntent(ctx, linked, telegramUserId, text, expenseIntent);
+    return;
+  }
+
+  const reassignIntent = parseTaskReassignQuery(text, linked.role);
+  if (reassignIntent) {
+    await routeParsedAiIntent(ctx, linked, telegramUserId, text, reassignIntent);
     return;
   }
 

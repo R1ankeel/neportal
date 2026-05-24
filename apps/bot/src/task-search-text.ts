@@ -15,6 +15,8 @@ const SEARCH_STOP_WORDS = new Set([
   "поводу",
   "насчет",
   "насчёт",
+  "относительно",
+  "касательно",
   "в",
   "во",
   "на",
@@ -65,20 +67,30 @@ const WORD_CANONICAL: Record<string, string> = {
   отчётом: "отчет",
   отчеты: "отчет",
   отчёты: "отчет",
+  квартальному: "квартальн",
+  квартальным: "квартальн",
+  квартального: "квартальн",
+  квартальная: "квартальн",
+  квартальный: "квартальн",
+  квартальные: "квартальн",
+  подготовить: "подготов",
+  подготовка: "подготов",
+  подготовки: "подготов",
+  подготовку: "подготов",
 };
 
 const STEM_SUFFIXES = [
   "ами",
   "ями",
-  "ах",
-  "ях",
   "иями",
   "ого",
   "его",
   "ому",
   "ему",
-  "ами",
-  "ией",
+  "ыми",
+  "ими",
+  "ах",
+  "ях",
   "ией",
   "ов",
   "ев",
@@ -94,8 +106,19 @@ const STEM_SUFFIXES = [
   "ам",
   "ям",
   "иям",
-  "ах",
-  "ях",
+  "ить",
+  "ать",
+  "ять",
+  "еть",
+  "ти",
+  "ый",
+  "ий",
+  "ая",
+  "яя",
+  "ое",
+  "ее",
+  "ые",
+  "ие",
   "а",
   "я",
   "у",
@@ -106,11 +129,18 @@ const STEM_SUFFIXES = [
   "о",
 ] as const;
 
-function simpleStem(word: string): string {
-  if (word.length < 4) return word;
+const MIN_STEM_LENGTH = 3;
+
+/** Простой stem русского слова (минимальная длина stem >= 3). */
+export function stemRussianWord(word: string): string {
+  if (word.length < MIN_STEM_LENGTH) return word;
+  if (WORD_CANONICAL[word]) return WORD_CANONICAL[word];
+
   for (const suffix of STEM_SUFFIXES) {
-    if (word.length > suffix.length + 2 && word.endsWith(suffix)) {
-      return word.slice(0, -suffix.length);
+    if (word.length - suffix.length < MIN_STEM_LENGTH) continue;
+    if (word.endsWith(suffix)) {
+      const stem = word.slice(0, -suffix.length);
+      if (stem.length >= MIN_STEM_LENGTH) return stem;
     }
   }
   return word;
@@ -118,7 +148,7 @@ function simpleStem(word: string): string {
 
 function canonicalToken(word: string): string {
   if (WORD_CANONICAL[word]) return WORD_CANONICAL[word];
-  return simpleStem(word);
+  return stemRussianWord(word);
 }
 
 /** Нормализует текст для поиска задачи (без токенизации). */
@@ -135,7 +165,7 @@ export function normalizeTaskSearchText(text: string): string {
 
 function isMeaningfulToken(token: string): boolean {
   if (!token) return false;
-  if (token.length >= 3) return !SEARCH_STOP_WORDS.has(token);
+  if (token.length >= MIN_STEM_LENGTH) return !SEARCH_STOP_WORDS.has(token);
   return token.length >= 2 && /^\d+$/u.test(token);
 }
 
@@ -154,6 +184,27 @@ export function tokenizeForTaskMatch(text: string): string[] {
     tokens.push(token);
   }
   return tokens;
+}
+
+/** Совпадение токенов с учётом общего stem / префикса. */
+export function taskTokensMatch(queryToken: string, titleToken: string): boolean {
+  if (!queryToken || !titleToken) return false;
+  if (queryToken === titleToken) return true;
+
+  const qStem = stemRussianWord(queryToken);
+  const tStem = stemRussianWord(titleToken);
+  if (qStem === tStem) return true;
+
+  const minLen = MIN_STEM_LENGTH;
+  if (qStem.length >= minLen && tStem.length >= minLen) {
+    if (qStem.startsWith(tStem) || tStem.startsWith(qStem)) return true;
+  }
+
+  if (queryToken.length >= minLen && titleToken.length >= minLen) {
+    if (queryToken.startsWith(titleToken) || titleToken.startsWith(queryToken)) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -175,8 +226,9 @@ export function scoreTaskTitleMatch(title: string, query: string): number {
     return normTitle.includes(normQuery) ? 55 : 0;
   }
 
-  const titleSet = new Set(titleTokens);
-  const matched = queryTokens.filter((t) => titleSet.has(t));
+  const matched = queryTokens.filter((qt) =>
+    titleTokens.some((tt) => taskTokensMatch(qt, tt)),
+  );
   if (matched.length === 0) {
     const q = query.trim().toLowerCase();
     if (title.trim().toLowerCase().includes(q)) return 55;

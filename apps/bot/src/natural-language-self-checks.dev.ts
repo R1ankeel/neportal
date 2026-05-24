@@ -10,8 +10,10 @@ import {
 import { extractLeadingAssigneeFromCreateTaskMessage } from "./create-task-assignee-extract";
 import { parseBudgetReceiptEdit } from "./parse-budget-receipt-edit";
 import { parseBasicCreateTask } from "./ai/deterministic/parse-basic-create-task";
+import { parseTaskReassignQuery } from "./ai/deterministic/parse-task-reassign-query";
 import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-text";
+import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import { scoreTaskTitleMatch } from "./task-search-text";
 
 const USER_HINT_TEST_USERS: ApiUser[] = [
@@ -36,6 +38,14 @@ const TASK_MATCH_FIXTURES: ApiTask[] = [
     status: "NEW",
     creatorId: "c1",
     assigneeId: "1",
+  },
+  {
+    id: "t3",
+    title: "Подготовить квартальный отчет",
+    deadlineAt: null,
+    status: "IN_PROGRESS",
+    creatorId: "c1",
+    assigneeId: "2",
   },
 ];
 
@@ -88,6 +98,8 @@ function devCheckUserHintCleanup(): void {
 
 function devCheckTaskMatching(): void {
   const queries: Array<{ query: string; expectedTitle: string }> = [
+    { query: "по квартальному отчету", expectedTitle: "Подготовить квартальный отчет" },
+    { query: "квартальный отчет", expectedTitle: "Подготовить квартальный отчет" },
     { query: "поехать к поставщикам", expectedTitle: "Поехать в офис к поставщикам" },
     { query: "поехать в офис поставщикам", expectedTitle: "Поехать в офис к поставщикам" },
     { query: "подготовить отчет", expectedTitle: "Подготовить отчет" },
@@ -104,6 +116,28 @@ function devCheckTaskMatching(): void {
       got: match.kind === "found" ? match.task.title : match.kind,
     });
   }
+}
+
+function devCheckReassignParser(): void {
+  const selfCases = [
+    "передай мне задачу по квартальному отчету",
+    "переведи на меня квартальный отчет",
+  ];
+  for (const text of selfCases) {
+    const parsed = parseTaskReassignQuery(text, "OWNER");
+    const ok =
+      parsed?.intent === "reassign_task" &&
+      parsed.payload.toUserHint === SELF_HINT_MARKER &&
+      parsed.payload.taskTitle.toLowerCase().includes("квартальн");
+    devLog(`reassign parser self ${ok ? "OK" : "FAIL"}`, { text, parsed });
+  }
+
+  const toOther = parseTaskReassignQuery("перекинь задачу купить бумагу на Машу", "OWNER");
+  const toOtherOk =
+    toOther?.intent === "reassign_task" &&
+    toOther.payload.taskTitle.toLowerCase().includes("бумаг") &&
+    toOther.payload.toUserHint.toLowerCase().startsWith("маш");
+  devLog(`reassign parser to user ${toOtherOk ? "OK" : "FAIL"}`, { parsed: toOther });
 }
 
 function devCheckTransferParser(): void {
@@ -175,6 +209,7 @@ function devCheckCreateTaskAssignee(): void {
 export function devLogNaturalLanguageSelfChecks(): void {
   devCheckUserHintCleanup();
   devCheckTaskMatching();
+  devCheckReassignParser();
   devCheckTransferParser();
   devCheckBudgetReceiptEdit();
   devCheckCreateTaskAssignee();

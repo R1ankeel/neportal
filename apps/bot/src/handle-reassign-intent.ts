@@ -7,11 +7,18 @@ import {
   MANAGER_REASSIGN_ONLY_MESSAGE,
 } from "./task-reassign-flow";
 import { isManagerOrOwner } from "./task-transfer-flow";
+import { isSelfHint, SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import {
   buildUserSelectionPayload,
   resolveUserHintWithSelection,
 } from "./user-hint-resolution";
 import type { ReassignUserSelectionPayload } from "./pending-user-selection";
+
+function isSelfUserHint(hint: string | undefined): boolean {
+  const t = hint?.trim();
+  if (!t) return false;
+  return t === SELF_HINT_MARKER || isSelfHint(t);
+}
 
 export async function handleReassignTaskIntent(
   ctx: Context,
@@ -28,10 +35,16 @@ export async function handleReassignTaskIntent(
 
   const users = await fetchUsers();
   const { taskTitle, fromUserHint, toUserHint, comment } = intent.payload;
+  const reassignToSelf = isSelfUserHint(toUserHint);
 
   let fromUser: ApiUser | undefined;
 
-  if (fromUserHint?.trim()) {
+  const effectiveFromHint =
+    fromUserHint?.trim() && !(reassignToSelf && isSelfUserHint(fromUserHint))
+      ? fromUserHint
+      : undefined;
+
+  if (effectiveFromHint?.trim()) {
     const fromPayload: ReassignUserSelectionPayload = {
       intent: "reassign_task",
       taskTitle,
@@ -42,7 +55,7 @@ export async function handleReassignTaskIntent(
       ctx,
       telegramUserId,
       users,
-      fromUserHint,
+      effectiveFromHint,
       linked,
       "select_user_for_reassign_from",
       fromPayload,
@@ -74,8 +87,17 @@ export async function handleReassignTaskIntent(
   );
   if (toResolution.status !== "resolved") return;
 
+  let effectiveFromUser = fromUser;
+  if (
+    reassignToSelf &&
+    effectiveFromUser &&
+    effectiveFromUser.id === toResolution.user.id
+  ) {
+    effectiveFromUser = undefined;
+  }
+
   await continueReassignAfterUsersResolved(ctx, linked, telegramUserId, intent, taskTitle, toResolution.user, {
-    fromUser,
+    fromUser: effectiveFromUser,
     comment,
   });
 }

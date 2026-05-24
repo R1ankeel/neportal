@@ -15,6 +15,10 @@ create_task.payload:
 - title — короткое главное действие без даты; description — остальные шаги.
 - «сегодня», «завтра», «до DD.MM» → deadlineDate.
 
+НЕ create_task (это reassign/transfer существующей задачи):
+- «передай мне задачу …», «перенеси мне задачу …», «перекинь мне задачу …»
+- «переведи на меня …», «забери мне задачу …», «назначь мне задачу …»
+
 Пример:
 Input: «создай задачу для Васи купить бумагу для офиса»
 Output: {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Вася","title":"Купить бумагу для офиса"}}
