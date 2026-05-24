@@ -19,6 +19,7 @@ import { showPendingExpenses } from "./pending-expenses-flow";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { setPendingConfirmation } from "./pending-intent";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
+import { validateIntentForRouting } from "./validate-parsed-intent";
 
 const CONFIDENCE_THRESHOLD = 0.7;
 
@@ -48,7 +49,11 @@ export async function routeParsedAiIntent(
   }
 
   if (intent.intent === "add_task_comment") {
-    await handleAddTaskCommentIntent(ctx, linked, telegramUserId, intent);
+    const routing = validateIntentForRouting({ intent: activeIntent, userText: text });
+    activeIntent = routing.intent;
+    await handleAddTaskCommentIntent(ctx, linked, telegramUserId, activeIntent, {
+      userText: text,
+    });
     return;
   }
 

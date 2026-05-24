@@ -1,6 +1,7 @@
 import type { AiIntent } from "../ai-contracts";
 import { parseAmount } from "../api";
-import { cleanupTaskTitleWithAi } from "../ai/cleanup-task-title";
+import { normalizeBasicTaskTitle } from "../ai/deterministic/basic-create-task-text";
+import { collapseSpaces } from "../validate-add-task-comment-payload";
 import { findProjectByHint } from "../hint-matchers";
 import {
   coerceDeadlineDateLoose,
@@ -123,12 +124,7 @@ export async function applyFieldEdit(
 
     case "title": {
       if (intent.intent === "create_task") {
-        let title = value;
-        try {
-          title = await cleanupTaskTitleWithAi(value);
-        } catch {
-          /* keep raw title */
-        }
+        const title = normalizeBasicTaskTitle(collapseSpaces(value));
         return { ok: true, intent: { ...intent, payload: { ...intent.payload, title } } };
       }
       break;

@@ -22,8 +22,13 @@ import {
   clearPendingTaskCommentDetails,
   setPendingTaskCommentMissingTask,
 } from "./pending-task-comment-details";
+import { validateAddTaskCommentPayload } from "./validate-add-task-comment-payload";
 
 const QUESTION_MISSING_TASK = "К какой задаче добавить комментарий?";
+
+export type HandleAddTaskCommentIntentOptions = {
+  userText?: string;
+};
 
 /** AI intent add_task_comment с выбором задачи и уточнением текста. */
 export async function handleAddTaskCommentIntent(
@@ -31,11 +36,18 @@ export async function handleAddTaskCommentIntent(
   linked: ApiUser,
   telegramUserId: number,
   intent: AiIntent,
+  options?: HandleAddTaskCommentIntentOptions,
 ): Promise<void> {
   if (intent.intent !== "add_task_comment") return;
 
-  const taskQuery = getAddTaskCommentTaskQuery(intent.payload);
-  const comment = getAddTaskCommentComment(intent.payload);
+  const validated = validateAddTaskCommentPayload({
+    payload: intent.payload,
+    userText: options?.userText?.trim() ?? "",
+  });
+  const safeIntent: AiIntent = { ...intent, payload: validated.payload };
+
+  const taskQuery = getAddTaskCommentTaskQuery(validated.payload);
+  const comment = getAddTaskCommentComment(validated.payload);
 
   if (!taskQuery) {
     clearPendingTaskCommentDetails(telegramUserId);
@@ -70,7 +82,7 @@ export async function handleAddTaskCommentIntent(
     setPendingConfirmation(telegramUserId, {
       type: "ai_intent",
       intent: {
-        ...intent,
+        ...safeIntent,
         payload: buildAddTaskCommentPayload({
           taskQuery,
           taskTitle: resolved.taskTitle,

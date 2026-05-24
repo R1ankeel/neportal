@@ -1,4 +1,4 @@
-import { splitCommentByExplicitSeparator } from "./ai/deterministic/split-comment-by-explicit-separator";
+import { validateAddTaskCommentPayload } from "./validate-add-task-comment-payload";
 
 function asTrimmedString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -13,33 +13,24 @@ export function applyAddTaskCommentPayloadFix(
 ): void {
   const legacyText = asTrimmedString(p.text);
   const comment = asTrimmedString(p.comment);
-  if (!comment && legacyText) {
-    p.comment = legacyText;
-  }
+  const { payload } = validateAddTaskCommentPayload({
+    payload: {
+      taskQuery: asTrimmedString(p.taskQuery),
+      taskTitle: asTrimmedString(p.taskTitle),
+      taskId: asTrimmedString(p.taskId),
+      comment: comment ?? legacyText,
+      text: legacyText,
+    },
+    userText: userText?.trim() ?? "",
+  });
+
   delete p.text;
-
-  const user = userText?.trim() ?? "";
-  const currentComment = asTrimmedString(p.comment);
-  const commentLooksLikeFullMessage =
-    Boolean(user) && Boolean(currentComment) && currentComment === user;
-
-  if (!currentComment || commentLooksLikeFullMessage) {
-    if (!user) return;
-
-    const split = splitCommentByExplicitSeparator(user);
-    if (!split) return;
-
-    if (split.comment && (!currentComment || commentLooksLikeFullMessage)) {
-      p.comment = split.comment;
-    }
-
-    const taskQuery = asTrimmedString(p.taskQuery);
-    const taskTitle = asTrimmedString(p.taskTitle);
-    if (split.taskQuery && !taskQuery) {
-      p.taskQuery = split.taskQuery;
-      if (!taskTitle || taskTitle === user || taskTitle === split.taskQuery) {
-        p.taskTitle = split.taskQuery;
-      }
-    }
-  }
+  if (payload.taskQuery) p.taskQuery = payload.taskQuery;
+  else delete p.taskQuery;
+  if (payload.taskTitle) p.taskTitle = payload.taskTitle;
+  else delete p.taskTitle;
+  if (payload.taskId) p.taskId = payload.taskId;
+  else delete p.taskId;
+  if (payload.comment) p.comment = payload.comment;
+  else delete p.comment;
 }

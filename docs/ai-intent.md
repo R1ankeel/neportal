@@ -83,7 +83,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `complete_task` | `taskTitle`, `completionResult?` |
 | `cancel_task` | `taskTitle`, `cancellationReason?` |
 | `start_task` | `taskTitle` |
-| `add_task_comment` | `taskTitle`, `text?` |
+| `add_task_comment` | `taskQuery?`, `taskTitle?`, `taskId?`, `comment?` (legacy `text?`) |
 | `mention_in_task` | `userHint`, `taskTitle`, `text?` |
 | `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
 | `reassign_task` | `taskTitle`, `fromUserHint?`, `toUserHint`, `comment?` |
@@ -197,6 +197,18 @@ Confirmation: *«Взять задачу «Проверить склад» в р
 ```
 
 Бот спросит: *«Что написать в комментарии к задаче «…»?»*, затем confirmation.
+
+### add_task_comment: bot-level validation (после LLM)
+
+YandexGPT может вернуть формально валидный JSON, где `comment` совпадает с целой фразой пользователя. Перед routing бот вызывает `validateIntentForRouting` → `validateAddTaskCommentPayload`:
+
+- нормализация строк (trim, схлопывание пробелов);
+- если `comment` пустой или почти равен `userText` при известной задаче — recovery: явные разделители (`:`, «, что», « что », « с текстом ») или хвост `userText` после fuzzy-вхождения `taskQuery`/`taskTitle` (stem из `task-search-text.ts`);
+- если recovery не удался — `needsComment` → бот спрашивает: *«Какой комментарий добавить?»*;
+- если нет `taskQuery` / `taskTitle` / `taskId` — `needsTaskQuery` → *«К какой задаче добавить комментарий?»*;
+- в preview и в БД сохраняется очищенный `comment`, не исходная команда.
+
+Edit-flow (`pendingConfirmationEdit`) для поля «Комментарий» не прогоняет текст через recovery (пустой `userText`).
 
 ### Пример: призвать в задачу (с текстом)
 
