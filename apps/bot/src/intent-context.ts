@@ -12,6 +12,7 @@ import { normalizeName, parseSystemAliasesString, pickPromptAliases } from "@nep
 import { todayIsoDate } from "./parse-ru-date";
 
 const MAX_TASKS_IN_CONTEXT = 20;
+const MAX_TASKS_IN_PROMPT = 12;
 const MAX_EMPLOYEES_WITH_ALIASES = 30;
 const COMPACT_ALIASES_PER_EMPLOYEE = 5;
 const EXPANDED_ALIASES_PER_EMPLOYEE = 8;
@@ -69,6 +70,51 @@ async function loadActiveTasks(
     }));
 }
 
+function normalizeForTaskFilter(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Сужает список задач в prompt по словам из userText (склад, отчет, …). */
+export function filterTasksForPrompt(
+  tasks: Array<{ title: string; projectName: string }>,
+  userText?: string,
+  max = MAX_TASKS_IN_PROMPT,
+): Array<{ title: string; projectName: string }> {
+  const slice = tasks.slice(0, max);
+  const query = userText?.trim();
+  if (!query) return slice;
+
+  const normalized = normalizeForTaskFilter(query);
+  const tokens = normalized
+    .split(/\s+/)
+    .filter((t) => t.length >= 3 && !/^(задачу|задаче|задачи|задача|по|на|мне|меня)$/u.test(t));
+
+  if (tokens.length === 0) return slice;
+
+  const matched = tasks.filter((task) => {
+    const title = normalizeForTaskFilter(task.title);
+    return tokens.some((token) => title.includes(token) || token.includes(title));
+  });
+
+  if (matched.length === 0) return slice;
+  return matched.slice(0, max);
+}
+
+function groupNeedsUsers(group: PromptGroup): boolean {
+  return (
+    group === "create-task-rich" ||
+    group === "create-note" ||
+    group === "absence" ||
+    group === "task-list" ||
+    group === "collaboration"
+  );
+}
+
 export type LoadIntentPromptContextOptions = {
   linkedUserId?: string;
   /** Текст пользователя — для hint-based расширения aliases в prompt. */
@@ -107,16 +153,25 @@ export async function loadIntentPromptContext(
       const users = await fetchUsers();
       return { ...empty, users };
     }
-    case "task-status":
+    case "task-status": {
+      const projects = await fetchProjects();
+      const tasks = await loadActiveTasks(options?.linkedUserId, projects);
+      return {
+        ...empty,
+        tasks: filterTasksForPrompt(tasks, options?.userText),
+      };
+    }
     case "collaboration": {
       const [projects, users] = await Promise.all([fetchProjects(), fetchUsers()]);
       const tasks = await loadActiveTasks(options?.linkedUserId, projects);
-      return { ...empty, users, tasks };
+      return {
+        ...empty,
+        users,
+        tasks: filterTasksForPrompt(tasks, options?.userText),
+      };
     }
-    case "classifier": {
-      const users = await fetchUsers();
-      return { ...empty, users };
-    }
+    case "classifier":
+      return empty;
     default:
       return empty;
   }
@@ -185,16 +240,7 @@ export function formatPromptContextForModel(
     lines.push("", "Проекты:", ...ctx.projects.map((p) => `- ${p.name}`));
   }
 
-  const includeUsers =
-    group === "create-task-rich" ||
-    group === "create-note" ||
-    group === "absence" ||
-    group === "task-list" ||
-    group === "task-status" ||
-    group === "collaboration" ||
-    group === "classifier";
-
-  if (includeUsers && ctx.users.length > 0) {
+  if (groupNeedsUsers(group) && ctx.users.length > 0) {
     lines.push("", "Сотрудники:", ...formatEmployeesForPrompt(ctx.users, userText));
   }
 

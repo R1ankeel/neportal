@@ -1,0 +1,7 @@
+/** Минимальный JSON-контракт для всех extractor-групп. */
+export const CORE_JSON_RULES = `Верни ТОЛЬКО один JSON: intent, confidence, requiresConfirmation, payload.
+Без markdown и текста вне JSON. Неизвестное → intent "unknown".
+Даты: YYYY-MM-DD от «Текущая дата». Не возвращай null-поля.`;
+
+/** Правила сопоставления сотрудников (только где есть список в контексте). */
+export const USER_HINT_RULES = `Сотрудники в контексте: userId только при уверенности; иначе hint. «мне/себе» → "__self__".`;

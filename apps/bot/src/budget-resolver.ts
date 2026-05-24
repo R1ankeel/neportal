@@ -3,6 +3,7 @@ import { budgetTotalsOrFallback } from "./api";
 
 const SCORE_EXACT_NAME = 100;
 const SCORE_NAME_PHRASE = 90;
+const SCORE_TITLE_STEM = 88;
 const SCORE_KEYWORD = 80;
 const SCORE_WEAK_INCLUDES = 50;
 
@@ -70,6 +71,25 @@ function scoreNamePhraseMatch(budgetName: string, text: string): number {
   return 0;
 }
 
+/** Совпадение основы слова в названии бюджета (рекламу → реклама VK). */
+function scoreTitleStemMatch(budgetName: string, text: string): number {
+  const name = normalizeBudgetText(budgetName);
+  const normalized = normalizeBudgetText(text);
+  if (!name || !normalized) return 0;
+
+  const tokens = normalized.split(" ").filter((t) => t.length >= 4);
+  for (const token of tokens) {
+    const stem = token.slice(0, Math.min(token.length, 6));
+    if (stem.length < 4) continue;
+    if (name.includes(stem)) return SCORE_TITLE_STEM;
+    const nameTokens = name.split(" ").filter(Boolean);
+    if (nameTokens.some((nt) => nt.startsWith(stem) || stem.startsWith(nt.slice(0, 6)))) {
+      return SCORE_TITLE_STEM;
+    }
+  }
+  return 0;
+}
+
 function scoreWeakIncludes(budgetName: string, hint: string): number {
   const name = normalizeBudgetText(budgetName);
   const h = normalizeBudgetText(hint);
@@ -101,17 +121,20 @@ function scoreBudgetForExpense(
   if (hint) {
     max = Math.max(max, scoreExactNameMatch(budget.title, hint));
     max = Math.max(max, scoreNamePhraseMatch(budget.title, hint));
+    max = Math.max(max, scoreTitleStemMatch(budget.title, hint));
     max = Math.max(max, scoreWeakIncludes(budget.title, hint));
     max = Math.max(max, scoreKeywordMatches(budget, hint));
   }
 
   if (description) {
     max = Math.max(max, scoreNamePhraseMatch(budget.title, description));
+    max = Math.max(max, scoreTitleStemMatch(budget.title, description));
     max = Math.max(max, scoreKeywordMatches(budget, description));
   }
 
   if (combined) {
     max = Math.max(max, scoreNamePhraseMatch(budget.title, combined));
+    max = Math.max(max, scoreTitleStemMatch(budget.title, combined));
     max = Math.max(max, scoreKeywordMatches(budget, combined));
   }
 

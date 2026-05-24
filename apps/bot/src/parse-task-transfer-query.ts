@@ -1,4 +1,6 @@
 import type { AiIntent } from "./ai-contracts";
+import type { ApiUser } from "./api";
+import { resolveUsersByHint } from "./resolve-users-by-hint";
 
 export type TaskTransferLikeIntent = Extract<
   AiIntent,
@@ -49,8 +51,55 @@ const REASSIGN_FROM_TO_RE =
 const TASK_ON_USER_RE =
   /^(?:перекинь|перенеси|переназначь|передай)(?:те)?\s+задачу\s+(.+?)\s+на\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
 
+/** «передай задачу … Васе» — один токен получателя в конце. */
 const TASK_TO_USER_RE =
-  /^(?:передай)(?:те)?\s+задачу\s+(.+?)\s+(\p{L}+(?:\s+\p{L}+)?)$/iu;
+  /^(?:передай)(?:те)?\s+задачу\s+(.+?)\s+(\p{L}+)$/iu;
+
+/** «передай задачу по <task> <user>» — один токен получателя в конце. */
+const TASK_PO_TO_USER_RE =
+  /^(?:передай)(?:те)?\s+задачу\s+по\s+(.+?)\s+(\p{L}+)$/iu;
+
+const TRANSFER_TASK_PREFIX_RE =
+  /^(?:передай|перекинь|перенеси|переназначь)(?:те)?\s+задачу\s+/iu;
+
+/**
+ * Отделяет taskQuery и toUserHint с конца, если resolver уверенно находит сотрудника.
+ */
+function trySplitTransferWithResolver(
+  trimmed: string,
+  users: ApiUser[],
+  currentUser: ApiUser | null,
+): ParsedTransfer | null {
+  const prefix = trimmed.match(TRANSFER_TASK_PREFIX_RE);
+  if (!prefix) return null;
+
+  let tail = trimmed.slice(prefix[0].length).trim();
+  if (!tail) return null;
+
+  if (/^по\s+/iu.test(tail)) {
+    tail = tail.replace(/^по\s+/iu, "").trim();
+  }
+
+  const words = tail.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+
+  for (let take = 2; take >= 1; take--) {
+    if (words.length <= take) continue;
+    const userWords = words.slice(-take).join(" ");
+    const taskWords = words.slice(0, -take).join(" ");
+    if (!taskWords.trim() || !userWords.trim()) continue;
+
+    const resolved = resolveUsersByHint(users, userWords, currentUser);
+    if (resolved.kind !== "one") continue;
+
+    return {
+      taskTitleNorm: taskWords.trim(),
+      toUserNorm: userWords.trim(),
+    };
+  }
+
+  return null;
+}
 
 function matchTransfer(normalized: string): ParsedTransfer | null {
   const fromTo = normalized.match(REASSIGN_FROM_TO_RE);
@@ -59,6 +108,14 @@ function matchTransfer(normalized: string): ParsedTransfer | null {
       taskTitleNorm: fromTo[1].trim(),
       fromUserNorm: fromTo[2].trim(),
       toUserNorm: fromTo[3].trim(),
+    };
+  }
+
+  const poUser = normalized.match(TASK_PO_TO_USER_RE);
+  if (poUser?.[1] && poUser[2]) {
+    return {
+      taskTitleNorm: poUser[1].trim(),
+      toUserNorm: poUser[2].trim(),
     };
   }
 
@@ -87,13 +144,20 @@ function matchTransfer(normalized: string): ParsedTransfer | null {
  */
 export function parseTaskTransferLikeQuery(
   text: string,
-  options?: { preferReassign?: boolean },
+  options?: {
+    preferReassign?: boolean;
+    users?: ApiUser[];
+    currentUser?: ApiUser | null;
+  },
 ): TaskTransferLikeIntent | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
 
   const normalized = normalizeTransferInput(trimmed);
-  const parsed = matchTransfer(normalized);
+  const parsed =
+    (options?.users?.length
+      ? trySplitTransferWithResolver(trimmed, options.users, options.currentUser ?? null)
+      : null) ?? matchTransfer(normalized);
   if (!parsed?.taskTitleNorm || !parsed.toUserNorm) return null;
 
   const taskTitle = extractPreservingCase(trimmed, parsed.taskTitleNorm);

@@ -1,4 +1,5 @@
 import { preprocessAiIntentInput } from "./ai-contracts";
+import { applyCreateAbsenceDateFix } from "./fix-ai-intent-absence-dates";
 import { applyCreateAbsenceUserSelfFix } from "./fix-ai-intent-absence-user";
 import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-user";
 import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
@@ -78,6 +79,7 @@ export function fixAiIntentBeforeValidation(
     applyDeadlineFields(p, intent as string, opts);
   } else if (intent === "create_absence") {
     applyCreateAbsenceUserSelfFix(p, opts.userText);
+    applyCreateAbsenceDateFix(p, opts.userText, opts.baseDate);
   } else if (intent === "cancel_absence") {
     applyCancelAbsenceUserSelfFix(p, opts.userText);
   } else if (intent === "set_task_deadline") {

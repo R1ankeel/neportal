@@ -1,9 +1,13 @@
-import type { ApiUser } from "./api";
+import type { ApiBudget, ApiUser } from "./api";
 import { resolveCompletionMaxTokens } from "./ai/completion-max-tokens";
+import { measureSystemPrompt } from "./ai/build-system-prompt";
 import { resolvePromptGroup } from "./ai/prompt-group-router";
 import { budgetContextCacheKey, clearBudgetContextCache } from "./budget-context-cache";
+import { resolveBudgetForExpense } from "./budget-resolver";
 import { devLog } from "./dev-log";
+import { applyCreateAbsenceDateFix } from "./fix-ai-intent-absence-dates";
 import { pickAliasesForPrompt } from "./intent-context";
+import { parseTaskTransferLikeQuery } from "./parse-task-transfer-query";
 import { generateSystemAliases, systemAliasesToString } from "@neportal/shared";
 
 function withAliases(fullName: string, id: string): ApiUser {
@@ -36,6 +40,11 @@ function devCheckPromptGroupRoutes(): void {
     { text: "поставь Маше задачу подготовить презентацию к пятнице", expected: "create-task-rich" },
     { text: "перекинь отчет на Машу, я не успеваю", expected: "collaboration" },
     { text: "привет как дела", expected: "classifier" },
+    {
+      text: "закрыл задачу по складу, проверил остатки, не хватает бумаги",
+      expected: "task-status",
+    },
+    { text: "добавь мне отпуск с завтра до понедельника", expected: "absence" },
   ];
 
   for (const { text, expected } of cases) {
@@ -111,6 +120,89 @@ function devCheckCompactAliases(): void {
   });
 }
 
+function devCheckTransferSabir(): void {
+  const intent = parseTaskTransferLikeQuery("передай задачу по складу Сабирчику", {
+    users: ALIAS_SMOKE_USERS,
+    currentUser: null,
+  });
+  const ok =
+    intent?.intent === "transfer_task" &&
+    intent.payload.toUserHint.toLowerCase().includes("сабир") &&
+    intent.payload.taskTitle.toLowerCase().includes("склад");
+  devLog(`transfer по складу Сабирчику ${ok ? "OK" : "FAIL"}`, {
+    intent: intent?.intent,
+    taskTitle: intent?.payload.taskTitle,
+    toUserHint: intent?.intent === "transfer_task" ? intent.payload.toUserHint : undefined,
+  });
+}
+
+function devCheckAbsenceDates(): void {
+  const baseDate = "2026-05-24";
+  const payload: Record<string, unknown> = {
+    type: "VACATION",
+    startDate: "2026-05-25",
+    endDate: "2026-05-29",
+  };
+  applyCreateAbsenceDateFix(
+    payload,
+    "добавь мне отпуск с завтра до понедельника",
+    baseDate,
+  );
+  const ok = payload.startDate === "2026-05-25" && payload.endDate === "2026-05-25";
+  devLog(`absence period fix ${ok ? "OK" : "FAIL"}`, {
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+  });
+}
+
+function devCheckPromptSizes(): void {
+  for (const group of [
+    "classifier",
+    "task-status",
+    "collaboration",
+    "create-task-rich",
+    "absence",
+  ] as const) {
+    const m = measureSystemPrompt(group);
+    devLog("system prompt size", { group, systemChars: m.systemChars, groupChars: m.groupChars });
+  }
+}
+
+function devCheckBudgetScoring(): void {
+  const budgets: ApiBudget[] = [
+    {
+      id: "b1",
+      title: "На подарки",
+      initialAmount: 1000,
+      spentAmount: 0,
+      currency: "RUB",
+      status: "ACTIVE",
+      requiresReceipt: false,
+      project: { id: "p1", name: "Реклама VK" },
+    },
+    {
+      id: "b2",
+      title: "Реклама VK",
+      initialAmount: 5000,
+      spentAmount: 0,
+      currency: "RUB",
+      status: "ACTIVE",
+      requiresReceipt: false,
+      project: { id: "p1", name: "Реклама VK" },
+    },
+  ];
+  const result = resolveBudgetForExpense({
+    budgets,
+    expenseDescription: "рекламу",
+    currentUser: { id: "u1", fullName: "Test", role: "EMPLOYEE" },
+  });
+  const ok = result.kind === "resolved" && result.budget.title === "Реклама VK";
+  devLog(`budget scoring рекламу ${ok ? "OK" : "FAIL"}`, {
+    kind: result.kind,
+    budget: result.kind === "resolved" ? result.budget.title : undefined,
+  });
+}
+
 function devCheckBudgetCacheKey(): void {
   clearBudgetContextCache();
   const k1 = budgetContextCacheKey();
@@ -122,5 +214,9 @@ export function devLogAiStage2SelfChecks(): void {
   devCheckPromptGroupRoutes();
   devCheckCompletionMaxTokens();
   devCheckCompactAliases();
+  devCheckTransferSabir();
+  devCheckAbsenceDates();
+  devCheckPromptSizes();
+  devCheckBudgetScoring();
   devCheckBudgetCacheKey();
 }

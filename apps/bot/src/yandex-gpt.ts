@@ -1,6 +1,6 @@
 ﻿import { assertAiContractsSchemaLoaded, safeParseAiIntent, type AiIntent } from "./ai-contracts";
 import { parseClassifierResult } from "./ai/classifier-schema";
-import { buildSystemPrompt } from "./ai/build-system-prompt";
+import { buildSystemPrompt, measureSystemPrompt } from "./ai/build-system-prompt";
 import {
   intentToExtractorGroup,
   type ExtractorPromptGroup,
@@ -245,9 +245,16 @@ async function runGptJsonCall(params: {
     params;
   const maxTokens =
     completionOptions?.maxTokens ?? resolveCompletionMaxTokens(promptGroup);
-  const promptChars = systemPrompt.length + userPrompt.length;
+  const systemChars = systemPrompt.length;
+  const userChars = userPrompt.length;
+  const promptChars = systemChars + userChars;
+  const promptMeasure = measureSystemPrompt(promptGroup);
   yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars} maxTokens=${maxTokens}`, {
     modelUri: config.modelUri,
+    systemChars,
+    userChars,
+    systemPromptChars: promptMeasure.systemChars,
+    groupPromptChars: promptMeasure.groupChars,
   });
 
   let callResult: YandexGptCallResult;
@@ -573,6 +580,7 @@ export async function parseTextIntent(
   logYandexGptTokenUsageTotal(totalUsage);
 
   const contextStats = extracted.contextStats;
+  const promptMeasure = measureSystemPrompt(extractorGroup);
   logIntentParseMetrics({
     routeGroup,
     classifierSkipped,
@@ -580,6 +588,8 @@ export async function parseTextIntent(
     latencyMs: Date.now() - startedAt,
     modelUri: state.config.modelUri,
     maxTokens: resolveCompletionMaxTokens(extractorGroup),
+    systemPromptChars: promptMeasure.systemChars,
+    groupPromptChars: promptMeasure.groupChars,
     contextUsers: contextStats.users,
     contextAliases: contextStats.aliasCount,
     contextTasks: contextStats.tasks,

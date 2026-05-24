@@ -299,8 +299,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
+  const usersForTransfer = await fetchUsers();
   const transferLikeIntent = parseTaskTransferLikeQuery(text, {
     preferReassign: isManagerOrOwner(linked.role),
+    users: usersForTransfer,
+    currentUser: linked,
   });
   if (transferLikeIntent) {
     await routeParsedAiIntent(ctx, linked, telegramUserId, text, transferLikeIntent);
