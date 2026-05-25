@@ -224,6 +224,26 @@ function devCheckCreateTaskAssignee(): void {
 
   const leading = extractLeadingAssigneeFromCreateTaskMessage(multiStep);
   devLog(`create_task leading extract ${leading ? "OK" : "FAIL"}`, { leading });
+
+  const withDeadlinePrep = parseBasicCreateTask(
+    "Создай задачу для ромыча на сегодня продать стулья Остапу",
+  );
+  const titleNorm = withDeadlinePrep?.payload.title.toLowerCase().replace(/ё/g, "е") ?? "";
+  const deadlineOk = Boolean(withDeadlinePrep?.payload.deadlineDate);
+  const noLeadingNa = !titleNorm.startsWith("на ");
+  const titleOk = titleNorm.includes("продать") && titleNorm.includes("остап");
+  devLog(
+    `basic create_task deadline prep stripped ${deadlineOk && noLeadingNa && titleOk ? "OK" : "FAIL"}`,
+    {
+      title: withDeadlinePrep?.payload.title,
+      deadlineDate: withDeadlinePrep?.payload.deadlineDate,
+      assigneeHint: withDeadlinePrep?.payload.assigneeHint,
+    },
+  );
+
+  const naTodayNotAssignee =
+    parseBasicCreateTask("создай задачу на сегодня проверить склад") === null;
+  devLog(`basic create_task на сегодня not assignee ${naTodayNotAssignee ? "OK" : "FAIL"}`);
 }
 
 export function devLogNaturalLanguageSelfChecks(): void {

@@ -1,5 +1,6 @@
 import { createTaskTextHasSelfAssigneeMarker } from "../../fix-ai-intent-assignee";
 import {
+  isRelativeDeadlineKeyword,
   resolveDeadlineFromUserMessage,
   stripDeadlineMarkersFromText,
 } from "../../parse-ru-date";
@@ -44,8 +45,13 @@ const BASIC_CREATE_TASK_PATTERNS: Array<{
     pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
   },
   {
+    /** «создай задачу на Васю …» — не «на сегодня/завтра». */
     re: /^(?:создай|поставь|заведи|добавь)(?:те)?\s+(?:задачу|хадачу)\s+на\s+(\p{L}+)\s+(.+)$/iu,
-    pick: (m) => ({ assigneeNorm: m[1]!, titleNorm: m[2]! }),
+    pick: (m) => {
+      if (isRelativeDeadlineKeyword(m[1]!)) return null;
+      if (!looksLikeBasicAssigneeWord(m[1]!)) return null;
+      return { assigneeNorm: m[1]!, titleNorm: m[2]! };
+    },
   },
   {
     re: /^(?:поставь|создай|добавь)(?:те)?\s+мне\s+(?:задачу|хадачу\s+)?(.+)$/iu,

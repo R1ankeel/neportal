@@ -262,20 +262,60 @@ export function extractDeadlineFromRussianText(
   return { deadlineDate: null };
 }
 
+const RELATIVE_DATE_KEYWORDS = /^(?:сегодня|завтра|послезавтра)$/iu;
+
+/** Одно слово — относительная дата (не имя исполнителя). */
+export function isRelativeDeadlineKeyword(word: string): boolean {
+  const w = word.trim().toLowerCase().replace(/ё/g, "е");
+  if (!w) return false;
+  if (RELATIVE_DATE_KEYWORDS.test(w)) return true;
+  return getWeekdayMentionDow(w) !== null;
+}
+
+const DEADLINE_PREP_BOUNDARY = "(?:^|[\\s,.!?;:—-])";
+const DEADLINE_PREP_END = "(?=$|[\\s,.!?;:—-])";
+
+/** «на сегодня», «к завтра», «до понедельника» и т.п. */
+function stripPrepositionalDeadlinePhrases(s: string): string {
+  let out = s;
+  out = out.replace(
+    new RegExp(
+      `${DEADLINE_PREP_BOUNDARY}(?:на|к|до|в)\\s+(?:сегодня|завтра|послезавтра)${DEADLINE_PREP_END}`,
+      "giu",
+    ),
+    " ",
+  );
+  for (const { pattern } of WEEKDAY_PATTERNS) {
+    out = out.replace(
+      new RegExp(
+        `${DEADLINE_PREP_BOUNDARY}(?:на|к|до|в)\\s+(?:${pattern.source})${DEADLINE_PREP_END}`,
+        "giu",
+      ),
+      " ",
+    );
+  }
+  return out;
+}
+
 /** Убирает маркеры дедлайна из текста (описание/title после извлечения deadlineDate). */
 export function stripDeadlineMarkersFromText(text: string): string | undefined {
   let s = text;
-  s = s.replace(/сегодня|завтра|послезавтра/giu, "");
+  s = stripPrepositionalDeadlinePhrases(s);
+  s = s.replace(/(?:^|[\s,.!?;:—-])(?:сегодня|завтра|послезавтра)(?=$|[\s,.!?;:—-])/giu, " ");
   s = s.replace(
     /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?(?:\s+до\s+\d{1,2}\s*числ(?:а)?)?|\d{1,2}\s*числ(?:а)?\s+следующ(?:его|ем)\s+месяца|через\s+месяц/giu,
     "",
   );
   for (const { pattern } of WEEKDAY_PATTERNS) {
-    s = s.replace(pattern, "");
+    s = s.replace(
+      new RegExp(`${DEADLINE_PREP_BOUNDARY}(?:${pattern.source})${DEADLINE_PREP_END}`, "giu"),
+      " ",
+    );
   }
   s = s.replace(/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/giu, "");
   s = s.replace(/\d{4}-\d{2}-\d{2}/g, "");
   s = s.trim().replace(/\s{2,}/g, " ");
+  s = s.replace(/^\s*(?:на|к|до|в)\s+/iu, "").trim();
   return s.length > 0 ? s : undefined;
 }
 
@@ -353,4 +393,11 @@ export function devLogRelativeMonthDeadlineChecks(
       got,
     });
   }
+
+  const stripped = stripDeadlineMarkersFromText("на сегодня продать стулья остапу");
+  const stripOk =
+    stripped === "продать стулья остапу" && !isRelativeDeadlineKeyword("сегодня");
+  console.log(`[parse-ru-date] strip deadline prep from title ${stripOk ? "OK" : "FAIL"}`, {
+    stripped,
+  });
 }
