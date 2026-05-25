@@ -1,4 +1,4 @@
-import { Bot, type Context } from "grammy";
+﻿import { Bot, type Context } from "grammy";
 import { loadRootEnv } from "@neportal/shared";
 import { handleCancelAbsenceSlashCommand } from "./absence-cancel-slash-flow";
 import {
@@ -31,6 +31,7 @@ import { devLogCreateTaskAssigneeResolveChecks } from "./create-task-assignee-re
 import { devLogTransferCommentFixChecks } from "./fix-ai-intent-transfer-comment.dev";
 import { devLogCreateTaskTitleDescriptionChecks } from "./normalize-create-task-title-description.dev";
 import { devLogCreateTaskNormalizeChecks } from "./ai/postprocess/create-task-normalize.dev";
+import { devLogConfirmationKeyboardChecks } from "./confirmation-keyboard.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
@@ -60,8 +61,9 @@ import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleStartTaskSlashCommand } from "./task-start-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { replyWithTasksForHint } from "./my-tasks-flow";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
+import { handleConfirmationCallback } from "./confirmation-callback";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -445,7 +447,7 @@ bot.command("done", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] done command error: ${msg}`);
@@ -480,7 +482,7 @@ async function runStartTaskSlash(ctx: Context, payload: string): Promise<void> {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] start-task command error: ${msg}`);
@@ -532,7 +534,7 @@ bot.command("cancel", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] cancel command error: ${msg}`);
@@ -571,7 +573,7 @@ bot.command("comment", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] comment command error: ${msg}`);
@@ -618,7 +620,7 @@ bot.command("mention", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] mention command error: ${msg}`);
@@ -665,7 +667,7 @@ bot.command("transfer", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] transfer command error: ${msg}`);
@@ -709,7 +711,7 @@ bot.command("reassign", async (ctx) => {
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] reassign command error: ${msg}`);
@@ -871,6 +873,10 @@ bot.on("message:document", async (ctx) => {
   });
 });
 
+bot.on("callback_query:data", async (ctx) => {
+  await handleConfirmationCallback(ctx);
+});
+
 bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   if (!text || text.startsWith("/")) return;
@@ -893,6 +899,7 @@ async function main() {
     devLogCreateTaskAssigneeResolveChecks();
     devLogTransferCommentFixChecks();
     devLogCreateTaskTitleDescriptionChecks();
+    devLogConfirmationKeyboardChecks();
     await devLogCreateTaskNormalizeChecks();
   }
   startTaskNotificationScheduler(bot);

@@ -1,7 +1,7 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { ApiUser } from "./api";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import type { ResolvedSetTaskDeadline } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import {
@@ -68,7 +68,7 @@ export async function handleTaskActionIntent(
   if (intent.intent === "start_task") {
     const resolved = buildResolvedStartTask(task);
     setPendingConfirmation(telegramUserId, { type: "ai_intent", intent, resolved });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
 
@@ -85,7 +85,7 @@ export async function handleTaskActionIntent(
       intent,
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
 
@@ -93,7 +93,7 @@ export async function handleTaskActionIntent(
     if (selectionPayload.completionResult) {
       const resolved = buildResolvedCompleteTask(task, selectionPayload.completionResult);
       setPendingConfirmation(telegramUserId, { type: "ai_intent", intent, resolved });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
     const question = startPendingTaskStatusDetails(
@@ -109,7 +109,7 @@ export async function handleTaskActionIntent(
     if (selectionPayload.cancellationReason) {
       const resolved = buildResolvedCancelTask(task, selectionPayload.cancellationReason);
       setPendingConfirmation(telegramUserId, { type: "ai_intent", intent, resolved });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
     const question = startPendingTaskStatusDetails(

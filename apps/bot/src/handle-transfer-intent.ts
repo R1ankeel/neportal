@@ -1,8 +1,8 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { ApiUser } from "./api";
 import { fetchUsers } from "./api";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import type { TaskSelectionPayload } from "./pending-task-selection";
 import {
@@ -95,7 +95,7 @@ export async function handleTransferTaskIntent(
       intent,
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
 

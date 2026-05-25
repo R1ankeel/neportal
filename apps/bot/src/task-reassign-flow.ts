@@ -1,10 +1,10 @@
-import type { Api } from "grammy";
+﻿import type { Api } from "grammy";
 import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { ApiTask, ApiUser } from "./api";
 import { createTaskTransfer, fetchUsers } from "./api";
 import type { ResolvedReassignTask } from "./intent-resolver";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { clearPendingConfirmation, setPendingConfirmation } from "./pending-intent";
 import {
   apiUserToCandidate,
@@ -158,7 +158,7 @@ export async function continueReassignAfterUsersResolved(
     intent,
     resolved,
   });
-  await ctx.reply(buildIntentPreview(resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolved);
 }
 
 export type SlashReassignResult =

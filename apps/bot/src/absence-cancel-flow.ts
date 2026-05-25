@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { ApiAbsence, ApiUser } from "./api";
 import { cancelAbsence, fetchAbsencesByUserId, fetchUsers } from "./api";
@@ -8,7 +8,7 @@ import {
   sanitizeAiUserHint,
 } from "./fix-ai-intent-absence-user";
 import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-user";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { type ResolvedCancelAbsence } from "./intent-resolver";
 import { todayIsoDate } from "./parse-ru-date";
 import { setPendingConfirmation } from "./pending-intent";
@@ -131,7 +131,7 @@ export async function confirmCancelAbsence(
     intent: syntheticIntent,
     resolved,
   });
-  await ctx.reply(buildIntentPreview(resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolved);
 }
 
 export async function continueCancelAbsenceForUser(

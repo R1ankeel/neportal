@@ -1,10 +1,10 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import {
   fetchProjects,
   fetchUsers,
 } from "./api";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import {
   resolveIntent,
   type ResolveIntentOverrides,
@@ -110,7 +110,7 @@ export async function continueAfterUserSelection(
       intent: syntheticIntent,
       resolved: resolvedResult.resolved,
     });
-    await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
     return;
   }
 
@@ -169,7 +169,7 @@ export async function continueAfterUserSelection(
       intent: syntheticIntent,
       resolved: resolvedResult.resolved,
     });
-    await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
     return;
   }
 

@@ -1,9 +1,9 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import { createAbsenceWithImpact } from "./absence-impact-flow";
 import { fetchUsers } from "./api";
 import { requireLinkedUser } from "./current-user";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import {
@@ -108,7 +108,7 @@ async function confirmCreateAbsence(
     intent: syntheticIntent,
     resolved: resolvedResult.resolved,
   });
-  await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
 }
 
 export async function handleSickSlashCommand(ctx: Context, payload: string): Promise<void> {

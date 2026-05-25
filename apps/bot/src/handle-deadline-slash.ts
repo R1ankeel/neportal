@@ -1,6 +1,6 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { ApiUser } from "./api";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import type { ResolvedSetTaskDeadline } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import { parseDeadlineCommandPayload } from "./parse-ru-date";
@@ -49,6 +49,6 @@ export async function handleDeadlineSlashCommand(
     resolved,
   });
 
-  await ctx.reply(buildIntentPreview(resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolved);
   return null;
 }

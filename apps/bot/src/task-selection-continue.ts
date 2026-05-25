@@ -1,6 +1,6 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import type { ResolvedSetTaskDeadline } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import {
@@ -74,7 +74,7 @@ export async function continueAfterTaskSelection(
         },
         resolved,
       });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
 
@@ -99,7 +99,7 @@ export async function continueAfterTaskSelection(
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
 
@@ -119,7 +119,7 @@ export async function continueAfterTaskSelection(
         },
         resolved,
       });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
 
@@ -145,7 +145,7 @@ export async function continueAfterTaskSelection(
       intent: syntheticDeadlineIntent(resolved),
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
 
@@ -165,7 +165,7 @@ export async function continueAfterTaskSelection(
         },
         resolved,
       });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
 
@@ -202,7 +202,7 @@ export async function continueAfterTaskSelection(
         },
         resolved,
       });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
 
@@ -246,7 +246,7 @@ export async function continueAfterTaskSelection(
         },
         resolved,
       });
-      await ctx.reply(buildIntentPreview(resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
 
@@ -311,6 +311,6 @@ export async function continueAfterTaskSelection(
       },
       resolved,
     });
-    await ctx.reply(buildIntentPreview(resolved));
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   }
 }

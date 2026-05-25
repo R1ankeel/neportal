@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import { isConfirmationCancel, isConfirmationEdit, isConfirmationNo } from "./confirmation";
 import { applyFieldEdit } from "./confirmation/apply-field-edit";
@@ -16,7 +16,7 @@ import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { formatBudgetSelectionMessage } from "./budget-selection-format";
 import { resolveCreateExpense } from "./create-expense-flow";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
 import {
@@ -139,7 +139,7 @@ async function reconfirmAfterEdit(
         intent,
         resolved: expenseResult.resolved,
       });
-      await ctx.reply(buildIntentPreview(expenseResult.resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, expenseResult.resolved);
       return true;
     }
 
@@ -185,7 +185,7 @@ async function reconfirmAfterEdit(
         intent,
         resolved: resolvedResult.resolved,
       });
-      await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
       return true;
     }
 
@@ -283,7 +283,7 @@ async function handleFieldSelection(
     clearPendingConfirmationEdit(telegramUserId);
     const confirmation = getPendingConfirmation(telegramUserId);
     if (confirmation?.type === "ai_intent") {
-      await ctx.reply(buildIntentPreview(confirmation.resolved));
+      await replyWithIntentPreview(ctx, telegramUserId, confirmation.resolved);
     }
     return true;
   }

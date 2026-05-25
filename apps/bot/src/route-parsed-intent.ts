@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { ApiUser } from "./api";
 import { fetchProjects, fetchUsers } from "./api";
@@ -10,7 +10,7 @@ import {
   resolveCreateTaskAssigneeInIntent,
 } from "./create-task-assignee-resolve";
 import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
@@ -174,5 +174,5 @@ export async function routeParsedAiIntent(
     intent: activeIntent,
     resolved: resolvedResult.resolved,
   });
-  await ctx.reply(buildIntentPreview(resolvedResult.resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
 }

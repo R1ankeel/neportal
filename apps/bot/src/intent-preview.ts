@@ -1,9 +1,10 @@
-import type { ResolvedIntent } from "./intent-resolver";
+﻿import type { ResolvedIntent } from "./intent-resolver";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
 import { transferPreviewNote } from "./task-transfer-flow";
 
 import { CONFIRM_REPLY_PROMPT, CREATE_EXPENSE_CONFIRM_FOOTER } from "./confirmation";
+import { replyWithConfirmationPreview } from "./confirmation-reply";
 
 const CONFIRM_FOOTER = `\n\n${CONFIRM_REPLY_PROMPT}`;
 
@@ -150,4 +151,12 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
     default:
       return "Подтвердить действие?" + CONFIRM_FOOTER;
   }
+}
+
+export async function replyWithIntentPreview(
+  ctx: Parameters<typeof replyWithConfirmationPreview>[0],
+  telegramUserId: number,
+  resolved: ResolvedIntent,
+): Promise<void> {
+  await replyWithConfirmationPreview(ctx, telegramUserId, buildIntentPreview(resolved));
 }

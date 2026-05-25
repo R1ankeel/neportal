@@ -7,21 +7,18 @@ import {
   isConfirmationNo,
   isConfirmationYes,
 } from "./confirmation";
-import { startBudgetSelectionFromExpenseConfirmation } from "./create-expense-confirmation";
 import {
-  enterConfirmationEditMode,
   handlePendingConfirmationEditMessage,
 } from "./confirmation-edit";
 import {
-  getLinkedUserByTelegramId,
-  NOT_LINKED_MESSAGE,
-} from "./current-user";
-import { executeResolvedIntent } from "./intent-executor";
-import { executeAbsenceDelegationDistribution } from "./absence-impact-flow";
+  handleConfirmationDecision,
+  handleCreateExpenseBudgetRejection,
+} from "./confirmation-decision";
 import {
-  clearPendingConfirmation,
   getPendingConfirmation,
 } from "./pending-intent";
+import { NOT_LINKED_MESSAGE } from "./current-user";
+import { getLinkedUserByTelegramId } from "./current-user";
 import { fetchUsers } from "./api";
 import { handlePendingTaskCommentDetailsMessage } from "./handle-pending-task-comment-details";
 import { handlePendingTaskMentionDetailsMessage } from "./handle-pending-task-mention-details";
@@ -78,35 +75,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
 
     if (pending.type === "confirm_absence_delegation_distribution") {
       if (isConfirmationNo(text)) {
-        clearPendingConfirmation(telegramUserId);
-        await ctx.reply("Ок, задачи остаются за вами.");
+        await handleConfirmationDecision(ctx, telegramUserId, "cancel");
         return;
       }
       if (isConfirmationYes(text)) {
-        const linked = await getLinkedUserByTelegramId(telegramUserId);
-        if (!linked) {
-          clearPendingConfirmation(telegramUserId);
-          await ctx.reply(NOT_LINKED_MESSAGE);
-          return;
-        }
-        const users = await fetchUsers();
-        const absenceUser = users.find((u) => u.id === pending.absenceUserId) ?? linked;
-        clearPendingConfirmation(telegramUserId);
-        try {
-          const reply = await executeAbsenceDelegationDistribution(ctx.api, {
-            absenceId: pending.absenceId,
-            absenceUser,
-            absenceType: pending.absenceType,
-            startDate: pending.startDate,
-            endDate: pending.endDate,
-            tasks: pending.tasks,
-            assignments: pending.assignments,
-          });
-          await ctx.reply(reply);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
-        }
+        await handleConfirmationDecision(ctx, telegramUserId, "confirm");
         return;
       }
       await ctx.reply(CONFIRM_WAIT_MESSAGE);
@@ -114,63 +87,27 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     }
 
     if (pending.type === "ai_intent" && isConfirmationEdit(text)) {
-      const editMessage = enterConfirmationEditMode(telegramUserId, pending);
-      await ctx.reply(editMessage);
+      await handleConfirmationDecision(ctx, telegramUserId, "edit");
       return;
     }
 
     if (isConfirmationCancel(text)) {
-      clearPendingConfirmation(telegramUserId);
-      const cancelledExpense =
-        pending.type === "ai_intent" && pending.resolved.intent === "create_expense";
-      await ctx.reply(cancelledExpense ? "Ок, расход отменён." : "Отменено.");
+      await handleConfirmationDecision(ctx, telegramUserId, "cancel");
       return;
     }
 
     if (isConfirmationYes(text)) {
-      const linked = await getLinkedUserByTelegramId(telegramUserId);
-      if (!linked) {
-        clearPendingConfirmation(telegramUserId);
-        await ctx.reply(NOT_LINKED_MESSAGE);
-        return;
-      }
-
-      clearPendingConfirmation(telegramUserId);
-      try {
-        const reply = await executeResolvedIntent(
-          pending.resolved,
-          telegramUserId,
-          ctx.api,
-        );
-        await ctx.reply(reply);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[bot] intent execution error: ${msg}`);
-        await ctx.reply(msg.startsWith("Не удалось") ? msg : `Ошибка API: ${msg}`);
-      }
+      await handleConfirmationDecision(ctx, telegramUserId, "confirm");
       return;
     }
 
     if (isConfirmationNo(text)) {
       if (pending.type === "ai_intent" && pending.resolved.intent === "create_expense") {
-        const linked = await getLinkedUserByTelegramId(telegramUserId);
-        if (!linked) {
-          clearPendingConfirmation(telegramUserId);
-          await ctx.reply(NOT_LINKED_MESSAGE);
-          return;
-        }
-        clearPendingConfirmation(telegramUserId);
-        await startBudgetSelectionFromExpenseConfirmation(
-          ctx,
-          telegramUserId,
-          linked,
-          pending.resolved,
-        );
+        await handleCreateExpenseBudgetRejection(ctx, telegramUserId, pending);
         return;
       }
 
-      clearPendingConfirmation(telegramUserId);
-      await ctx.reply("Отменено.");
+      await handleConfirmationDecision(ctx, telegramUserId, "cancel");
       return;
     }
 

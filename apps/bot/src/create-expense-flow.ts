@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import type { CreateExpensePayload } from "@neportal/ai-contracts";
 import {
@@ -11,7 +11,7 @@ import type { ApiBudget, ApiProject, ApiUser } from "./api";
 import { fetchBudgets, fetchProjects } from "./api";
 import { findProjectByHint } from "./hint-matchers";
 import type { ResolvedCreateExpense } from "./intent-resolver";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
 
@@ -171,7 +171,7 @@ export async function beginCreateExpenseFlow(
     intent,
     resolved: result.resolved,
   });
-  await ctx.reply(buildIntentPreview(result.resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, result.resolved);
   return { kind: "confirmation", intent, resolved: result.resolved };
 }
 

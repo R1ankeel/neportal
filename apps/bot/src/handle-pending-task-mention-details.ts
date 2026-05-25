@@ -1,7 +1,7 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import type { AiIntent } from "./ai-contracts";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import type { ResolvedMentionInTask } from "./intent-resolver";
 import {
   clearPendingConfirmation,
@@ -87,6 +87,6 @@ export async function handlePendingTaskMentionDetailsMessage(
     resolved,
   });
 
-  await ctx.reply(buildIntentPreview(resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolved);
   return true;
 }

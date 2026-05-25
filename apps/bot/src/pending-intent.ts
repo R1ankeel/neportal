@@ -7,12 +7,14 @@ import type {
 
 export type PendingAiIntent = {
   type: "ai_intent";
+  confirmationId?: string;
   intent: AiIntent;
   resolved: ResolvedIntent;
 };
 
 export type PendingLinkByUsername = {
   type: "confirm_link_by_username";
+  confirmationId?: string;
   userId: string;
   fullName: string;
   username: string;
@@ -20,6 +22,7 @@ export type PendingLinkByUsername = {
 
 export type PendingAbsenceDelegationDistributionConfirmation = {
   type: "confirm_absence_delegation_distribution";
+  confirmationId?: string;
   absenceId: string;
   absenceUserId: string;
   absenceUserName: string;
@@ -36,6 +39,7 @@ export type PendingConfirmation =
   | PendingAbsenceDelegationDistributionConfirmation;
 
 const pendingByTelegramUserId = new Map<number, PendingConfirmation>();
+let nextConfirmationId = 1;
 
 export function getPendingConfirmation(
   telegramUserId: number,
@@ -46,8 +50,10 @@ export function getPendingConfirmation(
 export function setPendingConfirmation(
   telegramUserId: number,
   pending: PendingConfirmation,
-): void {
-  pendingByTelegramUserId.set(telegramUserId, pending);
+): string {
+  const confirmationId = String(nextConfirmationId++);
+  pendingByTelegramUserId.set(telegramUserId, { ...pending, confirmationId });
+  return confirmationId;
 }
 
 export function clearPendingConfirmation(telegramUserId: number): void {

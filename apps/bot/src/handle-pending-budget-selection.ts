@@ -1,7 +1,7 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import { confirmCreateExpenseAfterBudgetSelection } from "./create-expense-flow";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
-import { buildIntentPreview } from "./intent-preview";
+import { replyWithIntentPreview } from "./intent-preview";
 import type { ApiProject } from "./api";
 import { isConfirmationCancel } from "./confirmation";
 import {
@@ -63,6 +63,6 @@ export async function handlePendingBudgetSelectionMessage(
     selected,
   );
 
-  await ctx.reply(buildIntentPreview(resolved));
+  await replyWithIntentPreview(ctx, telegramUserId, resolved);
   return true;
 }
