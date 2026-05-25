@@ -6,7 +6,7 @@
 
 Обычный текст в боте проходит **три слоя** (см. также [bot.md](bot.md#детерминированный-разбор-без-yandexgpt)):
 
-1. **Pending-состояния** — ответы «да/нет», номер задачи, уточнение комментария и т.д. (без GPT).
+1. **Pending-состояния** — подтверждение и выбор: inline-кнопки (`callback_query`) или текст («да»/«нет», номер пункта, уточнение комментария и т.д.) — без GPT. См. [bot.md — Telegram UX](bot.md#telegram-ux-inline-кнопки).
 2. **Детерминированные парсеры** — регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) — **без** LLM.
 3. **LLM** (`parseTextIntent` → `AiProvider.complete`) — двухэтапный разбор для остальных фраз, если env настроен.
 
@@ -30,8 +30,12 @@ sequenceDiagram
     B->>B: fixAiIntent + Zod + validateIntentForRouting
   end
   B->>B: resolve hints, __self__ assignee
-  B-->>U: preview, да/нет?
-  U->>B: да
+  B-->>U: preview + inline-кнопки (или текст)
+  alt callback_query
+    U->>B: Подтвердить / Изменить / Отменить
+  else message:text
+    U->>B: да / нет / изменить / номер
+  end
   B->>A: POST notes / tasks / ...
   B-->>U: результат
 ```
@@ -120,6 +124,22 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 → сразу preview «Создать задачу?», исполнитель = текущий пользователь (без clarification).
 
+### create_task: дедлайн
+
+Разбор даты в сообщении пользователя **сначала детерминированный** (`apps/bot/src/parse-ru-date.ts`), LLM для дедлайна — только fallback (`ai/postprocess/create-task-deadline-llm.ts`, prompt group `create-task-deadline`).
+
+| Шаг | Источник | Когда |
+|-----|----------|--------|
+| 1 | `deterministic-deadline-resolver` | ISO, `DD.MM`, ordinal+weekday+след. месяц / named month, завтра/сегодня, «до пятницы», … |
+| 2 | `llm-deadline-resolver` | `needsLlmDeadlineResolution` — сложная фраза без покрытия парсером |
+| 3 | `ai-deadline-fallback` | Поле `deadlineDate` из extractor + коррекции в `fix-ai-intent-deadline.ts` |
+
+Примеры (baseDate `2026-05-25`): «первая пятница следующего месяца» → `2026-06-05`; «первая пятница июля» → `2026-07-03`. После resolve — удаление временной фразы из title/description (`create-task-text-cleanup.ts`). Provider layer (Yandex/Qwen) **не менялся**.
+
+### Подтверждение и выбор (UX)
+
+Intents с `requiresConfirmation: true` → preview в Telegram с кнопками **Подтвердить / Изменить / Отменить**. Callback `confirmation:*` ссылается на pending по `confirmationId` — **без** payload intent в callback data. Списки (сотрудник, задача, бюджет, поля edit) — choice-layer (`choice:select:…`). Текстовый fallback сохранён. Подробно: [bot.md — Telegram UX](bot.md#telegram-ux-inline-кнопки).
+
 > Поставь мне задачу проверить склад завтра
 
 ```json
@@ -137,7 +157,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ### Неоднозначный сотрудник
 
-Если по hint найдено несколько сотрудников (например «Ване» и два Ивана), бот **не** выбирает автоматически — показывает нумерованный список и ждёт номер (см. [bot.md](bot.md#поиск-сотрудника-user-resolution-flow-v1)).
+Если по hint найдено несколько сотрудников (например «Ване» и два Ивана), бот **не** выбирает автоматически — показывает нумерованный список с inline-кнопками или ждёт номер (см. [bot.md](bot.md#поиск-сотрудника-user-resolution-flow-v1)).
 
 ## Контракт JSON
 
@@ -190,7 +210,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 }
 ```
 
-Бот спросит: *«Что сделано по задаче «…»?»*, затем confirmation.
+Бот спросит: *«Что сделано по задаче «…»?»*, затем preview с кнопками (или confirmation текстом).
 
 ### Пример: взять задачу в работу
 
@@ -281,7 +301,7 @@ Confirmation: *«Взять задачу «Проверить склад» в р
 }
 ```
 
-Бот спросит: *«Что написать в комментарии к задаче «…»?»*, затем confirmation.
+Бот спросит: *«Что написать в комментарии к задаче «…»?»*, затем preview с кнопками.
 
 ### add_task_comment: bot-level validation (после LLM)
 
@@ -327,7 +347,7 @@ Confirmation: *«Позвать Вася Пупкин в задачу «…»? �
 }
 ```
 
-Бот спросит: *«Что написать в комментарии для … по задаче «…»?»*, затем confirmation.
+Бот спросит: *«Что написать в комментарии для … по задаче «…»?»*, затем preview с кнопками.
 
 ### Пример: передача задачи
 
@@ -467,6 +487,8 @@ pnpm --filter @neportal/bot dev
 ```
 
 1. Slash: `/note Тест` — без Yandex.
-2. Текст с настроенным Yandex → preview → `да` → запись в Web (проект «Реклама VK»).
+2. Текст с настроенным Yandex → preview → Подтвердить (кнопка) или `да` → запись в Web (проект «Реклама VK»).
+3. `BOT_DEV_SELF_CHECKS=true` — self-checks при старте бота (в т.ч. deadline normalize, confirmation/choice keyboard).
+4. `BOT_DEV_MOCK_DEADLINE_LLM=true` — dev-checks дедлайна без реального LLM (см. [env.md](env.md)).
 
 См. также: [bot.md](bot.md), [packages.md](packages.md).

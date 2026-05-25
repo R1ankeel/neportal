@@ -60,6 +60,9 @@ flowchart TB
 | Уведомление в Telegram с API | `apps/api/src/telegram/telegram-notify.service.ts` |
 | Страница / форма в Web | `apps/web/src/app/(app)/` + `src/lib/api.ts` → [web.md](web.md) |
 | Команда бота или AI | `apps/bot/src/main.ts`, `api.ts`, `ai-message.ts` → [bot.md](bot.md) |
+| Inline confirmation / choice | `confirmation-reply.ts`, `confirmation-callback.ts`, `choice-reply.ts`, `telegram/keyboards/*` → [bot.md#telegram-ux-inline-кнопки](bot.md#telegram-ux-inline-кнопки) |
+| Безопасный Telegram callback | `telegram/safe-answer-callback.ts`, `telegram-error-log.ts` |
+| Дедлайн create_task (deterministic) | `parse-ru-date.ts`, `ai/postprocess/create-task-normalize.ts` |
 | Детерминированный parse текста | `parse-expense-query.ts`, `parse-create-budget-command.ts`, `ai/deterministic/` |
 | LLM (2 шага) | `yandex-gpt.ts`, `ai/provider/`, `ai/prompts/`, `ai/prompt-group-router.ts` |
 | Выбор AI backend | `ai/provider/registry.ts`, env `AI_PROVIDER` → [env.md](env.md) |
@@ -102,14 +105,18 @@ apps/web/src/
 
 | Файл | Ответственность |
 |------|-----------------|
-| `main.ts` | Регистрация `bot.command`, фото/документов, делегирование в handlers |
+| `main.ts` | `bot.command`, `callback_query:data`, `message:text`, `bot.catch` |
 | `api.ts` | HTTP-клиент к REST, выбор проекта/бюджета по умолчанию |
-| `start-binding.ts` | `/start`, привязка по username |
+| `start-binding.ts` | `/start`, привязка по username (да/нет только текстом) |
 | `ai-message.ts` | Текст без `/`: pending → deterministic → `parseTextIntent` → preview |
 | `route-parsed-intent.ts` | Общий путь после parse (deterministic или GPT) |
+| `confirmation-reply.ts` | Preview + `buildConfirmationKeyboard` |
+| `confirmation-callback.ts` / `confirmation-decision.ts` | Inline confirm / edit / cancel |
+| `choice-reply.ts` / `choice-callback.ts` / `choice-state.ts` | Списки выбора + cancel |
 | `budget-resolver.ts` | Сопоставление расхода с бюджетом по `matchingKeywords` |
 | `intent-resolver.ts` / `intent-executor.ts` | hints → id → POST/PATCH API |
-| `pending-intent.ts` | In-memory очередь подтверждений |
+| `pending-intent.ts` | In-memory pending + `confirmationId` |
+| `parse-ru-date.ts` | Даты для slash и дедлайнов задач (ordinal, named month, DD.MM, ISO) |
 
 ## Глоссарий домена
 
@@ -149,7 +156,7 @@ apps/web/src/
 
 1. В `.env`: `AI_PROVIDER=yandex` (или `qwen` + `QWEN_*`) и ключи Yandex/Qwen.
 2. Фраза: «Запиши заметку: тест AI» или «Создай мне задачу …».
-3. Preview → ответ `да`.
+3. Preview → **Подтвердить** (кнопка) или `да`.
 4. Web: вкладка «Заметки» / задачи проекта по умолчанию.
 
 Контракт JSON: [ai-intent.md](ai-intent.md).
@@ -162,7 +169,7 @@ apps/web/src/
 ### 5. Бюджет через бот (deterministic или Yandex)
 
 1. Фраза: «создай бюджет Тестовый 100000 с чеком» (или через Yandex, если deterministic не сработал).
-2. Preview → `да`.
+2. Preview → Подтвердить (кнопка) или `да`.
 3. Web: проект → «Бюджеты» — новый бюджет; при необходимости допишите **ключевые слова** на карточке бюджета.
 
 ## Как вносить изменения
@@ -193,9 +200,17 @@ apps/web/src/
 
 1. Обработчик в `main.ts` через `bot.command("name", ...)`.
 2. Бизнес-логика — функция в `api.ts` (не дублировать URL вручную в handler).
-3. Для команд с датами — `parse-ru-date.ts` (формат **DD.MM.YYYY**).
+3. Для команд с датами — `parse-ru-date.ts` (slash: **DD.MM.YYYY**; в AI — также ordinal/named month, см. [bot.md](bot.md#дедлайн-задачи)).
 4. Рабочие команды: `requireLinkedUser` из `current-user.ts`.
 5. Документировать в [bot.md](bot.md).
+
+### Новый preview / selection в боте
+
+1. Confirmation: `replyWithConfirmationPreview` — не дублировать клавиатуру вручную; `confirmationId` уже в `setPendingConfirmation`.
+2. Choice-список: `replyWithActiveChoiceKeyboard` + `choiceId` в pending state.
+3. **Не класть** `taskId`, `userId` или payload intent в `callback_data` — только `confirmation:*` / `choice:select:…:index` и guards.
+4. Решение после кнопки — через `applyConfirmationDecision` или существующий handler выбора по номеру.
+5. UX и guards: [bot.md#telegram-ux-inline-кнопки](bot.md#telegram-ux-inline-кнопки).
 
 **Важно:** в grammY сообщения вида `/sick …` **не попадают** в `bot.hears` — только `bot.command`.
 
@@ -204,7 +219,8 @@ apps/web/src/
 1. Расширить Zod в `packages/ai-contracts/src/index.ts`.
 2. `pnpm --filter @neportal/ai-contracts build`.
 3. Prompt в `ai/prompts/`, orchestration в `yandex-gpt.ts`, resolver/preview/executor в боте.
-4. [ai-intent.md](ai-intent.md) + пример фразы в [bot.md](bot.md).
+4. Preview через `replyWithConfirmationPreview`; при необходимости selection — choice-layer.
+5. [ai-intent.md](ai-intent.md) + пример фразы в [bot.md](bot.md).
 
 ## Инструменты и сборка
 
@@ -214,7 +230,7 @@ apps/web/src/
 | pnpm | 11 (`packageManager` в корневом `package.json`) |
 | Turborepo | `build` → `^build` сначала пакеты, потом apps |
 | Prisma | CLI через `pnpm db:*` с `dotenv-cli` |
-| Тесты | Автотестов в репозитории **нет**; проверка — ручные сценарии выше + Swagger |
+| Тесты | Автотестов в репозитории **нет**; `pnpm --filter @neportal/bot test` / build; `BOT_DEV_SELF_CHECKS`; проверка — ручные сценарии (в т.ч. inline-кнопки) + Swagger |
 
 Запуск одного приложения:
 

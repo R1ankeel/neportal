@@ -66,6 +66,7 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | `QWEN_AUTH_TYPE` | `api-key` | `api-key` (`Authorization: Api-Key`) или `iam-token` (`Bearer`; при отсутствии `QWEN_API_KEY` — `YANDEX_CLOUD_IAM_TOKEN`) |
 | `QWEN_MODEL` | — | URI модели, напр. `gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest`; folder можно не дублировать, если задан `YANDEX_CLOUD_FOLDER_ID` |
 | `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
+| `BOT_DEV_MOCK_DEADLINE_LLM` | — | Только dev: при `true` mock resolver дедлайна в self-checks (`create-task-deadline-llm.ts`) без реального LLM (named month / July cases) |
 | `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
 | `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
 | `TASK_NOTIFICATION_SCHEDULER_ENABLED` | `true` | Scheduler уведомлений по задачам |

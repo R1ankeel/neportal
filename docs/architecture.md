@@ -89,7 +89,7 @@ neportal/
 ## AI intent (реализовано в MVP)
 
 - **`@neportal/ai-contracts`** — Zod-контракт `intent` + `payload` для ответа парсера.
-- **`apps/bot`** — текст без `/`: сначала **детерминированные парсеры**, затем при необходимости **двухэтапный LLM** (`parseTextIntent` → `AiProvider.complete`: по умолчанию YandexGPT Foundation API, опционально Qwen через OpenAI-compatible endpoint Yandex Cloud) → подтверждение → REST API.
+- **`apps/bot`** — текст без `/`: сначала **детерминированные парсеры**, затем при необходимости **двухэтапный LLM** → preview с **inline-кнопками** подтверждения/выбора (текстовый fallback сохранён) → REST API.
 - Yandex Cloud **не хостит** приложение в MVP; вызываются только внешние HTTP API (Foundation Models и/или AI Studio).
 - SpeechKit (голос → текст) — env в `.env.example`, код не подключён.
 
@@ -99,5 +99,5 @@ neportal/
 
 - Redis — очереди, кэш, напоминания (`Reminder` в БД).
 - S3 — постоянное хранение вложений (сейчас чеки через `telegramFileId`).
-- SpeechKit — голосовые команды в боте.
+- SpeechKit — голосовые команды в боте (inline UX уже снижает ошибки ввода до голоса).
 - Пакет `permissions` — отдельная модель ролей; в Prisma уже есть `UserRole` / `ProjectRole`.
