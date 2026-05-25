@@ -646,6 +646,9 @@ REST для scheduler (вызывает бот):
 | `ai/provider/yandex-provider.ts` | HTTP YandexGPT Foundation Models |
 | `ai/provider/qwen-provider.ts` | HTTP Qwen (Yandex Cloud AI Studio, OpenAI-compatible) |
 | `ai/provider/registry.ts` | `getPrimaryAiProvider()`, `AI_PROVIDER`, `getAiProviderState()` |
+| `ai/provider/http.ts` | Timeout, retry/backoff, `requestProviderHttp()` |
+| `ai/provider/errors.ts` | `AiProviderError` (безопасные коды для логов) |
+| `ai/provider/provider-config.ts` | `AI_PROVIDER_TIMEOUT_MS`, max retries, diagnostics base |
 | `ai/completion-max-tokens.ts` | `maxTokens` по `promptGroup` |
 | `ai/prompt-group-router.ts` | Предмаршрутизация без classifier |
 | `create-task-assignee-resolve.ts` | Резолв `__self__` → текущий user id до clarification |

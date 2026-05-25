@@ -1,3 +1,6 @@
+import { AiProviderError } from "./errors";
+import { requestProviderHttp } from "./http";
+import { buildProviderDiagnosticsBase, getProviderHttpSettings } from "./provider-config";
 import type { AiCompletionParams, AiCompletionResult, AiProvider, AiProviderState, AiTokenUsage } from "./types";
 
 /** Yandex Cloud AI Studio — OpenAI-compatible endpoint. */
@@ -149,6 +152,10 @@ function buildQwenRequestHeaders(config: QwenConfig): Record<string, string> {
   return headers;
 }
 
+export function buildChatCompletionsUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+}
+
 export function getQwenState(): QwenState {
   const baseUrl = resolveQwenBaseUrl();
   const model = resolveQwenModel();
@@ -194,27 +201,58 @@ export function getQwenState(): QwenState {
 
 export function getQwenAiProviderState(): AiProviderState {
   const state = getQwenState();
+  const base = buildProviderDiagnosticsBase("qwen");
   if (!state.enabled) {
-    return { enabled: false, providerId: "qwen", reason: state.reason };
+    const missingEnv: string[] = [];
+    if (!state.hasApiKey) missingEnv.push("QWEN_API_KEY");
+    if (state.model === "(not set)" || !state.model.trim()) missingEnv.push("QWEN_MODEL");
+    return {
+      enabled: false,
+      providerId: "qwen",
+      reason: state.reason,
+      diagnostics: {
+        ...base,
+        configured: false,
+        baseUrl: state.baseUrl,
+        authType: state.authType,
+        model: state.model,
+        reason: state.reason,
+        missingEnv,
+      },
+    };
   }
+  const endpoint = buildChatCompletionsUrl(state.config.baseUrl);
   return {
     enabled: true,
     providerId: "qwen",
     model: state.config.model,
+    diagnostics: {
+      ...base,
+      configured: true,
+      model: state.config.model,
+      baseUrl: state.config.baseUrl,
+      endpoint,
+      authType: state.config.authType,
+    },
   };
 }
 
 /** Для dev-checks: state без секретов. */
 export function qwenStateForDiagnostics(state: QwenState): Record<string, unknown> {
+  const http = getProviderHttpSettings();
   if (state.enabled) {
     return {
       provider: "qwen",
       configured: true,
       hasApiKey: true,
       baseUrl: state.config.baseUrl,
+      endpoint: buildChatCompletionsUrl(state.config.baseUrl),
       authType: state.config.authType,
       model: state.config.model,
       folderId: state.config.folderId ?? null,
+      timeoutMs: http.timeoutMs,
+      maxRetries: http.maxRetries,
+      retryBaseDelayMs: http.retryBaseDelayMs,
     };
   }
   return {
@@ -225,50 +263,10 @@ export function qwenStateForDiagnostics(state: QwenState): Record<string, unknow
     authType: state.authType,
     model: state.model,
     reason: state.reason,
+    timeoutMs: http.timeoutMs,
+    maxRetries: http.maxRetries,
+    retryBaseDelayMs: http.retryBaseDelayMs,
   };
-}
-
-function buildChatCompletionsUrl(baseUrl: string): string {
-  return `${baseUrl.replace(/\/$/, "")}/chat/completions`;
-}
-
-function extractRequestId(headers: Headers, body: unknown): string | undefined {
-  const fromHeader =
-    headers.get("x-request-id") ??
-    headers.get("x-requestid") ??
-    headers.get("x-dashscope-requestid");
-  if (fromHeader?.trim()) return fromHeader.trim();
-
-  if (typeof body === "object" && body !== null && !Array.isArray(body)) {
-    const b = body as Record<string, unknown>;
-    const id = b.request_id ?? b.requestId;
-    if (typeof id === "string" && id.trim()) return id.trim();
-  }
-  return undefined;
-}
-
-function formatQwenHttpError(
-  status: number,
-  bodyText: string,
-  headers: Headers,
-): Error {
-  let detail = bodyText.slice(0, 500);
-  let requestId: string | undefined;
-  try {
-    const parsed = JSON.parse(bodyText) as QwenChatCompletionResponse & {
-      request_id?: string;
-    };
-    requestId = extractRequestId(headers, parsed);
-    const msg = parsed.error?.message;
-    if (typeof msg === "string" && msg.trim()) {
-      detail = msg.trim().slice(0, 500);
-    }
-  } catch {
-    requestId = extractRequestId(headers, undefined);
-  }
-
-  const reqPart = requestId ? ` requestId=${requestId}` : "";
-  return new Error(`provider=qwen HTTP ${status}${reqPart}: ${detail}`);
 }
 
 /** Парсит OpenAI-compatible chat completion без HTTP. */
@@ -278,7 +276,12 @@ export function mapQwenChatCompletionResponse(
 ): AiCompletionResult {
   const text = data.choices?.[0]?.message?.content;
   if (!text?.trim()) {
-    throw new Error("provider=qwen returned empty completion (no choices[0].message.content)");
+    throw new AiProviderError({
+      provider: "qwen",
+      code: "AI_PROVIDER_EMPTY_RESPONSE",
+      retryable: false,
+      message: "provider=qwen code=AI_PROVIDER_EMPTY_RESPONSE",
+    });
   }
 
   return {
@@ -290,14 +293,44 @@ export function mapQwenChatCompletionResponse(
   };
 }
 
+function parseQwenCompletionBody(bodyText: string, config: QwenConfig): AiCompletionResult {
+  let data: QwenChatCompletionResponse;
+  try {
+    data = JSON.parse(bodyText) as QwenChatCompletionResponse;
+  } catch {
+    throw new AiProviderError({
+      provider: "qwen",
+      code: "AI_PROVIDER_RESPONSE_PARSE_ERROR",
+      retryable: false,
+      message: "provider=qwen code=AI_PROVIDER_RESPONSE_PARSE_ERROR",
+    });
+  }
+
+  if (!data.choices?.length) {
+    const errMsg = data.error?.message;
+    throw new AiProviderError({
+      provider: "qwen",
+      code: "AI_PROVIDER_EMPTY_RESPONSE",
+      retryable: false,
+      message: errMsg
+        ? `provider=qwen code=AI_PROVIDER_EMPTY_RESPONSE`
+        : "provider=qwen code=AI_PROVIDER_EMPTY_RESPONSE",
+      details: errMsg ? { apiMessage: errMsg.slice(0, 200) } : undefined,
+    });
+  }
+
+  return mapQwenChatCompletionResponse(data, config.model);
+}
+
 async function callQwenCompletion(
   config: QwenConfig,
   params: AiCompletionParams,
 ): Promise<AiCompletionResult> {
   const startedAt = Date.now();
   const url = buildChatCompletionsUrl(config.baseUrl);
-  const res = await fetch(url, {
-    method: "POST",
+  const { bodyText } = await requestProviderHttp({
+    provider: "qwen",
+    url,
     headers: buildQwenRequestHeaders(config),
     body: JSON.stringify({
       model: config.model,
@@ -308,33 +341,10 @@ async function callQwenCompletion(
       temperature: params.temperature ?? 0.2,
       max_tokens: params.maxTokens ?? 2000,
     }),
+    promptGroup: params.promptGroup,
   });
 
-  const bodyText = await res.text().catch(() => "");
-
-  if (!res.ok) {
-    throw formatQwenHttpError(res.status, bodyText, res.headers);
-  }
-
-  let data: QwenChatCompletionResponse;
-  try {
-    data = JSON.parse(bodyText) as QwenChatCompletionResponse;
-  } catch {
-    throw new Error(
-      `provider=qwen invalid JSON response: ${bodyText.slice(0, 200)}`,
-    );
-  }
-
-  if (!data.choices?.length) {
-    const errMsg = data.error?.message;
-    throw new Error(
-      errMsg
-        ? `provider=qwen API error: ${errMsg.slice(0, 500)}`
-        : "provider=qwen response missing choices",
-    );
-  }
-
-  const result = mapQwenChatCompletionResponse(data, config.model);
+  const result = parseQwenCompletionBody(bodyText, config);
   return { ...result, latencyMs: Date.now() - startedAt };
 }
 
@@ -347,9 +357,13 @@ export function createQwenProvider(): AiProvider {
     id: "qwen",
     async complete(params: AiCompletionParams): Promise<AiCompletionResult> {
       if (!config) {
-        throw new Error(
-          "Qwen (Yandex Cloud) is not configured. Set QWEN_API_KEY, QWEN_MODEL (gpt://<folder>/<model>/latest) or use AI_PROVIDER=yandex.",
-        );
+        throw new AiProviderError({
+          provider: "qwen",
+          code: "AI_PROVIDER_NOT_CONFIGURED",
+          retryable: false,
+          message:
+            "provider=qwen code=AI_PROVIDER_NOT_CONFIGURED (missing QWEN_API_KEY or QWEN_MODEL)",
+        });
       }
       return callQwenCompletion(config, params);
     },

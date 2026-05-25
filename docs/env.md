@@ -58,6 +58,9 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
 | `AI_PROVIDER` | `yandex` | Primary AI provider для `parseTextIntent` и других completions. Значения: `yandex` (по умолчанию), `qwen`. Неизвестное значение → предупреждение в лог и fallback на `yandex` |
+| `AI_PROVIDER_TIMEOUT_MS` | `30000` | Timeout одного HTTP-запроса к LLM (все providers) |
+| `AI_PROVIDER_MAX_RETRIES` | `1` | Число **повторов** после неудачной попытки (только transient: timeout, network, 408/429/5xx) |
+| `AI_PROVIDER_RETRY_BASE_DELAY_MS` | `500` | Базовая задержка backoff между retry (`500`, `1000`, …) |
 | `QWEN_API_KEY` | — | Секретный API-ключ из Yandex Cloud; **обязателен** при `AI_PROVIDER=qwen` и `QWEN_AUTH_TYPE=api-key` |
 | `QWEN_BASE_URL` | `https://ai.api.cloud.yandex.net/v1` | OpenAI-compatible endpoint Yandex Cloud AI Studio |
 | `QWEN_AUTH_TYPE` | `api-key` | `api-key` (`Authorization: Api-Key`) или `iam-token` (`Bearer`; при отсутствии `QWEN_API_KEY` — `YANDEX_CLOUD_IAM_TOKEN`) |
@@ -81,6 +84,8 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 Пустая строка и `change_me` считаются «переменная не задана». Без настроенного AI provider бот отвечает на произвольный текст: использовать slash-команды.
 
 **Qwen (Yandex Cloud):** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. Модель и каталог — в формате Yandex (`gpt://…`). При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
+
+**Retry/timeout:** `AI_PROVIDER_*` применяются к YandexGPT и Qwen. Секреты (API key, Authorization) **не** попадают в логи и `AiProviderError`. Ошибки 401/403/400 не retry-ятся; token usage логируется только после успешного ответа.
 
 Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md#ai-парсер-опционально).
 

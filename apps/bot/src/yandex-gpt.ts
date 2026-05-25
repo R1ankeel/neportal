@@ -6,6 +6,7 @@ import {
   type ExtractorPromptGroup,
 } from "./ai/intent-to-prompt-group";
 import { resolveCompletionMaxTokens } from "./ai/completion-max-tokens";
+import { logAiProviderError } from "./ai/provider/http";
 import { getAiProviderState, getPrimaryAiProvider } from "./ai/provider/registry";
 import type { AiProvider } from "./ai/provider/types";
 import { resolvePromptGroup, type PromptGroup } from "./ai/prompt-group-router";
@@ -143,6 +144,7 @@ async function runGptJsonCall(params: {
       requestLabel: promptGroup,
     });
   } catch (e) {
+    logAiProviderError(e, { promptGroup, provider: provider.id });
     throw e;
   }
 

@@ -1,7 +1,10 @@
 import { parseYandexGptUsage } from "../../yandex-gpt-usage";
+import { AiProviderError } from "./errors";
+import { requestProviderHttp } from "./http";
+import { buildProviderDiagnosticsBase, getProviderHttpSettings } from "./provider-config";
 import type { AiCompletionParams, AiCompletionResult, AiProvider, AiProviderState } from "./types";
 
-const YANDEX_COMPLETION_URL =
+export const YANDEX_COMPLETION_URL =
   "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
 
 export type YandexGptAuthMode = "api-key" | "iam-token";
@@ -93,15 +96,101 @@ export function getYandexGptState(): YandexGptState {
   };
 }
 
+export function yandexStateForDiagnostics(state: YandexGptState): Record<string, unknown> {
+  const http = getProviderHttpSettings();
+  if (state.enabled) {
+    return {
+      provider: "yandex",
+      configured: true,
+      endpoint: YANDEX_COMPLETION_URL,
+      authType: state.config.authMode,
+      model: state.config.modelUri,
+      timeoutMs: http.timeoutMs,
+      maxRetries: http.maxRetries,
+      retryBaseDelayMs: http.retryBaseDelayMs,
+    };
+  }
+  const missingEnv: string[] = [];
+  if (isPlaceholder(process.env.YANDEX_CLOUD_FOLDER_ID)) missingEnv.push("YANDEX_CLOUD_FOLDER_ID");
+  if (!resolveAuth()) missingEnv.push("YANDEX_GPT_API_KEY or YANDEX_CLOUD_IAM_TOKEN");
+  return {
+    provider: "yandex",
+    configured: false,
+    endpoint: YANDEX_COMPLETION_URL,
+    reason: state.reason,
+    missingEnv,
+    timeoutMs: http.timeoutMs,
+    maxRetries: http.maxRetries,
+    retryBaseDelayMs: http.retryBaseDelayMs,
+  };
+}
+
 export function getYandexAiProviderState(): AiProviderState {
   const state = getYandexGptState();
+  const base = buildProviderDiagnosticsBase("yandex");
   if (!state.enabled) {
-    return { enabled: false, providerId: "yandex", reason: state.reason };
+    const missingEnv: string[] = [];
+    if (isPlaceholder(process.env.YANDEX_CLOUD_FOLDER_ID)) missingEnv.push("YANDEX_CLOUD_FOLDER_ID");
+    if (!resolveAuth()) missingEnv.push("YANDEX_GPT_API_KEY or YANDEX_CLOUD_IAM_TOKEN");
+    return {
+      enabled: false,
+      providerId: "yandex",
+      reason: state.reason,
+      diagnostics: {
+        ...base,
+        configured: false,
+        endpoint: YANDEX_COMPLETION_URL,
+        reason: state.reason,
+        missingEnv,
+      },
+    };
   }
   return {
     enabled: true,
     providerId: "yandex",
     model: state.config.modelUri,
+    diagnostics: {
+      ...base,
+      configured: true,
+      model: state.config.modelUri,
+      endpoint: YANDEX_COMPLETION_URL,
+      authType: state.config.authMode,
+    },
+  };
+}
+
+function parseYandexCompletionBody(
+  bodyText: string,
+  config: YandexGptConfig,
+): AiCompletionResult {
+  let data: YandexCompletionResponse;
+  try {
+    data = JSON.parse(bodyText) as YandexCompletionResponse;
+  } catch {
+    throw new AiProviderError({
+      provider: "yandex",
+      code: "AI_PROVIDER_RESPONSE_PARSE_ERROR",
+      retryable: false,
+      message: "provider=yandex code=AI_PROVIDER_RESPONSE_PARSE_ERROR",
+    });
+  }
+
+  const text = data.result?.alternatives?.[0]?.message?.text;
+  if (!text?.trim()) {
+    throw new AiProviderError({
+      provider: "yandex",
+      code: "AI_PROVIDER_EMPTY_RESPONSE",
+      retryable: false,
+      message: "provider=yandex code=AI_PROVIDER_EMPTY_RESPONSE",
+    });
+  }
+
+  return {
+    text,
+    usage: parseYandexGptUsage(data.result?.usage),
+    raw: data,
+    model: config.modelUri,
+    provider: "yandex",
   };
 }
 
@@ -110,8 +199,9 @@ async function callYandexCompletion(
   params: AiCompletionParams,
 ): Promise<AiCompletionResult> {
   const startedAt = Date.now();
-  const res = await fetch(YANDEX_COMPLETION_URL, {
-    method: "POST",
+  const { bodyText } = await requestProviderHttp({
+    provider: "yandex",
+    url: YANDEX_COMPLETION_URL,
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -130,27 +220,11 @@ async function callYandexCompletion(
         { role: "user", text: params.userPrompt },
       ],
     }),
+    promptGroup: params.promptGroup,
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`YandexGPT HTTP ${res.status}: ${text.slice(0, 500)}`);
-  }
-
-  const data = (await res.json()) as YandexCompletionResponse;
-  const text = data.result?.alternatives?.[0]?.message?.text;
-  if (!text?.trim()) {
-    throw new Error("YandexGPT returned empty completion");
-  }
-
-  return {
-    text,
-    usage: parseYandexGptUsage(data.result?.usage),
-    raw: data,
-    model: config.modelUri,
-    provider: "yandex",
-    latencyMs: Date.now() - startedAt,
-  };
+  const result = parseYandexCompletionBody(bodyText, config);
+  return { ...result, latencyMs: Date.now() - startedAt };
 }
 
 /** HTTP-адаптер YandexGPT Foundation Models API. */
@@ -162,7 +236,13 @@ export function createYandexGptProvider(): AiProvider {
     id: "yandex",
     async complete(params: AiCompletionParams): Promise<AiCompletionResult> {
       if (!config) {
-        throw new Error("YandexGPT is not configured (missing env)");
+        throw new AiProviderError({
+          provider: "yandex",
+          code: "AI_PROVIDER_NOT_CONFIGURED",
+          retryable: false,
+          message:
+            "provider=yandex code=AI_PROVIDER_NOT_CONFIGURED (missing YANDEX_CLOUD_FOLDER_ID or auth)",
+        });
       }
       return callYandexCompletion(config, params);
     },

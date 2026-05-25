@@ -26,6 +26,7 @@ import { devLogNaturalLanguageSelfChecks } from "./natural-language-self-checks.
 import { devLogValidateAddTaskCommentChecks } from "./validate-add-task-comment-payload.dev";
 import { devLogAiStage2SelfChecks } from "./ai-stage2-self-checks.dev";
 import { devLogAiProviderRegistryChecks } from "./ai-provider-registry.dev";
+import { devLogAiProviderHardeningChecks } from "./ai-provider-hardening.dev";
 import { devLogCreateTaskAssigneeResolveChecks } from "./create-task-assignee-resolve.dev";
 import { devLogTransferCommentFixChecks } from "./fix-ai-intent-transfer-comment.dev";
 import { devLogCreateTaskTitleDescriptionChecks } from "./normalize-create-task-title-description.dev";
@@ -887,6 +888,7 @@ async function main() {
     devLogValidateAddTaskCommentChecks();
     devLogAiStage2SelfChecks();
     devLogAiProviderRegistryChecks();
+    devLogAiProviderHardeningChecks();
     devLogCreateTaskAssigneeResolveChecks();
     devLogTransferCommentFixChecks();
     devLogCreateTaskTitleDescriptionChecks();

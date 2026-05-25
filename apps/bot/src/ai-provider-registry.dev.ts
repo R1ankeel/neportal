@@ -175,7 +175,7 @@ function devCheckQwenCompleteMissingKey(): void {
       } catch (e) {
         message = e instanceof Error ? e.message : String(e);
       }
-      const ok = message.includes("QWEN_API_KEY") || message.includes("QWEN_MODEL");
+      const ok = message.includes("AI_PROVIDER_NOT_CONFIGURED");
       devLog(`qwen complete missing key ${ok ? "OK" : "FAIL"}`, { message });
     })();
   });

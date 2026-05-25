@@ -28,7 +28,7 @@ export function resolveAiProviderId(): AiProviderId {
   return parseAiProviderId(process.env.AI_PROVIDER);
 }
 
-/** Состояние primary provider (enabled / model) без создания HTTP-клиента. */
+/** Состояние primary provider (enabled / model / diagnostics) без HTTP-клиента. */
 export function getAiProviderState(): AiProviderState {
   const id = resolveAiProviderId();
   switch (id) {
@@ -38,6 +38,11 @@ export function getAiProviderState(): AiProviderState {
     default:
       return getYandexAiProviderState();
   }
+}
+
+/** Безопасная диагностика выбранного provider (для логов / dev). */
+export function getAiProviderDiagnostics(): AiProviderState["diagnostics"] {
+  return getAiProviderState().diagnostics;
 }
 
 /** Primary AI provider для completion-вызовов. */

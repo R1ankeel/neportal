@@ -81,11 +81,14 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ### Логирование токенов и отладка
 
-- `[yandex-gpt] tokens provider=yandex|qwen promptGroup=… input=… output=… latencyMs=…` (`yandex-gpt-usage.ts`).
+- `[yandex-gpt] tokens provider=yandex|qwen promptGroup=… input=… output=… latencyMs=…` (`yandex-gpt-usage.ts`) — **один** лог на успешный completion (без дублей при retry).
 - Итог за один `parseTextIntent`: `tokens parseTextIntent total`.
+- При HTTP/transient ошибках: `ai-provider error` / `retry` с `code`, `status`, `retryable`, `attempts`, `requestId` (без API key и Authorization).
+- Timeout/retry: `AI_PROVIDER_TIMEOUT_MS`, `AI_PROVIDER_MAX_RETRIES`, `AI_PROVIDER_RETRY_BASE_DELAY_MS` — см. [env.md](env.md).
+- Диагностика: `getAiProviderState().diagnostics` (configured, model, endpoint, timeoutMs, maxRetries).
 - При отказе модели / невалидной схеме — `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt`).
-- `BOT_DEV_SELF_CHECKS=true` — self-checks (registry, assignee `__self__`, парсеры, stage 2).
-- `BOT_AI_CLEANUP_BASIC_TASKS` — LLM-очистка title для коротких deterministic `create_task` (`cleanup-task-title.ts` → `requestAiJson`).
+- `BOT_DEV_SELF_CHECKS=true` — self-checks (registry, hardening, assignee `__self__`, парсеры).
+- `BOT_AI_CLEANUP_BASIC_TASKS` — LLM-очистка title (`cleanup-task-title.ts` → `requestAiJson`).
 
 ### Местоимения и `__self__`
 

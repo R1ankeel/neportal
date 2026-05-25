@@ -31,6 +31,26 @@ export interface AiProvider {
 
 export type AiProviderDisabledReason = "missing_env" | "placeholder_env";
 
+/** Безопасная диагностика provider (без секретов). */
+export type AiProviderDiagnostics = {
+  provider: AiProviderId;
+  configured: boolean;
+  model?: string;
+  endpoint?: string;
+  baseUrl?: string;
+  authType?: string;
+  timeoutMs: number;
+  maxRetries: number;
+  retryBaseDelayMs: number;
+  reason?: AiProviderDisabledReason;
+  missingEnv?: string[];
+};
+
 export type AiProviderState =
-  | { enabled: true; providerId: AiProviderId; model?: string }
-  | { enabled: false; providerId: AiProviderId; reason: AiProviderDisabledReason };
+  | { enabled: true; providerId: AiProviderId; model?: string; diagnostics: AiProviderDiagnostics }
+  | {
+      enabled: false;
+      providerId: AiProviderId;
+      reason: AiProviderDisabledReason;
+      diagnostics: AiProviderDiagnostics;
+    };
