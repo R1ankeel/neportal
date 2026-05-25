@@ -1,81 +1,121 @@
-# AI intent (YandexGPT + `@neportal/ai-contracts`)
+# AI intent (LLM + `@neportal/ai-contracts`)
 
-Локальный MVP: Yandex Cloud используется **только как внешний API** (YandexGPT для текста; SpeechKit — позже). Бот и API работают на `localhost`, без деплоя в Yandex.
+Локальный MVP: Yandex Cloud используется **только как внешний API** (YandexGPT Foundation Models и/или Qwen в AI Studio; SpeechKit — позже). Бот и API работают на `localhost`, без деплоя приложения в Yandex.
 
 ## Архитектура разбора текста
 
 Обычный текст в боте проходит **три слоя** (см. также [bot.md](bot.md#детерминированный-разбор-без-yandexgpt)):
 
 1. **Pending-состояния** — ответы «да/нет», номер задачи, уточнение комментария и т.д. (без GPT).
-2. **Детерминированные парсеры** — регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) — **без** YandexGPT.
-3. **YandexGPT** — двухэтапный разбор для остальных фраз (если env настроен).
+2. **Детерминированные парсеры** — регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) — **без** LLM.
+3. **LLM** (`parseTextIntent` → `AiProvider.complete`) — двухэтапный разбор для остальных фраз, если env настроен.
 
 ```mermaid
 sequenceDiagram
   participant U as Telegram user
   participant B as apps/bot
-  participant Y as YandexGPT API
+  participant P as AiProvider
   participant A as apps/api
 
   U->>B: обычный текст
   B->>B: pending / deterministic parsers
   alt deterministic match
     B->>B: routeParsedAiIntent
-  else needs GPT
+  else needs LLM
     B->>A: GET projects, users, budgets, tasks
-    B->>Y: classifier (optional)
-    Y-->>B: intent name
-    B->>Y: extractor promptGroup + context
-    Y-->>B: JSON intent
+    B->>P: classifier (optional)
+    P-->>B: intent name
+    B->>P: extractor promptGroup + context
+    P-->>B: JSON intent
     B->>B: fixAiIntent + Zod + validateIntentForRouting
   end
-  B->>B: resolve hints
+  B->>B: resolve hints, __self__ assignee
   B-->>U: preview, да/нет?
   U->>B: да
   B->>A: POST notes / tasks / ...
   B-->>U: результат
 ```
 
-Slash-команды (`/task`, `/note`, …) **не** проходят через YandexGPT.
+Slash-команды (`/task`, `/note`, …) **не** проходят через LLM.
+
+### AiProvider (`apps/bot/src/ai/provider/`)
+
+| Компонент | Назначение |
+|-----------|------------|
+| `types.ts` | `AiProvider`, `AiCompletionParams`, `AiCompletionResult` |
+| `registry.ts` | `AI_PROVIDER` → `getPrimaryAiProvider()`, `getAiProviderState()` |
+| `yandex-provider.ts` | Foundation Models API (`llm.api.cloud.yandex.net`) |
+| `qwen-provider.ts` | OpenAI-compatible API (`ai.api.cloud.yandex.net/v1`) |
+
+Оркестрация: `yandex-gpt.ts` (`parseTextIntent`, `requestAiJson`). Entry point для состояния AI в боте: `getAiProviderState()` (не только Yandex env).
+
+| `AI_PROVIDER` | Backend |
+|---------------|---------|
+| *(пусто)* / `yandex` | `createYandexGptProvider()` |
+| `qwen` | `createQwenProvider()` (Yandex Cloud AI Studio) |
+| неизвестное | warn + fallback на `yandex` |
 
 ### Маршрутизация промптов (`resolvePromptGroup`)
 
 Файл: `apps/bot/src/ai/prompt-group-router.ts`.
 
-По тексту пользователя бот выбирает **группу промпта** (`expense`, `absence`, `task-status`, `collaboration`, `task-list`, `create-task-rich`, `create-note` или `classifier`). Если группа **не** `classifier`, шаг classifier в YandexGPT **пропускается** — сразу вызывается extractor этой группы.
+По тексту пользователя бот выбирает **группу промпта** (`expense`, `absence`, `task-status`, `collaboration`, `task-list`, `create-task-rich`, `create-note` или `classifier`). Если группа **не** `classifier`, шаг classifier **пропускается** — сразу extractor этой группы.
 
-Примеры маршрутизации без classifier: фразы про «мои задачи», «расходы без чеков», явное «потратил …», «создай задачу …» (богатый шаблон).
+Примеры маршрутизации без classifier: «мои задачи», «расходы без чеков», «потратил …», «создай задачу …», «закрыл задачу по складу …», transfer/reassign.
 
-### Двухэтапный YandexGPT
+Контекст в prompt **компактный** по группе (`intent-context.ts`); бюджеты кэшируются in-memory TTL (`budget-context-cache.ts`). Лимит ответа: `ai/completion-max-tokens.ts` по `promptGroup`.
+
+### Двухэтапный разбор (classifier + extractor)
 
 Реализация: `apps/bot/src/yandex-gpt.ts`, промпты: `apps/bot/src/ai/prompts/`.
 
 | Шаг | Что делает |
 |-----|------------|
-| 1. Classifier | Короткий JSON: только `intent` + `confidence` (если `resolvePromptGroup` вернул `classifier`) |
-| 2. Extractor | Полный JSON по группе (`expense`, `collaboration`, …) с контекстом из API |
-| Post-process | `fixAiIntentBeforeValidation` (даты, assignee «мне», …) |
+| 1. Classifier | Короткий JSON: `intent` + `confidence` (если `resolvePromptGroup` → `classifier`) |
+| 2. Extractor | Полный JSON по группе с контекстом из API |
+| Post-process | `fixAiIntentBeforeValidation` (даты, assignee «мне», title/description, transfer comment, …) |
 | Validate | Zod (`safeParseAiIntent`) + `validateIntentForRouting` (в т.ч. `add_task_comment`) |
+| Routing | `route-parsed-intent.ts` → resolver → preview |
 
 Группы extractor ↔ intent: `intentToExtractorGroup()` в `apps/bot/src/ai/intent-to-prompt-group.ts`.
 
 ### Логирование токенов и отладка
 
-- В консоли бота: `[yandex-gpt] tokens promptGroup=… input=… output=…` и итог `parseTextIntent total` (`yandex-gpt-usage.ts`).
-- При отказе модели или невалидной схеме — сохранение промпта в `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt` в cwd бота).
-- `BOT_DEV_SELF_CHECKS=true` — self-checks при старте; `BOT_AI_CLEANUP_BASIC_TASKS` — опциональная LLM-очистка title для коротких deterministic `create_task`.
+- `[yandex-gpt] tokens provider=yandex|qwen promptGroup=… input=… output=… latencyMs=…` (`yandex-gpt-usage.ts`).
+- Итог за один `parseTextIntent`: `tokens parseTextIntent total`.
+- При отказе модели / невалидной схеме — `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt`).
+- `BOT_DEV_SELF_CHECKS=true` — self-checks (registry, assignee `__self__`, парсеры, stage 2).
+- `BOT_AI_CLEANUP_BASIC_TASKS` — LLM-очистка title для коротких deterministic `create_task` (`cleanup-task-title.ts` → `requestAiJson`).
 
 ### Местоимения и `__self__`
 
-Если пользователь говорит о себе («мне», «меня», «себе», «на меня»), модель возвращает `assigneeHint` / `toUserHint` / `userHint` = `"__self__"`. Бот подставляет привязанного сотрудника.
+Если пользователь говорит о себе («мне», «меня», «себе», «на меня»), модель может вернуть `assigneeHint` / `assigneeUserId` / `toUserHint` / `userHint` = `"__self__"`. Бот подставляет привязанного сотрудника (`resolve-user-from-ai-payload.ts`, `resolve-users-by-hint.ts`).
 
 ### create_task: исполнитель vs имена в задаче
 
-- **assigneeHint** — только кому назначают задачу («поставь Васе», «поручи Ивану», «мне» → `__self__`).
+- **assigneeHint** / **assigneeUserId** — кому назначают задачу; «мне» → `__self__` (модель может отдать только `assigneeUserId`, без hint).
 - Имена **внутри действия** («уволить Васю», «позвонить Ивану») — часть `title`, не исполнитель.
-- После YandexGPT для `create_task` срабатывает post-processing (`fix-ai-intent-assignee.ts`): фразы вроде «поставь мне задачу», «запиши мне в задачи» принудительно ставят `assigneeHint: "__self__"`, даже если модель ошибочно взяла имя из title.
+- Post-processing (`fix-ai-intent-assignee.ts`): «поставь/создай/добавь мне задачу», «запиши мне в задачи» → `assigneeHint: "__self__"`.
+- После parse, в `route-parsed-intent.ts`: `resolveCreateTaskAssigneeInIntent` заменяет `__self__` на `currentUser.id` **до** вопроса «Кому назначить задачу?»; уточнение только если исполнитель полностью отсутствует.
 
-Пример:
+Примеры:
+
+> Создай мне задачу на завтра подготовить сводный отчёт
+
+```json
+{
+  "intent": "create_task",
+  "confidence": 0.9,
+  "requiresConfirmation": true,
+  "payload": {
+    "assigneeUserId": "__self__",
+    "title": "Подготовить сводный отчёт",
+    "deadlineDate": "2026-05-26"
+  }
+}
+```
+
+→ сразу preview «Создать задачу?», исполнитель = текущий пользователь (без clarification).
 
 > Поставь мне задачу проверить склад завтра
 
@@ -115,7 +155,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 
 | intent | payload |
 |--------|---------|
-| `create_task` | `projectHint?`, `assigneeHint?`, `title`, `description?`, `deadlineDate?` (ISO) |
+| `create_task` | `projectHint?`, `assigneeHint?`, `assigneeUserId?` (в т.ч. `__self__`), `title`, `description?`, `deadlineDate?` (ISO) |
 | `create_note` | `projectHint?`, `text` (в тексте даты — **DD.MM.YYYY**) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_budget` | `projectHint?`, `name`, `amount`, `requiresReceipt?`, `matchingKeywords?` |
@@ -375,16 +415,27 @@ OWNER/MANAGER: задача передаётся сразу после «да».
 
 Бот дополнительно нормализует ISO-даты в `text` → `22.05.2026` перед сохранением.
 
-## API YandexGPT
+## HTTP API провайдеров
+
+### YandexGPT (`AI_PROVIDER=yandex`)
 
 - Endpoint: `https://llm.api.cloud.yandex.net/foundationModels/v1/completion`
-- Реализация: `apps/bot/src/yandex-gpt.ts`
-- Auth (приоритет):
-  1. `YANDEX_GPT_API_KEY` → `Authorization: Api-Key <key>`
-  2. иначе `YANDEX_CLOUD_IAM_TOKEN` → `Authorization: Bearer <token>`
+- Код: `apps/bot/src/ai/provider/yandex-provider.ts`
+- Auth: `YANDEX_GPT_API_KEY` → `Api-Key`; иначе `YANDEX_CLOUD_IAM_TOKEN` → `Bearer`
 - Заголовок `x-folder-id`: `YANDEX_CLOUD_FOLDER_ID`
+- Тело: `modelUri`, `messages[]` с полем `text` (не OpenAI-формат)
 
-В prompt передаются: текущая дата (UTC ISO), списки проектов, пользователей, бюджетов и задач из REST API — для сопоставления «Вася» → «Вася Пупкин», «реклама VK» → проект/бюджет.
+### Qwen (`AI_PROVIDER=qwen`)
+
+- Endpoint: `{QWEN_BASE_URL}/chat/completions` (default `https://ai.api.cloud.yandex.net/v1`)
+- Код: `apps/bot/src/ai/provider/qwen-provider.ts`
+- Auth: `QWEN_AUTH_TYPE=api-key` → `Api-Key`; `iam-token` → `Bearer` (`QWEN_API_KEY` или `YANDEX_CLOUD_IAM_TOKEN`)
+- Модель: `QWEN_MODEL` (`gpt://<FOLDER_ID>/<model>/latest`), опционально `x-folder-id` из URI или `YANDEX_CLOUD_FOLDER_ID`
+- Тело: OpenAI-compatible (`messages[].content`, `max_tokens`)
+
+### Контекст в prompt
+
+Текущая дата (UTC ISO), проекты, пользователи (компактные alias), бюджеты, задачи — из REST API (`intent-context.ts`) для сопоставления имён и hints.
 
 ## Загрузка схемы в боте
 

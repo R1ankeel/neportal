@@ -82,7 +82,7 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 
 **Qwen (Yandex Cloud):** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. Модель и каталог — в формате Yandex (`gpt://…`). При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
 
-Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md#yandexgpt-опционально).
+Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md#ai-парсер-опционально).
 
 ### S3 (заготовки)
 

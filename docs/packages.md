@@ -35,13 +35,13 @@
 
 ## `@neportal/ai-contracts`
 
-Zod-схемы для ответа **YandexGPT intent parser** (только разбор текста, без выполнения действий).
+Zod-схемы для ответа **LLM intent parser** (YandexGPT или Qwen через `AiProvider`; только разбор текста, без выполнения действий).
 
 Корневой тип **`AiIntent`** — discriminated union по полю `intent`:
 
 | `intent` | Ключевые поля `payload` |
 |----------|-------------------------|
-| `create_task` | `title`, `assigneeHint?`, `projectHint?`, `deadlineDate?` (ISO) |
+| `create_task` | `title`, `assigneeHint?`, `assigneeUserId?`, `projectHint?`, `deadlineDate?` (ISO) |
 | `create_note` | `text`, `projectHint?` |
 | `create_expense` | `amount`, `projectHint?`, `budgetHint?`, `description?` |
 | `create_budget` | `name`, `amount`, `projectHint?`, `requiresReceipt?`, `matchingKeywords?` |

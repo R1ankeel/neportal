@@ -23,7 +23,7 @@ cp .env.example .env
 - `DATABASE_URL` — должен совпадать с `docker-compose.yml`
 - `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather), если запускаете бота
 - `API_URL` / `NEXT_PUBLIC_API_URL` — обычно `http://localhost:4000` для локальной разработки
-- **YandexGPT** (опционально): `YANDEX_CLOUD_FOLDER_ID`, `YANDEX_GPT_API_KEY` или `YANDEX_CLOUD_IAM_TOKEN`, `YANDEX_GPT_MODEL_URI` — см. [ai-intent.md](ai-intent.md)
+- **AI-парсер** (опционально): `AI_PROVIDER=yandex` (по умолчанию) + `YANDEX_*`; или `AI_PROVIDER=qwen` + `QWEN_*` — см. [env.md](env.md), [ai-intent.md](ai-intent.md)
 
 Подробнее о загрузке `.env` — [env.md](env.md), [architecture.md](architecture.md#переменные-окружения).
 

@@ -48,7 +48,7 @@ Neportal снимает операционный хаос из переписо�
 | [Быстрый старт](docs/getting-started.md) | Установка, Docker, миграции, `pnpm dev` |
 | [Архитектура](docs/architecture.md) | Компоненты, потоки данных, MVP |
 | [AI intent](docs/ai-intent.md) | Контракт JSON, classifier + extractor |
-| [Telegram-бот](docs/bot.md) | Команды, парсеры, YandexGPT, чеки |
+| [Telegram-бот](docs/bot.md) | Команды, парсеры, AI provider (Yandex/Qwen), чеки |
 | [REST API](docs/api.md) | Эндпоинты, Swagger |
 | [База данных](docs/database.md) | Prisma, миграции, сид |
 | [Веб-приложение](docs/web.md) | Next.js, маршруты |

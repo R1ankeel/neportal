@@ -29,31 +29,50 @@ pnpm --filter @neportal/bot dev
 
 При старте вызывается `loadRootEnv()` из `@neportal/shared` (как в API).
 
-### YandexGPT (опционально)
+### AI-парсер (опционально)
 
-Для разбора **обычного текста** без slash-команд в **корневом** `.env`:
+Разбор **обычного текста** без slash-команд идёт через абстракцию **`AiProvider`** (`apps/bot/src/ai/provider/`). Провайдер выбирается переменной **`AI_PROVIDER`** (по умолчанию `yandex`). См. [ai-intent.md](ai-intent.md).
+
+#### `AI_PROVIDER=yandex` (по умолчанию)
+
+YandexGPT Foundation Models API в **корневом** `.env`:
 
 ```env
+AI_PROVIDER=yandex
 YANDEX_CLOUD_FOLDER_ID=<folder-id>
-# API key (приоритет): Authorization: Api-Key
 YANDEX_GPT_API_KEY=<ключ вида y0__...>
-# Или IAM token: Authorization: Bearer (если API key не задан)
-YANDEX_CLOUD_IAM_TOKEN=
+# или YANDEX_CLOUD_IAM_TOKEN=  (Bearer, если API key не задан)
 YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 ```
 
 | Переменная | Назначение |
 |------------|------------|
 | `YANDEX_CLOUD_FOLDER_ID` | Каталог Yandex Cloud, заголовок `x-folder-id` |
-| `YANDEX_GPT_API_KEY` | Статический ключ; **не** подставлять в `Bearer` |
-| `YANDEX_CLOUD_IAM_TOKEN` | IAM-токен; **не** подставлять в `Api-Key` |
+| `YANDEX_GPT_API_KEY` | `Authorization: Api-Key` (**приоритет**) |
+| `YANDEX_CLOUD_IAM_TOKEN` | `Authorization: Bearer`, если API key пуст |
 | `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` — `gpt://{folder}/yandexgpt/latest` |
 
-Значения `change_me` и пустые строки считаются «не задано».
+При старте (без секретов): `[yandex-gpt] auth mode: api-key` или `iam-token`.
 
-Если Yandex не настроен — slash-команды работают; на произвольный текст бот отвечает: *«AI-парсер пока не настроен. Используйте команды /demo.»*
+#### `AI_PROVIDER=qwen`
 
-При успешном старте в консоли (без секретов): `[yandex-gpt] auth mode: api-key` или `iam-token`.
+Qwen через **Yandex Cloud AI Studio** (OpenAI-compatible `chat/completions`):
+
+```env
+AI_PROVIDER=qwen
+QWEN_API_KEY=<полный_secret_ключ_из_yc>
+QWEN_BASE_URL=https://ai.api.cloud.yandex.net/v1
+QWEN_AUTH_TYPE=api-key
+QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
+```
+
+`QWEN_*` **не используются**, пока `AI_PROVIDER` не равен `qwen`. Неизвестное значение `AI_PROVIDER` → предупреждение в лог и fallback на `yandex`.
+
+#### Общее
+
+Значения `change_me` и пустые строки считаются «не задано». Если выбранный provider не настроен — slash-команды работают; на произвольный текст: *«AI-парсер пока не настроен. Используйте команды /demo.»*
+
+В логах completion (префикс `[yandex-gpt]` сохранён для совместимости): `provider=yandex|qwen`, `promptGroup`, `maxTokens`, `latencyMs`, токены.
 
 Подробнее о контракте JSON → [ai-intent.md](ai-intent.md).
 
@@ -271,7 +290,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 7. Pending task selection, create-task assignee, user selection
 8. Проверка привязки (`requireLinkedUser`)
 9. **Детерминированный блок** (см. ниже) — **не** в YandexGPT
-10. **YandexGPT** (`parseTextIntent`) — classifier (опционально) + extractor
+10. **LLM** (`parseTextIntent` → `AiProvider`) — classifier (опционально) + extractor
 11. `routeParsedAiIntent` → resolver → preview → confirmation → API
 
 Подробнее про AI: [ai-intent.md](ai-intent.md#архитектура-разбора-текста).
@@ -301,7 +320,11 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 
 **Где используется:** `create_task` (assignee после уточнения или из `assigneeHint`), `transfer_task`, `reassign_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/reassign`, `/mention`, `/link` (dev).
 
-**create_task без исполнителя в AI:** если `assigneeHint` пустой, бот спрашивает (TTL 30 мин):
+**create_task — исполнитель в AI** (`route-parsed-intent.ts`, `create-task-assignee-resolve.ts`):
+
+- Модель может вернуть `assigneeHint` и/или `assigneeUserId` (в т.ч. `"__self__"` для «мне / себе / создай мне задачу»).
+- Перед проверкой обязательных полей `__self__` в hint или `assigneeUserId` **резолвится** в `id` привязанного пользователя; уточняющий вопрос **не** задаётся.
+- Вопрос «Кому назначить задачу?» — только если **нет** ни hint, ни `assigneeUserId`, ни `__self__` (TTL 30 мин, `pending-create-task-assignee.ts`):
 
 ```
 Кому назначить задачу «Уволить Машу»?
@@ -309,7 +332,9 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 Напишите имя сотрудника или «мне».
 ```
 
-Ответ «мне», «себе», «на меня», «меня» или `__self__` → исполнитель = привязанный пользователь. Имя → User Resolution Flow (один → confirmation, несколько → список с номерами). Ответ только цифрой (например `1`) без списка → *«Напишите имя сотрудника или «мне».»* (номера — только в User Selection Flow). Отмена: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
+Ответ «мне», «себе», «на меня», «меня» или `__self__` → исполнитель = привязанный пользователь. Имя → User Resolution Flow. Ответ только цифрой без списка → *«Напишите имя сотрудника или «мне».»* Отмена: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
+
+Dev-лог (без секретов): `[bot] create_task assignee before required-fields` с `originalAssigneeUserId`, `resolvedAssigneeUserId`, `isSelfAssignee`, `currentUserId`.
 
 **Slash с «мне»:** `/transfer Проверить склад | мне | …`, `/mention мне | Проверить склад | …`
 
@@ -385,9 +410,9 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 
 **Edit-mode для бюджета:** в confirmation `create_budget` поле «чек» можно править фразами «чек да» / «нужен чек» (`parse-budget-receipt-edit.ts`).
 
-### Обычный текст (YandexGPT)
+### Обычный текст (LLM)
 
-Сообщения **без** `/`, которые **не** разобрал детерминированный слой, обрабатываются YandexGPT (если заданы переменные Yandex). Двухэтапный поток: classifier → extractor по группе промпта — см. [ai-intent.md](ai-intent.md#двухэтапный-yandexgpt).
+Сообщения **без** `/`, которые **не** разобрал детерминированный слой, обрабатываются `parseTextIntent` (если настроен `AI_PROVIDER`). Двухэтапный поток: classifier → extractor — см. [ai-intent.md](ai-intent.md#двухэтапный-разбор-classifier--extractor).
 
 **Поток после GPT:**
 
@@ -446,7 +471,7 @@ Pending confirmation хранится **в памяти** процесса (`pen
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…&status=ACTIVE&userId=…` (фильтр доступа) предпочитается заголовок с «Реклама VK», иначе первый.
 3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
-4. **Исполнитель задачи (AI):** если `assigneeHint` не указан — бот уточняет исполнителя (см. выше); иначе подсказка / `__self__` / User Resolution Flow. Slash `/task` по-прежнему использует `pickAssigneeId` (Вася или первый `EMPLOYEE`).
+4. **Исполнитель задачи (AI):** `assigneeHint` / `assigneeUserId` / `__self__` → резолв в `create-task-assignee-resolve.ts`; уточнение только при полном отсутствии исполнителя (см. выше). Slash `/task` — `pickAssigneeId` (Вася или первый `EMPLOYEE`).
 
 Если проектов или бюджетов нет — бот просит создать их в Web.
 
@@ -616,9 +641,16 @@ REST для scheduler (вызывает бот):
 | Файл | Назначение |
 |------|------------|
 | `main.ts` | Регистрация команд, фото/документов, `message:text` → `ai-message.ts` |
-| `yandex-gpt.ts` | Запрос в YandexGPT, prompt, auth, `extractJsonText`, валидация |
+| `yandex-gpt.ts` | Оркестрация `parseTextIntent`, `requestAiJson`, classifier/extractor, валидация |
+| `ai/provider/types.ts` | Интерфейс `AiProvider`, `AiCompletionParams/Result` |
+| `ai/provider/yandex-provider.ts` | HTTP YandexGPT Foundation Models |
+| `ai/provider/qwen-provider.ts` | HTTP Qwen (Yandex Cloud AI Studio, OpenAI-compatible) |
+| `ai/provider/registry.ts` | `getPrimaryAiProvider()`, `AI_PROVIDER`, `getAiProviderState()` |
+| `ai/completion-max-tokens.ts` | `maxTokens` по `promptGroup` |
+| `ai/prompt-group-router.ts` | Предмаршрутизация без classifier |
+| `create-task-assignee-resolve.ts` | Резолв `__self__` → текущий user id до clarification |
 | `ai-contracts.ts` | Загрузка Zod-схемы из `packages/ai-contracts/dist` (обход stale `node_modules`) |
-| `ai-message.ts` | Текст без `/`: pending → deterministic → YandexGPT |
+| `ai-message.ts` | Текст без `/`: pending → deterministic → `parseTextIntent` |
 | `route-parsed-intent.ts` | Общий routing после parse (deterministic или GPT) |
 | `parse-expense-query.ts` | Детерминированный `create_expense` |
 | `parse-create-budget-command.ts` | Детерминированный `create_budget` |
@@ -661,10 +693,12 @@ REST для scheduler (вызывает бот):
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, `replaceIsoDatesInText` |
 
-**Dev-логи YandexGPT** (не логируют токены; отключить: `BOT_DEV_LOG=0`):
+**Dev-логи AI** (не логируют токены; отключить: `BOT_DEV_LOG=0`):
 
-- `raw AI JSON before validation`
-- `validation error` / `parsed intent`
+- `[yandex-gpt] tokens provider=… promptGroup=… latencyMs=…`
+- `raw AI JSON before validation`, `validation error`, `parsed intent`
+- `create_task assignee before required-fields` (резолв `__self__`)
+- `BOT_DEV_SELF_CHECKS=true` — self-checks при старте (registry, assignee, парсеры)
 
 ## Troubleshooting
 
@@ -681,10 +715,10 @@ REST для scheduler (вызывает бот):
 ## Ограничения
 
 - Состояние «последний расход» и **pending AI intent** — **в памяти процесса**; сбрасывается при перезапуске бота.
-- YandexGPT **не выполняет** действия — только парсит текст; API вызывает бот после «да».
+- LLM **не выполняет** действия — только парсит текст; API вызывает бот после «да».
 - Без привязки `telegramId` рабочие команды и AI **не выполняются** (`NOT_LINKED_MESSAGE`). Доступны: `/start`, `/demo`, `/me`, `/link` (dev).
 - `/link` — только для dev; в продукте — username в Web + `/start`.
 - SpeechKit / голосовые сообщения — не реализованы (env в `.env.example` — заготовка).
 - Уведомления по задачам — in-process scheduler в боте; позже worker/BullMQ.
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
-- Деплой в Yandex Cloud для MVP **не требуется** — только внешний API YandexGPT/SpeechKit из локального бота.
+- Деплой в Yandex Cloud для MVP **не требуется** — только внешние API Yandex Cloud (Foundation Models / AI Studio) и SpeechKit из локального бота.

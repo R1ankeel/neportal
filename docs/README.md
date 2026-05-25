@@ -17,8 +17,8 @@ Neportal — монорепозиторий для внутреннего пор
 | [REST API](api.md) | Эндпоинты, тела запросов, Swagger, ограничения MVP |
 | [База данных](database.md) | Prisma-модели, enum'ы, миграции, демо-данные |
 | [Веб-приложение](web.md) | Next.js, маршруты, серверный fetch к API |
-| [Telegram-бот](bot.md) | Команды, детерминированный разбор, YandexGPT (2 шага), чеки |
-| [AI intent](ai-intent.md) | Контракт JSON, classifier + extractor, `create_budget`, env |
+| [Telegram-бот](bot.md) | Команды, детерминированный разбор, AI provider (YandexGPT / Qwen), чеки |
+| [AI intent](ai-intent.md) | Контракт JSON, classifier + extractor, `AiProvider`, env |
 | [Пакеты](packages.md) | `@neportal/database`, `shared`, `permissions`, `ai-contracts` |
 
 Корневой [README.md](../README.md) — описание для нетехнической аудитории; быстрый старт разработчика — [getting-started.md](getting-started.md).
@@ -55,6 +55,6 @@ Neportal — монорепозиторий для внутреннего пор
 - **Нет аутентификации** в API: все запросы обслуживаются в контексте одной организации (`NEPORTAL_ORG_SLUG` или `NEPORTAL_ORGANIZATION_ID`).
 - **Web** не реализует логин; страницы доверяют API и демо-данным сида.
 - **Отсутствия** — бот `/sick`, `/vacation`, API `GET/POST /absences`, вкладка проекта в Web — см. [api.md](api.md), [bot.md](bot.md).
-- **Разбор текста в боте** — сначала детерминированные парсеры (без GPT), затем опционально **двухэтапный YandexGPT** (classifier + extractor); см. [bot.md](bot.md), [ai-intent.md](ai-intent.md).
+- **Разбор текста в боте** — сначала детерминированные парсеры (без LLM), затем опционально **двухэтапный LLM** (classifier + extractor через `AI_PROVIDER`: YandexGPT Foundation API или Qwen в Yandex Cloud AI Studio); см. [bot.md](bot.md), [ai-intent.md](ai-intent.md).
 - **Бюджеты** — intent `create_budget`, поле `matchingKeywords` для выбора бюджета при расходах; чеки из Telegram (`telegramFileId`) и загрузка из Web (`UPLOAD_DIR`, `POST .../receipt`).
 - **S3 / SpeechKit** в `.env.example` — заготовки; постоянное хранение вложений в S3 не в MVP.

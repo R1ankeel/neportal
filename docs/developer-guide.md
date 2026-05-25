@@ -38,7 +38,7 @@ flowchart TB
   T --> API
   API --> DB
   Det[Deterministic parsers] -.->|без GPT| T
-  Yandex[YandexGPT API] -.->|classifier + extractor, опционально| T
+  LLM[AI Provider Yandex/Qwen] -.->|classifier + extractor, опционально| T
   TG[Telegram Bot API] <-->|чеки, уведомления| API
   TG <-->|polling| T
 ```
@@ -61,11 +61,13 @@ flowchart TB
 | Страница / форма в Web | `apps/web/src/app/(app)/` + `src/lib/api.ts` → [web.md](web.md) |
 | Команда бота или AI | `apps/bot/src/main.ts`, `api.ts`, `ai-message.ts` → [bot.md](bot.md) |
 | Детерминированный parse текста | `parse-expense-query.ts`, `parse-create-budget-command.ts`, `ai/deterministic/` |
-| YandexGPT (2 шага) | `yandex-gpt.ts`, `ai/prompts/`, `ai/prompt-group-router.ts` |
-| Выбор бюджета по ключевым словам | `budget-resolver.ts`, поле `matchingKeywords` в Web/API |
-| Исполнитель в «создай задачу Маше…» | `create-task-assignee-extract.ts` |
+| LLM (2 шага) | `yandex-gpt.ts`, `ai/provider/`, `ai/prompts/`, `ai/prompt-group-router.ts` |
+| Выбор AI backend | `ai/provider/registry.ts`, env `AI_PROVIDER` → [env.md](env.md) |
+| Выбор бюджета по ключевым словам | `budget-resolver.ts`, `budget-context-cache.ts`, `matchingKeywords` |
+| Исполнитель «создай задачу Маше…» | `create-task-assignee-extract.ts` |
+| Исполнитель «мне» / `__self__` | `create-task-assignee-resolve.ts`, `fix-ai-intent-assignee.ts` |
 | Псевдонимы сотрудников | `packages/shared/src/name-aliases/`, `User.systemAliases`, `pnpm users:aliases:backfill` |
-| Контракт ответа YandexGPT | `packages/ai-contracts/src/index.ts` → [ai-intent.md](ai-intent.md) |
+| Контракт ответа LLM | `packages/ai-contracts/src/index.ts` → [ai-intent.md](ai-intent.md) |
 | Загрузка `.env` | `packages/shared/src/env/load-root-env.ts` → [env.md](env.md) |
 | Общие enum вне Prisma | `packages/shared/src/enums.ts` |
 | RBAC (пока не в API) | `packages/permissions/` |
@@ -103,7 +105,7 @@ apps/web/src/
 | `main.ts` | Регистрация `bot.command`, фото/документов, делегирование в handlers |
 | `api.ts` | HTTP-клиент к REST, выбор проекта/бюджета по умолчанию |
 | `start-binding.ts` | `/start`, привязка по username |
-| `ai-message.ts` | Текст без `/`: pending → deterministic → YandexGPT → preview |
+| `ai-message.ts` | Текст без `/`: pending → deterministic → `parseTextIntent` → preview |
 | `route-parsed-intent.ts` | Общий путь после parse (deterministic или GPT) |
 | `budget-resolver.ts` | Сопоставление расхода с бюджетом по `matchingKeywords` |
 | `intent-resolver.ts` / `intent-executor.ts` | hints → id → POST/PATCH API |
@@ -143,11 +145,12 @@ apps/web/src/
 2. Отправить **фото** или **документ** — вложение к последнему расходу.
 3. Web: `/budgets/[id]` → модальный просмотр через `GET .../preview` (API проксирует файл из Telegram).
 
-### 3. AI intent (если настроен Yandex)
+### 3. AI intent (если настроен AI provider)
 
-1. Фраза: «Запиши заметку: тест AI».
-2. Preview → ответ `да`.
-3. Web: вкладка «Заметки» проекта по умолчанию.
+1. В `.env`: `AI_PROVIDER=yandex` (или `qwen` + `QWEN_*`) и ключи Yandex/Qwen.
+2. Фраза: «Запиши заметку: тест AI» или «Создай мне задачу …».
+3. Preview → ответ `да`.
+4. Web: вкладка «Заметки» / задачи проекта по умолчанию.
 
 Контракт JSON: [ai-intent.md](ai-intent.md).
 
@@ -200,7 +203,7 @@ apps/web/src/
 
 1. Расширить Zod в `packages/ai-contracts/src/index.ts`.
 2. `pnpm --filter @neportal/ai-contracts build`.
-3. Prompt в `yandex-gpt.ts`, resolver/preview/executor в боте.
+3. Prompt в `ai/prompts/`, orchestration в `yandex-gpt.ts`, resolver/preview/executor в боте.
 4. [ai-intent.md](ai-intent.md) + пример фразы в [bot.md](bot.md).
 
 ## Инструменты и сборка
@@ -233,7 +236,7 @@ pnpm --filter @neportal/bot dev
 |---------|----------|
 | API не стартует, org not found | `pnpm db:seed`, проверить `NEPORTAL_ORG_SLUG` |
 | Бот: не привязан | Web: username + `/start` + «да» |
-| Бот: AI не работает | Slash без Yandex; для текста — [env.md](env.md) YandexGPT |
+| Бот: AI не работает | Slash без LLM; для текста — [env.md](env.md) (`AI_PROVIDER`, `YANDEX_*` / `QWEN_*`) |
 | Web: чек не открывается | `NEXT_PUBLIC_API_URL`, API запущен, `TELEGRAM_BOT_TOKEN` на API |
 | Zod `version` в боте | `pnpm --filter @neportal/ai-contracts build`, перезапуск бота |
 | Prisma без URL | Команды из корня, не из `packages/database` |
@@ -261,5 +264,5 @@ pnpm --filter @neportal/bot dev
 | [database.md](database.md) | Модели Prisma |
 | [web.md](web.md) | Маршруты Next.js |
 | [bot.md](bot.md) | Команды, чеки, привязка |
-| [ai-intent.md](ai-intent.md) | YandexGPT JSON |
+| [ai-intent.md](ai-intent.md) | LLM intent JSON, AiProvider |
 | [packages.md](packages.md) | Workspace-пакеты |
