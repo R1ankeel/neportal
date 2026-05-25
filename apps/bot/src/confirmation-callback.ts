@@ -2,13 +2,11 @@ import type { Context } from "grammy";
 import { handleConfirmationDecision } from "./confirmation-decision";
 import { getPendingConfirmation } from "./pending-intent";
 import { parseConfirmationCallbackData } from "./telegram/keyboards/confirmation-keyboard";
+import { safeAnswerCallbackQuery } from "./telegram/safe-answer-callback";
+import { safeEditMessageReplyMarkup } from "./telegram/safe-edit-message-reply-markup";
 
 async function removeInlineKeyboard(ctx: Context): Promise<void> {
-  try {
-    await ctx.editMessageReplyMarkup(undefined);
-  } catch {
-    // Message may be too old, already edited, or not editable by this bot.
-  }
+  await safeEditMessageReplyMarkup(ctx, undefined);
 }
 
 export async function handleConfirmationCallback(ctx: Context): Promise<void> {
@@ -17,7 +15,7 @@ export async function handleConfirmationCallback(ctx: Context): Promise<void> {
 
   const telegramUserId = ctx.from?.id;
   if (!telegramUserId) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Это подтверждение не для вас или уже устарело.",
       show_alert: false,
     });
@@ -28,7 +26,7 @@ export async function handleConfirmationCallback(ctx: Context): Promise<void> {
     parsed.ownerTelegramUserId !== undefined &&
     parsed.ownerTelegramUserId !== telegramUserId
   ) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Это подтверждение не для вас или уже устарело.",
       show_alert: false,
     });
@@ -37,7 +35,7 @@ export async function handleConfirmationCallback(ctx: Context): Promise<void> {
 
   const pending = getPendingConfirmation(telegramUserId);
   if (!pending) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Это действие уже обработано или устарело.",
       show_alert: false,
     });
@@ -49,7 +47,7 @@ export async function handleConfirmationCallback(ctx: Context): Promise<void> {
     parsed.confirmationId !== undefined &&
     pending.confirmationId !== parsed.confirmationId
   ) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Это действие уже обработано или устарело.",
       show_alert: false,
     });
@@ -57,7 +55,7 @@ export async function handleConfirmationCallback(ctx: Context): Promise<void> {
     return;
   }
 
-  await ctx.answerCallbackQuery();
+  await safeAnswerCallbackQuery(ctx);
   const result = await handleConfirmationDecision(ctx, telegramUserId, parsed.action);
   if (result.handled) {
     await removeInlineKeyboard(ctx);

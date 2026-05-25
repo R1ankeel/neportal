@@ -7,13 +7,11 @@ import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-ex
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
 import { parseChoiceCallbackData } from "./telegram/keyboards/choice-keyboard";
+import { safeAnswerCallbackQuery } from "./telegram/safe-answer-callback";
+import { safeEditMessageReplyMarkup } from "./telegram/safe-edit-message-reply-markup";
 
 async function removeInlineKeyboard(ctx: Context): Promise<void> {
-  try {
-    await ctx.editMessageReplyMarkup(undefined);
-  } catch {
-    // Message may be too old, already edited, or already without markup.
-  }
+  await safeEditMessageReplyMarkup(ctx, undefined);
 }
 
 async function dispatchChoiceText(
@@ -36,7 +34,7 @@ export async function handleChoiceCallback(ctx: Context): Promise<void> {
 
   const telegramUserId = ctx.from?.id;
   if (!telegramUserId || parsed.ownerTelegramUserId !== telegramUserId) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Этот выбор не для вас или уже устарел.",
       show_alert: false,
     });
@@ -45,7 +43,7 @@ export async function handleChoiceCallback(ctx: Context): Promise<void> {
 
   const choice = getActiveChoice(telegramUserId);
   if (!choice) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Этот выбор уже обработан или устарел.",
       show_alert: false,
     });
@@ -54,7 +52,7 @@ export async function handleChoiceCallback(ctx: Context): Promise<void> {
   }
 
   if (choice.choiceId !== parsed.choiceId) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Этот выбор уже обработан или устарел.",
       show_alert: false,
     });
@@ -66,14 +64,14 @@ export async function handleChoiceCallback(ctx: Context): Promise<void> {
     parsed.action === "select" &&
     (parsed.optionIndex === undefined || parsed.optionIndex >= choice.optionCount)
   ) {
-    await ctx.answerCallbackQuery({
+    await safeAnswerCallbackQuery(ctx, {
       text: "Некорректный выбор.",
       show_alert: false,
     });
     return;
   }
 
-  await ctx.answerCallbackQuery();
+  await safeAnswerCallbackQuery(ctx);
   const text = parsed.action === "cancel" ? "отмена" : String((parsed.optionIndex ?? 0) + 1);
   const handled = await dispatchChoiceText(ctx, telegramUserId, text);
   if (handled) {

@@ -67,6 +67,8 @@ import { setPendingConfirmation } from "./pending-intent";
 import { handleConfirmationCallback } from "./confirmation-callback";
 import { handleChoiceCallback } from "./choice-callback";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { logBotMiddlewareError } from "./telegram-error-log";
+import { devLogSafeCallbackChecks } from "./telegram/safe-callback.dev";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -82,6 +84,8 @@ if (!token || token === "change_me") {
 }
 
 const bot = new Bot(token);
+
+bot.catch(logBotMiddlewareError);
 
 bot.command("start", async (ctx) => {
   await handleStartBinding(ctx);
@@ -909,6 +913,7 @@ async function main() {
     devLogCreateTaskTitleDescriptionChecks();
     devLogConfirmationKeyboardChecks();
     devLogChoiceKeyboardChecks();
+    await devLogSafeCallbackChecks();
     await devLogCreateTaskNormalizeChecks();
   }
   startTaskNotificationScheduler(bot);
