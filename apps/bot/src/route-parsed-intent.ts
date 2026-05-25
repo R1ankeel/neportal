@@ -5,6 +5,10 @@ import { fetchProjects, fetchUsers } from "./api";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { beginCreateExpenseFromAiIntent } from "./create-expense-flow";
 import { refineCreateTaskIntent } from "./create-task-assignee-extract";
+import {
+  createTaskAssigneeNeedsClarification,
+  resolveCreateTaskAssigneeInIntent,
+} from "./create-task-assignee-resolve";
 import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
 import { buildIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
@@ -128,9 +132,13 @@ export async function routeParsedAiIntent(
   if (activeIntent.intent === "create_task") {
     const usersForRefine = await fetchUsers();
     activeIntent = refineCreateTaskIntent(activeIntent, usersForRefine, linked, text);
+    activeIntent = resolveCreateTaskAssigneeInIntent(activeIntent, linked);
   }
 
-  if (activeIntent.intent === "create_task" && !activeIntent.payload.assigneeHint?.trim()) {
+  if (
+    activeIntent.intent === "create_task" &&
+    createTaskAssigneeNeedsClarification(activeIntent.payload)
+  ) {
     const projects = await fetchProjects();
     const project = findProjectByHint(projects, activeIntent.payload.projectHint);
     if (!project) {

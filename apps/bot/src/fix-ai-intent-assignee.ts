@@ -14,6 +14,8 @@ const CREATE_TASK_SELF_MARKER_PATTERNS: RegExp[] = [
   new RegExp(`${WB_START}поставь\\s+мне\\s+задачу${WB_END}`, "iu"),
   new RegExp(`${WB_START}запиши\\s+мне\\s+в\\s+задач`, "iu"),
   new RegExp(`${WB_START}добавь\\s+мне\\s+задачу${WB_END}`, "iu"),
+  new RegExp(`${WB_START}создай\\s+мне\\s+задачу${WB_END}`, "iu"),
+  new RegExp(`${WB_START}создай\\s+мне\\s+задач${WB_END}`, "iu"),
   new RegExp(`${WB_START}на\\s+меня${WB_END}`, "iu"),
   new RegExp(`${WB_START}себе${WB_END}`, "iu"),
   new RegExp(`${WB_START}для\\s+меня${WB_END}`, "iu"),

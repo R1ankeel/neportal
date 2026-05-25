@@ -25,13 +25,19 @@ export function resolveUserFromAiPayload(
     return { kind: "one", user: currentUser };
   }
 
-  if (userId) {
-    const user = users.find((entry) => entry.id === userId);
+  const trimmedUserId = userId?.trim();
+  if (trimmedUserId === SELF_HINT_MARKER) {
+    if (!currentUser) return { kind: "none" };
+    return { kind: "one", user: currentUser };
+  }
+
+  if (trimmedUserId) {
+    const user = users.find((entry) => entry.id === trimmedUserId);
     if (user) {
-      console.log(`[ai-user-resolve] used userId ${userId}`);
+      console.log(`[ai-user-resolve] used userId ${trimmedUserId}`);
       return { kind: "one", user };
     }
-    console.log(`[ai-user-resolve] invalid userId ${userId}, fallback to hint resolver`);
+    console.log(`[ai-user-resolve] invalid userId ${trimmedUserId}, fallback to hint resolver`);
   }
 
   if (trimmedHint) {
