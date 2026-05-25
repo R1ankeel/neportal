@@ -4,6 +4,7 @@ export type ChoiceAction = "select" | "cancel";
 
 export const CHOICE_CALLBACK_PREFIX = "choice";
 const MAX_BUTTON_LABEL_LENGTH = 48;
+const TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64;
 
 function trimButtonLabel(label: string): string {
   const clean = label.trim().replace(/\s+/g, " ");
@@ -21,6 +22,28 @@ export function buildChoiceCallbackData(params: {
   return params.action === "select" ? `${base}:${params.optionIndex}` : base;
 }
 
+function isCallbackDataSafeLength(callbackData: string): boolean {
+  return Buffer.byteLength(callbackData, "utf8") <= TELEGRAM_CALLBACK_DATA_MAX_BYTES;
+}
+
+function safeChoiceCallbackData(params: {
+  action: ChoiceAction;
+  ownerTelegramUserId: number;
+  choiceId: string;
+  optionIndex?: number;
+}): string {
+  const callbackData = buildChoiceCallbackData(params);
+  if (isCallbackDataSafeLength(callbackData)) return callbackData;
+  console.warn("[bot] choice callback_data exceeds Telegram limit", {
+    action: params.action,
+    ownerTelegramUserId: params.ownerTelegramUserId,
+    choiceId: params.choiceId,
+    optionIndex: params.optionIndex,
+    length: Buffer.byteLength(callbackData, "utf8"),
+  });
+  throw new Error("choice callback_data exceeds Telegram 64-byte limit");
+}
+
 export function buildChoiceKeyboard(params: {
   ownerTelegramUserId: number;
   choiceId: string;
@@ -32,7 +55,7 @@ export function buildChoiceKeyboard(params: {
     keyboard
       .text(
         `${index + 1}. ${trimButtonLabel(label)}`,
-        buildChoiceCallbackData({
+        safeChoiceCallbackData({
           action: "select",
           ownerTelegramUserId: params.ownerTelegramUserId,
           choiceId: params.choiceId,
@@ -44,7 +67,7 @@ export function buildChoiceKeyboard(params: {
 
   keyboard.text(
     "Отменить",
-    buildChoiceCallbackData({
+    safeChoiceCallbackData({
       action: "cancel",
       ownerTelegramUserId: params.ownerTelegramUserId,
       choiceId: params.choiceId,

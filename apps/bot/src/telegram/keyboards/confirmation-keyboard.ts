@@ -3,6 +3,7 @@ import { InlineKeyboard } from "grammy";
 export type ConfirmationAction = "confirm" | "edit" | "cancel";
 
 export const CONFIRMATION_CALLBACK_PREFIX = "confirmation";
+const TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64;
 
 export function buildConfirmationCallbackData(
   action: ConfirmationAction,
@@ -16,6 +17,26 @@ export function buildConfirmationCallbackData(
   return confirmationId ? `${base}:${confirmationId}` : base;
 }
 
+function isCallbackDataSafeLength(callbackData: string): boolean {
+  return Buffer.byteLength(callbackData, "utf8") <= TELEGRAM_CALLBACK_DATA_MAX_BYTES;
+}
+
+function safeConfirmationCallbackData(
+  action: ConfirmationAction,
+  ownerTelegramUserId?: number,
+  confirmationId?: string,
+): string {
+  const callbackData = buildConfirmationCallbackData(action, ownerTelegramUserId, confirmationId);
+  if (isCallbackDataSafeLength(callbackData)) return callbackData;
+  console.warn("[bot] confirmation callback_data exceeds Telegram limit", {
+    action,
+    ownerTelegramUserId,
+    confirmationId,
+    length: Buffer.byteLength(callbackData, "utf8"),
+  });
+  throw new Error("confirmation callback_data exceeds Telegram 64-byte limit");
+}
+
 export function buildConfirmationKeyboard(options?: {
   ownerTelegramUserId?: number;
   confirmationId?: string;
@@ -23,7 +44,7 @@ export function buildConfirmationKeyboard(options?: {
   return new InlineKeyboard()
     .text(
       "Подтвердить",
-      buildConfirmationCallbackData(
+      safeConfirmationCallbackData(
         "confirm",
         options?.ownerTelegramUserId,
         options?.confirmationId,
@@ -31,7 +52,7 @@ export function buildConfirmationKeyboard(options?: {
     )
     .text(
       "Изменить",
-      buildConfirmationCallbackData(
+      safeConfirmationCallbackData(
         "edit",
         options?.ownerTelegramUserId,
         options?.confirmationId,
@@ -39,7 +60,7 @@ export function buildConfirmationKeyboard(options?: {
     )
     .text(
       "Отменить",
-      buildConfirmationCallbackData(
+      safeConfirmationCallbackData(
         "cancel",
         options?.ownerTelegramUserId,
         options?.confirmationId,

@@ -1,5 +1,5 @@
-let nextChoiceId = 1;
+import { createCallbackId } from "./callback-id";
 
 export function createChoiceId(): string {
-  return String(nextChoiceId++);
+  return createCallbackId();
 }

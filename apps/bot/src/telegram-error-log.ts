@@ -1,5 +1,6 @@
 import type { BotError, Context } from "grammy";
 import { callbackDataPreview } from "./telegram/callback-log";
+import { sanitizeLogString, stringifyAndSanitize } from "./telegram/log-sanitizer";
 
 function updateType(ctx: Context): string {
   if (ctx.callbackQuery) return "callback_query";
@@ -10,6 +11,9 @@ function updateType(ctx: Context): string {
 
 export function logBotMiddlewareError(error: BotError<Context>): void {
   const err = error.error;
+  const errorMessage = sanitizeLogString(err instanceof Error ? err.message : String(err));
+  const stack = sanitizeLogString(err instanceof Error ? err.stack ?? "" : "");
+  const errorDetails = stringifyAndSanitize(err);
   const base = {
     updateId: error.ctx.update.update_id,
     updateType: updateType(error.ctx),
@@ -17,7 +21,8 @@ export function logBotMiddlewareError(error: BotError<Context>): void {
     chatId: error.ctx.chat?.id ?? null,
     callbackData: callbackDataPreview(error.ctx.callbackQuery?.data),
     errorName: err instanceof Error ? err.name : typeof err,
-    errorMessage: err instanceof Error ? err.message : String(err),
+    errorMessage,
+    errorDetails,
   };
 
   if (process.env.BOT_DEV_LOG === "0") {
@@ -27,6 +32,6 @@ export function logBotMiddlewareError(error: BotError<Context>): void {
 
   console.error("[bot] middleware error", {
     ...base,
-    stack: err instanceof Error ? err.stack : undefined,
+    stack: stack || undefined,
   });
 }

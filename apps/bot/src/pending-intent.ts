@@ -4,6 +4,7 @@ import type {
   AbsenceDelegationAssignment,
   AbsenceDelegationTaskItem,
 } from "./pending-absence-delegation";
+import { createCallbackId } from "./callback-id";
 
 export type PendingAiIntent = {
   type: "ai_intent";
@@ -39,7 +40,6 @@ export type PendingConfirmation =
   | PendingAbsenceDelegationDistributionConfirmation;
 
 const pendingByTelegramUserId = new Map<number, PendingConfirmation>();
-let nextConfirmationId = 1;
 
 export function getPendingConfirmation(
   telegramUserId: number,
@@ -51,7 +51,7 @@ export function setPendingConfirmation(
   telegramUserId: number,
   pending: PendingConfirmation,
 ): string {
-  const confirmationId = String(nextConfirmationId++);
+  const confirmationId = createCallbackId();
   pendingByTelegramUserId.set(telegramUserId, { ...pending, confirmationId });
   return confirmationId;
 }
