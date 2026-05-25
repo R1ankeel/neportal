@@ -49,7 +49,8 @@ import { handlePendingExpenseReceiptUploadMessage } from "./handle-pending-expen
 import { parsePendingExpensesQuery } from "./parse-pending-expenses-query";
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { handleLinkByUsernameConfirmation } from "./start-binding";
-import { getYandexGptState, parseTextIntent } from "./yandex-gpt";
+import { getAiProviderState } from "./ai/provider/registry";
+import { parseTextIntent } from "./yandex-gpt";
 
 export async function handlePlainTextMessage(ctx: Context): Promise<void> {
   const text = ctx.message?.text?.trim();
@@ -314,8 +315,8 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const yandexState = getYandexGptState();
-  if (!yandexState.enabled) {
+  const aiState = getAiProviderState();
+  if (!aiState.enabled) {
     await ctx.reply("AI-парсер пока не настроен. Используйте команды /demo.");
     return;
   }

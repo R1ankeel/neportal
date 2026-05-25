@@ -6,6 +6,8 @@ import {
   type ExtractorPromptGroup,
 } from "./ai/intent-to-prompt-group";
 import { resolveCompletionMaxTokens } from "./ai/completion-max-tokens";
+import { getAiProviderState, getPrimaryAiProvider } from "./ai/provider/registry";
+import type { AiProvider } from "./ai/provider/types";
 import { resolvePromptGroup, type PromptGroup } from "./ai/prompt-group-router";
 import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
 import {
@@ -29,88 +31,27 @@ import {
   addTokenUsage,
   logYandexGptTokenUsage,
   logYandexGptTokenUsageTotal,
-  parseYandexGptUsage,
   type YandexGptTokenUsage,
 } from "./yandex-gpt-usage";
+
+export type {
+  YandexGptAuthMode,
+  YandexGptConfig,
+  YandexGptDisabledReason,
+  YandexGptState,
+} from "./ai/provider/yandex-provider";
+export { getYandexGptState } from "./ai/provider/yandex-provider";
 
 export type { PromptGroup };
 export type ParseTextIntentOptions = LoadIntentPromptContextOptions;
 
-const YANDEX_COMPLETION_URL =
-  "https://llm.api.cloud.yandex.net/foundationModels/v1/completion";
+export type ParseTextIntentResult =
+  | { ok: true; intent: AiIntent }
+  | { ok: false; kind: "disabled" | "api_error" | "invalid_json" | "invalid_schema" };
 
-export type YandexGptAuthMode = "api-key" | "iam-token";
-
-export type YandexGptConfig = {
-  folderId: string;
-  modelUri: string;
-  authMode: YandexGptAuthMode;
-  /** API key (Api-Key) or IAM token (Bearer), never logged. */
-  credential: string;
-};
-
-export type YandexGptDisabledReason = "missing_env" | "placeholder_env";
-
-export type YandexGptState =
-  | { enabled: true; config: YandexGptConfig }
-  | { enabled: false; reason: YandexGptDisabledReason };
-
-function isPlaceholder(value: string | undefined): boolean {
-  if (!value) return true;
-  const v = value.trim();
-  return v.length === 0 || v === "change_me";
-}
-
-function resolveAuth(): { authMode: YandexGptAuthMode; credential: string } | null {
-  const apiKey = process.env.YANDEX_GPT_API_KEY?.trim();
-  if (!isPlaceholder(apiKey)) {
-    return { authMode: "api-key", credential: apiKey! };
-  }
-
-  const iamToken = process.env.YANDEX_CLOUD_IAM_TOKEN?.trim();
-  if (!isPlaceholder(iamToken)) {
-    return { authMode: "iam-token", credential: iamToken! };
-  }
-
-  return null;
-}
-
-function buildAuthorizationHeader(config: YandexGptConfig): string {
-  if (config.authMode === "api-key") {
-    return `Api-Key ${config.credential}`;
-  }
-  return `Bearer ${config.credential}`;
-}
-
-export function getYandexGptState(): YandexGptState {
-  const folderId = process.env.YANDEX_CLOUD_FOLDER_ID?.trim();
-  const modelUriRaw = process.env.YANDEX_GPT_MODEL_URI?.trim();
-
-  if (isPlaceholder(folderId)) {
-    return { enabled: false, reason: "missing_env" };
-  }
-
-  const auth = resolveAuth();
-  if (!auth) {
-    return { enabled: false, reason: "missing_env" };
-  }
-
-  const modelUri = isPlaceholder(modelUriRaw)
-    ? `gpt://${folderId}/yandexgpt/latest`
-    : modelUriRaw!;
-
-  console.log(`[yandex-gpt] auth mode: ${auth.authMode}`);
-
-  return {
-    enabled: true,
-    config: {
-      folderId: folderId!,
-      modelUri,
-      authMode: auth.authMode,
-      credential: auth.credential,
-    },
-  };
-}
+type GptCallResult =
+  | { ok: true; responseText: string; parsed: unknown; usage: YandexGptTokenUsage | null }
+  | { ok: false; kind: "invalid_json" | "invalid_schema" };
 
 /** Dev-only logs (отключить: BOT_DEV_LOG=0). */
 function yandexGptDevLog(message: string, data?: Record<string, unknown>): void {
@@ -137,83 +78,6 @@ export function extractJsonText(raw: string): string {
   return trimmed;
 }
 
-type YandexCompletionResponse = {
-  result?: {
-    alternatives?: Array<{
-      message?: { text?: string };
-      status?: string;
-    }>;
-    usage?: {
-      inputTextTokens?: number | string;
-      completionTokens?: number | string;
-      totalTokens?: number | string;
-    };
-  };
-};
-
-type YandexGptCallResult = {
-  text: string;
-  usage: YandexGptTokenUsage | null;
-};
-
-export type ParseTextIntentResult =
-  | { ok: true; intent: AiIntent }
-  | { ok: false; kind: "disabled" | "api_error" | "invalid_json" | "invalid_schema" };
-
-type GptCallResult =
-  | { ok: true; responseText: string; parsed: unknown; usage: YandexGptTokenUsage | null }
-  | { ok: false; kind: "invalid_json" | "invalid_schema" };
-
-export type YandexGptCompletionOptions = {
-  temperature?: number;
-  maxTokens?: number;
-};
-
-async function callYandexGpt(
-  config: YandexGptConfig,
-  systemPrompt: string,
-  userPrompt: string,
-  completionOptions?: YandexGptCompletionOptions,
-): Promise<YandexGptCallResult> {
-  const res = await fetch(YANDEX_COMPLETION_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: buildAuthorizationHeader(config),
-      "x-folder-id": config.folderId,
-    },
-    body: JSON.stringify({
-      modelUri: config.modelUri,
-      completionOptions: {
-        stream: false,
-        temperature: completionOptions?.temperature ?? 0.2,
-        maxTokens: completionOptions?.maxTokens ?? 2000,
-      },
-      messages: [
-        { role: "system", text: systemPrompt },
-        { role: "user", text: userPrompt },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`YandexGPT HTTP ${res.status}: ${text.slice(0, 500)}`);
-  }
-
-  const data = (await res.json()) as YandexCompletionResponse;
-  const text = data.result?.alternatives?.[0]?.message?.text;
-  if (!text?.trim()) {
-    throw new Error("YandexGPT returned empty completion");
-  }
-
-  return {
-    text,
-    usage: parseYandexGptUsage(data.result?.usage),
-  };
-}
-
 function buildUserPrompt(context: IntentPromptContext, group: PromptGroup, userText: string): string {
   return [
     formatPromptContextForModel(context, group, userText),
@@ -233,42 +97,62 @@ function unknownIntent(confidence: number): AiIntent {
 }
 
 async function runGptJsonCall(params: {
-  config: YandexGptConfig;
+  provider: AiProvider;
+  modelUri?: string;
   promptGroup: string;
   systemPrompt: string;
   userPrompt: string;
   userText: string;
   validate?: (parsed: unknown) => boolean;
-  completionOptions?: YandexGptCompletionOptions;
+  temperature?: number;
+  maxTokens?: number;
 }): Promise<GptCallResult & { systemPrompt: string; userPrompt: string }> {
-  const { config, promptGroup, systemPrompt, userPrompt, userText, validate, completionOptions } =
-    params;
-  const maxTokens =
-    completionOptions?.maxTokens ?? resolveCompletionMaxTokens(promptGroup);
+  const {
+    provider,
+    modelUri,
+    promptGroup,
+    systemPrompt,
+    userPrompt,
+    userText,
+    validate,
+    temperature,
+    maxTokens: maxTokensParam,
+  } = params;
+  const maxTokens = maxTokensParam ?? resolveCompletionMaxTokens(promptGroup);
   const systemChars = systemPrompt.length;
   const userChars = userPrompt.length;
   const promptChars = systemChars + userChars;
   const promptMeasure = measureSystemPrompt(promptGroup);
   yandexGptDevLog(`promptGroup=${promptGroup} promptChars=${promptChars} maxTokens=${maxTokens}`, {
-    modelUri: config.modelUri,
+    provider: provider.id,
+    modelUri: modelUri ?? undefined,
     systemChars,
     userChars,
     systemPromptChars: promptMeasure.systemChars,
     groupPromptChars: promptMeasure.groupChars,
   });
 
-  let callResult: YandexGptCallResult;
+  let completion;
   try {
-    callResult = await callYandexGpt(config, systemPrompt, userPrompt, {
-      ...completionOptions,
+    completion = await provider.complete({
+      systemPrompt,
+      userPrompt,
+      temperature,
       maxTokens,
+      promptGroup,
+      requestLabel: promptGroup,
     });
   } catch (e) {
     throw e;
   }
 
-  logYandexGptTokenUsage(promptGroup, callResult.usage);
-  const responseText = callResult.text;
+  const usage = completion.usage;
+  logYandexGptTokenUsage(promptGroup, usage, {
+    provider: completion.provider,
+    model: completion.model ?? modelUri,
+    latencyMs: completion.latencyMs,
+  });
+  const responseText = completion.text;
 
   const jsonText = extractJsonText(responseText);
   let parsed: unknown;
@@ -284,12 +168,22 @@ async function runGptJsonCall(params: {
       systemPrompt,
       userPrompt,
       modelResponse: responseText,
-      modelUri: config.modelUri,
-      extra: { promptGroup, usage: callResult.usage, jsonPreview: jsonText.slice(0, 500) },
+      modelUri: completion.model ?? modelUri,
+      extra: {
+        promptGroup,
+        provider: completion.provider,
+        usage,
+        jsonPreview: jsonText.slice(0, 500),
+      },
     });
     yandexGptDevLog(
       reason === "api_refusal" ? "model refusal/non-json" : "model returned non-JSON text",
-      { promptGroup, preview: jsonText.slice(0, 500), logFile: logFile ?? "save failed" },
+      {
+        promptGroup,
+        provider: completion.provider,
+        preview: jsonText.slice(0, 500),
+        logFile: logFile ?? "save failed",
+      },
     );
     return { ok: false, kind: "invalid_json", systemPrompt, userPrompt };
   }
@@ -301,23 +195,28 @@ async function runGptJsonCall(params: {
       systemPrompt,
       userPrompt,
       modelResponse: responseText,
-      modelUri: config.modelUri,
-      extra: { promptGroup, usage: callResult.usage, parsed },
+      modelUri: completion.model ?? modelUri,
+      extra: {
+        promptGroup,
+        provider: completion.provider,
+        usage,
+        parsed,
+      },
     });
     yandexGptDevLog("validation error", {
       promptGroup,
+      provider: completion.provider,
       parsed,
       logFile: logFile ?? "save failed",
     });
     return { ok: false, kind: "invalid_schema", systemPrompt, userPrompt };
   }
 
-  return { ok: true, responseText, parsed, usage: callResult.usage, systemPrompt, userPrompt };
+  return { ok: true, responseText, parsed, usage, systemPrompt, userPrompt };
 }
 
-/** Отдельный JSON-вызов YandexGPT (cleanup и др.). */
-export async function requestYandexGptJson(params: {
-  config: YandexGptConfig;
+/** JSON completion через primary AiProvider. */
+export async function requestAiJson(params: {
   promptGroup: string;
   systemPrompt: string;
   userPrompt: string;
@@ -329,17 +228,22 @@ export async function requestYandexGptJson(params: {
   | { ok: true; parsed: unknown; responseText: string }
   | { ok: false; kind: "invalid_json" | "invalid_schema" }
 > {
+  const providerState = getAiProviderState();
+  if (!providerState.enabled) {
+    return { ok: false, kind: "invalid_json" };
+  }
+
+  const provider = getPrimaryAiProvider();
   const gptResult = await runGptJsonCall({
-    config: params.config,
+    provider,
+    modelUri: providerState.model,
     promptGroup: params.promptGroup,
     systemPrompt: params.systemPrompt,
     userPrompt: params.userPrompt,
     userText: params.userText,
     validate: params.validate,
-    completionOptions: {
-      temperature: params.temperature,
-      maxTokens: params.maxTokens,
-    },
+    temperature: params.temperature,
+    maxTokens: params.maxTokens,
   });
 
   if (!gptResult.ok) {
@@ -349,12 +253,40 @@ export async function requestYandexGptJson(params: {
   return { ok: true, parsed: gptResult.parsed, responseText: gptResult.responseText };
 }
 
+/**
+ * @deprecated Используйте requestAiJson. config оставлен для совместимости и игнорируется.
+ */
+export async function requestYandexGptJson(params: {
+  config?: unknown;
+  promptGroup: string;
+  systemPrompt: string;
+  userPrompt: string;
+  userText: string;
+  validate?: (parsed: unknown) => boolean;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<
+  | { ok: true; parsed: unknown; responseText: string }
+  | { ok: false; kind: "invalid_json" | "invalid_schema" }
+> {
+  return requestAiJson({
+    promptGroup: params.promptGroup,
+    systemPrompt: params.systemPrompt,
+    userPrompt: params.userPrompt,
+    userText: params.userText,
+    validate: params.validate,
+    temperature: params.temperature,
+    maxTokens: params.maxTokens,
+  });
+}
+
 function logIntentParseMetrics(data: Record<string, unknown>): void {
   yandexGptDevLog("intent-parse metrics", data);
 }
 
 async function runClassifier(
-  config: YandexGptConfig,
+  provider: AiProvider,
+  modelUri: string | undefined,
   userText: string,
   options?: ParseTextIntentOptions,
 ): Promise<
@@ -381,13 +313,14 @@ async function runClassifier(
   let gptResult: GptCallResult & { systemPrompt: string; userPrompt: string };
   try {
     gptResult = await runGptJsonCall({
-      config,
+      provider,
+      modelUri,
       promptGroup,
       systemPrompt,
       userPrompt,
       userText,
       validate: (parsed) => parseClassifierResult(parsed) !== null,
-      completionOptions: { maxTokens: resolveCompletionMaxTokens(promptGroup) },
+      maxTokens: resolveCompletionMaxTokens(promptGroup),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -402,6 +335,7 @@ async function runClassifier(
   const classified = parseClassifierResult(gptResult.parsed)!;
   yandexGptDevLog(`classifier intent=${classified.intent}`, {
     confidence: classified.confidence,
+    provider: provider.id,
   });
 
   if (classified.intent === "unknown") {
@@ -418,7 +352,8 @@ async function runClassifier(
 }
 
 async function runExtractor(
-  config: YandexGptConfig,
+  provider: AiProvider,
+  modelUri: string | undefined,
   extractorGroup: ExtractorPromptGroup,
   userText: string,
   options?: ParseTextIntentOptions,
@@ -451,12 +386,13 @@ async function runExtractor(
   let gptResult: GptCallResult & { systemPrompt: string; userPrompt: string };
   try {
     gptResult = await runGptJsonCall({
-      config,
+      provider,
+      modelUri,
       promptGroup: extractorGroup,
       systemPrompt,
       userPrompt,
       userText,
-      completionOptions: { maxTokens: resolveCompletionMaxTokens(extractorGroup) },
+      maxTokens: resolveCompletionMaxTokens(extractorGroup),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -470,6 +406,7 @@ async function runExtractor(
 
   yandexGptDevLog("raw AI JSON before validation", {
     promptGroup: extractorGroup,
+    provider: provider.id,
     parsed: gptResult.parsed,
   });
 
@@ -482,10 +419,13 @@ export async function parseTextIntent(
 ): Promise<ParseTextIntentResult> {
   assertAiContractsSchemaLoaded();
 
-  const state = getYandexGptState();
-  if (!state.enabled) {
+  const providerState = getAiProviderState();
+  if (!providerState.enabled) {
     return { ok: false, kind: "disabled" };
   }
+
+  const provider = getPrimaryAiProvider();
+  const modelUri = providerState.model;
 
   const startedAt = Date.now();
   const routeGroup = resolvePromptGroup(userText);
@@ -495,9 +435,9 @@ export async function parseTextIntent(
 
   if (classifierSkipped) {
     extractorGroup = routeGroup;
-    yandexGptDevLog("classifier skipped", { routeGroup });
+    yandexGptDevLog("classifier skipped", { routeGroup, provider: provider.id });
   } else {
-    const classified = await runClassifier(state.config, userText, {
+    const classified = await runClassifier(provider, modelUri, userText, {
       ...options,
       userText,
     });
@@ -511,8 +451,9 @@ export async function parseTextIntent(
         routeGroup,
         classifierSkipped: false,
         promptGroup: "classifier",
+        provider: provider.id,
         latencyMs: Date.now() - startedAt,
-        modelUri: state.config.modelUri,
+        modelUri,
         maxTokens: resolveCompletionMaxTokens("classifier"),
       });
       return { ok: true, intent: classified.intent };
@@ -520,7 +461,7 @@ export async function parseTextIntent(
     extractorGroup = classified.extractorGroup;
   }
 
-  const extracted = await runExtractor(state.config, extractorGroup, userText, {
+  const extracted = await runExtractor(provider, modelUri, extractorGroup, userText, {
     ...options,
     userText,
   });
@@ -546,9 +487,10 @@ export async function parseTextIntent(
         userText,
       ),
       modelResponse: JSON.stringify(extracted.parsed),
-      modelUri: state.config.modelUri,
+      modelUri,
       extra: {
         promptGroup: extractorGroup,
+        provider: provider.id,
         fieldErrors: validated.error.flatten().fieldErrors,
         formErrors: validated.error.flatten().formErrors,
         parsed: fixed,
@@ -556,6 +498,7 @@ export async function parseTextIntent(
     });
     yandexGptDevLog("validation error", {
       promptGroup: extractorGroup,
+      provider: provider.id,
       fieldErrors: validated.error.flatten().fieldErrors,
       formErrors: validated.error.flatten().formErrors,
       logFile: logFile ?? "save failed",
@@ -585,8 +528,9 @@ export async function parseTextIntent(
     routeGroup,
     classifierSkipped,
     promptGroup: extractorGroup,
+    provider: provider.id,
     latencyMs: Date.now() - startedAt,
-    modelUri: state.config.modelUri,
+    modelUri,
     maxTokens: resolveCompletionMaxTokens(extractorGroup),
     systemPromptChars: promptMeasure.systemChars,
     groupPromptChars: promptMeasure.groupChars,
@@ -600,6 +544,7 @@ export async function parseTextIntent(
 
   yandexGptDevLog("parsed intent", {
     promptGroup: extractorGroup,
+    provider: provider.id,
     intent: intent.intent,
     confidence: intent.confidence,
     requiresConfirmation: intent.requiresConfirmation,

@@ -1,6 +1,7 @@
 import { TASK_TITLE_CLEANUP_PROMPT } from "./prompts/task-title-cleanup-prompt";
 import { normalizeBasicTaskTitle } from "./deterministic/basic-create-task-text";
-import { getYandexGptState, requestYandexGptJson } from "../yandex-gpt";
+import { getAiProviderState } from "./provider/registry";
+import { requestAiJson } from "../yandex-gpt";
 
 function isValidCleanupPayload(parsed: unknown): parsed is { title: string } {
   if (!parsed || typeof parsed !== "object") return false;
@@ -13,14 +14,13 @@ export async function cleanupTaskTitleWithAi(rawTitle: string): Promise<string> 
   const trimmed = rawTitle.trim();
   if (!trimmed) return trimmed;
 
-  const state = getYandexGptState();
-  if (!state.enabled) {
+  const providerState = getAiProviderState();
+  if (!providerState.enabled) {
     return normalizeBasicTaskTitle(trimmed);
   }
 
   const userPrompt = `Текст задачи:\n${trimmed}`;
-  const result = await requestYandexGptJson({
-    config: state.config,
+  const result = await requestAiJson({
     promptGroup: "task-title-cleanup",
     systemPrompt: TASK_TITLE_CLEANUP_PROMPT,
     userPrompt,

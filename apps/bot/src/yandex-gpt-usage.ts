@@ -54,18 +54,32 @@ export function addTokenUsage(
   };
 }
 
-/** Логирует расход токенов одного запроса к YandexGPT. */
+export type AiTokenUsageMeta = {
+  provider?: string;
+  model?: string;
+  latencyMs?: number;
+};
+
+/** Логирует расход токенов одного запроса к AI provider. */
 export function logYandexGptTokenUsage(
   promptGroup: string,
   usage: YandexGptTokenUsage | null,
+  meta?: AiTokenUsageMeta,
 ): void {
+  const provider = meta?.provider ?? "yandex";
+  const modelPart = meta?.model ? ` model=${meta.model}` : "";
+  const latencyPart =
+    meta?.latencyMs !== undefined ? ` latencyMs=${meta.latencyMs}` : "";
+
   if (!usage) {
-    console.log(`[yandex-gpt] tokens promptGroup=${promptGroup} usage=unavailable`);
+    console.log(
+      `[yandex-gpt] tokens provider=${provider} promptGroup=${promptGroup} usage=unavailable${modelPart}${latencyPart}`,
+    );
     return;
   }
 
   console.log(
-    `[yandex-gpt] tokens promptGroup=${promptGroup} input=${usage.inputTextTokens} output=${usage.completionTokens} total=${usage.totalTokens}`,
+    `[yandex-gpt] tokens provider=${provider} promptGroup=${promptGroup} input=${usage.inputTextTokens} output=${usage.completionTokens} total=${usage.totalTokens}${modelPart}${latencyPart}`,
   );
 }
 

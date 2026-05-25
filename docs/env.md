@@ -57,6 +57,7 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
+| `AI_PROVIDER` | `yandex` | Primary AI provider (`AI_PROVIDER` controls which backend handles `parseTextIntent` and other completions). Сейчас: только `yandex`. Неизвестное значение → предупреждение в лог и fallback на `yandex` |
 | `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
 | `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
 | `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
