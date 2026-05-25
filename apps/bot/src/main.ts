@@ -893,7 +893,7 @@ async function main() {
     devLogCreateTaskAssigneeResolveChecks();
     devLogTransferCommentFixChecks();
     devLogCreateTaskTitleDescriptionChecks();
-    devLogCreateTaskNormalizeChecks();
+    await devLogCreateTaskNormalizeChecks();
   }
   startTaskNotificationScheduler(bot);
 

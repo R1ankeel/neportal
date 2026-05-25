@@ -207,7 +207,7 @@ export async function resolveIntent(
   switch (intent.intent) {
     case "create_task": {
       const creatorId = currentUser.id;
-      const payload = normalizeCreateTaskPayload(intent.payload, {
+      const payload = await normalizeCreateTaskPayload(intent.payload, {
         userText,
       });
 

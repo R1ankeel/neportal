@@ -1,10 +1,13 @@
 import type { AiIntent } from "../../ai-contracts";
+import { applyCreateTaskTitleDescriptionFix } from "../../fix-ai-intent-create-task";
 import { createTaskAssigneeNeedsClarification } from "../../create-task-assignee-resolve";
 import { devLog } from "../../dev-log";
 import { fixAiIntentBeforeValidation } from "../../fix-ai-intent-deadline";
-import { extractOrdinalWeekdayNextMonth } from "../../parse-ru-date";
+import { extractOrdinalWeekdayDate } from "../../parse-ru-date";
 import { SELF_HINT_MARKER } from "../../resolve-users-by-hint";
-import { postProcessCreateTaskPayload } from "./create-task-normalize";
+import { needsLlmDeadlineResolution } from "./create-task-deadline-llm";
+import { resolveCreateTaskDeadlineDevMock } from "./create-task-deadline-llm";
+import { postProcessCreateTaskPayloadAsync } from "./create-task-normalize";
 
 const BASE_DATE = "2026-05-25";
 
@@ -18,7 +21,13 @@ const ORDINAL_DATE_CASES: ReadonlyArray<{ text: string; expected: string }> = [
   { text: "ко второй среде следующего месяца", expected: "2026-06-10" },
   { text: "на первый понедельник следующего месяца", expected: "2026-06-01" },
   { text: "в следующем месяце в первую пятницу", expected: "2026-06-05" },
+  { text: "на первую пятницу июля", expected: "2026-07-03" },
+  { text: "на вторую среду июля", expected: "2026-07-08" },
+  { text: "на последнюю пятницу июля", expected: "2026-07-31" },
 ];
+
+const JULY_TEXT =
+  "Создай Маше задачу на первую пятницу июля сделать отчёт по продажам";
 
 const ORIGINAL_CASE_1 =
   "Создай Маше задачу на первую пятницу следующего месяца сделать отчёт по продажам";
@@ -114,6 +123,51 @@ const NORMALIZE_CASES: NormalizeCase[] = [
       deadlineDate: "2026-06-05",
     },
   },
+  {
+    name: "case6 july first friday",
+    userText: JULY_TEXT,
+    payload: {
+      title: "Сделать отчёт по продажам",
+      description: null,
+      deadlineDate: "2026-05-29",
+      assigneeHint: "Маше",
+    },
+    expect: {
+      title: "Сделать отчёт по продажам",
+      description: null,
+      deadlineDate: "2026-07-03",
+    },
+  },
+  {
+    name: "case7 july first friday at end",
+    userText: "Создай Маше задачу сделать отчёт по продажам на первую пятницу июля",
+    payload: {
+      title: "Сделать отчёт по продажам на первую пятницу июля",
+      description: null,
+      deadlineDate: "2026-05-29",
+      assigneeHint: "Маше",
+    },
+    expect: {
+      title: "Сделать отчёт по продажам",
+      description: null,
+      deadlineDate: "2026-07-03",
+    },
+  },
+  {
+    name: "case8 july first friday supplemental description",
+    userText: "Создай Маше задачу на первую пятницу июля сделать отчёт. Собрать данные из CRM.",
+    payload: {
+      title: "На первую пятницу июля сделать отчёт",
+      description: null,
+      deadlineDate: "2026-05-29",
+      assigneeHint: "Маше",
+    },
+    expect: {
+      title: "Сделать отчёт",
+      description: "Собрать данные из CRM",
+      deadlineDate: "2026-07-03",
+    },
+  },
 ];
 
 function clonePayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -122,7 +176,7 @@ function clonePayload(payload: Record<string, unknown>): Record<string, unknown>
 
 function runOrdinalDateChecks(): void {
   for (const { text, expected } of ORDINAL_DATE_CASES) {
-    const match = extractOrdinalWeekdayNextMonth(text, BASE_DATE);
+    const match = extractOrdinalWeekdayDate(text, BASE_DATE);
     const ok = match?.deadlineDate === expected;
     devLog(`create_task ordinal date ${ok ? "OK" : "FAIL"}: ${text.slice(0, 48)}`, {
       expected,
@@ -130,6 +184,28 @@ function runOrdinalDateChecks(): void {
       matchedText: match?.matchedText,
     });
   }
+}
+
+function runNeedsLlmChecks(): void {
+  const julyOk = needsLlmDeadlineResolution(JULY_TEXT) === false;
+  devLog(`create_task needsLlm июля deterministic ${julyOk ? "OK" : "FAIL"}`, {});
+
+  const tomorrowOk =
+    needsLlmDeadlineResolution("создай задачу на завтра сделать отчёт") === false;
+  devLog(`create_task needsLlm завтра only ${tomorrowOk ? "OK" : "FAIL"}`, {});
+
+  const fridayOk =
+    needsLlmDeadlineResolution("создай Маше задачу до пятницы сделать отчёт") === false;
+  devLog(`create_task needsLlm до пятницы ${fridayOk ? "OK" : "FAIL"}`, {});
+}
+
+function runJulyMockCheck(): void {
+  const mock = resolveCreateTaskDeadlineDevMock(JULY_TEXT, BASE_DATE);
+  const ok = mock?.deadlineDate === "2026-07-03";
+  devLog(`create_task mock july first friday ${ok ? "OK" : "FAIL"}`, {
+    got: mock?.deadlineDate ?? null,
+    datePhrase: mock?.datePhrase,
+  });
 }
 
 function assertPayload(
@@ -157,10 +233,10 @@ function assertPayload(
   });
 }
 
-function runNormalizeCases(): void {
+async function runNormalizeCases(): Promise<void> {
   for (const testCase of NORMALIZE_CASES) {
     const payload = clonePayload(testCase.payload);
-    postProcessCreateTaskPayload(payload, {
+    await postProcessCreateTaskPayloadAsync(payload, {
       userText: testCase.userText,
       baseDate: BASE_DATE,
     });
@@ -168,14 +244,17 @@ function runNormalizeCases(): void {
   }
 }
 
-function runRegressionCases(): void {
+async function runRegressionCases(): Promise<void> {
   const tomorrowText = "создай Маше задачу на завтра сделать отчёт";
   const tomorrowPayload: Record<string, unknown> = {
     title: "На завтра сделать отчёт",
     deadlineDate: "2026-05-30",
     assigneeHint: "Маше",
   };
-  postProcessCreateTaskPayload(tomorrowPayload, { userText: tomorrowText, baseDate: BASE_DATE });
+  await postProcessCreateTaskPayloadAsync(tomorrowPayload, {
+    userText: tomorrowText,
+    baseDate: BASE_DATE,
+  });
   devLog(
     `create_task regression завтра ${tomorrowPayload.deadlineDate === "2026-05-26" ? "OK" : "FAIL"}`,
     { got: tomorrowPayload.deadlineDate, title: tomorrowPayload.title },
@@ -187,7 +266,10 @@ function runRegressionCases(): void {
     deadlineDate: "2026-06-05",
     assigneeHint: "Маше",
   };
-  postProcessCreateTaskPayload(fridayPayload, { userText: fridayText, baseDate: BASE_DATE });
+  await postProcessCreateTaskPayloadAsync(fridayPayload, {
+    userText: fridayText,
+    baseDate: BASE_DATE,
+  });
   const fridayOk =
     typeof fridayPayload.deadlineDate === "string" &&
     fridayPayload.deadlineDate >= "2026-05-25" &&
@@ -203,7 +285,7 @@ function runRegressionCases(): void {
     deadlineDate: "2026-05-29",
     assigneeHint: "Маше",
   };
-  postProcessCreateTaskPayload(absPayload, { userText: absText, baseDate: BASE_DATE });
+  await postProcessCreateTaskPayloadAsync(absPayload, { userText: absText, baseDate: BASE_DATE });
   devLog(
     `create_task regression 25.06.2026 ${absPayload.deadlineDate === "2026-06-25" ? "OK" : "FAIL"}`,
     { got: absPayload.deadlineDate, title: absPayload.title },
@@ -248,10 +330,10 @@ function runRegressionCases(): void {
   );
 }
 
-function runFixAiIntentFlowCheck(): void {
+async function runFixAiIntentFlowCheck(): Promise<void> {
   const userText =
     "Создай Маше задачу на первую пятницу следующего месяца сделать отчёт по продажам.";
-  const fixed = fixAiIntentBeforeValidation(
+  let fixed = fixAiIntentBeforeValidation(
     {
       intent: "create_task",
       confidence: 0.9,
@@ -266,6 +348,11 @@ function runFixAiIntentFlowCheck(): void {
     { userText, baseDate: BASE_DATE },
   ) as Extract<AiIntent, { intent: "create_task" }>;
 
+  const payload = { ...fixed.payload };
+  await postProcessCreateTaskPayloadAsync(payload, { userText, baseDate: BASE_DATE });
+  applyCreateTaskTitleDescriptionFix(payload);
+  fixed = { ...fixed, payload };
+
   const ok =
     fixed.payload.deadlineDate === "2026-06-05" &&
     fixed.payload.title === "Сделать отчёт по продажам" &&
@@ -273,12 +360,39 @@ function runFixAiIntentFlowCheck(): void {
   devLog(`create_task fixAiIntent flow ${ok ? "OK" : "FAIL"}`, {
     got: fixed.payload,
   });
+
+  const julyPayload: Record<string, unknown> = {
+    title: "Сделать отчёт по продажам",
+    deadlineDate: "2026-05-29",
+    assigneeHint: "Маше",
+  };
+  await postProcessCreateTaskPayloadAsync(julyPayload, {
+    userText: JULY_TEXT,
+    baseDate: BASE_DATE,
+  });
+  devLog(
+    `create_task july flow ${julyPayload.deadlineDate === "2026-07-03" ? "OK" : "FAIL"}`,
+    { got: julyPayload },
+  );
 }
 
 /** Dev self-checks для post-processing create_task (BOT_DEV_SELF_CHECKS=true). */
-export function devLogCreateTaskNormalizeChecks(): void {
-  runOrdinalDateChecks();
-  runNormalizeCases();
-  runRegressionCases();
-  runFixAiIntentFlowCheck();
+export async function devLogCreateTaskNormalizeChecks(): Promise<void> {
+  const prevMock = process.env.BOT_DEV_MOCK_DEADLINE_LLM;
+  process.env.BOT_DEV_MOCK_DEADLINE_LLM = "true";
+
+  try {
+    runOrdinalDateChecks();
+    runNeedsLlmChecks();
+    runJulyMockCheck();
+    await runNormalizeCases();
+    await runRegressionCases();
+    await runFixAiIntentFlowCheck();
+  } finally {
+    if (prevMock === undefined) {
+      delete process.env.BOT_DEV_MOCK_DEADLINE_LLM;
+    } else {
+      process.env.BOT_DEV_MOCK_DEADLINE_LLM = prevMock;
+    }
+  }
 }

@@ -3,7 +3,8 @@ export const CREATE_TASK_PROMPT = `Intent: create_task.
 Payload: { projectHint?, assigneeHint?, assigneeUserId?, title, description?, deadlineDate? }
 
 Правила:
-- assigneeHint отдельно от title; «мне» → "__self__"; фразы срока → только deadlineDate.
+- assigneeHint отдельно от title; «мне» → "__self__"; фразы срока → только deadlineDate (ISO YYYY-MM-DD).
+- Сложные сроки («первая пятница июля», «через 2 месяца») — точная календарная дата, не ближайший weekday от сегодня.
 - title — действие/результат задачи, не дата и не «первая пятница следующего месяца».
 - description — только доп. детали исполнения; если их нет — null/пусто; не дублируй title и не повторяй фразу срока.
 - Не помещай deadline phrase в title или description.

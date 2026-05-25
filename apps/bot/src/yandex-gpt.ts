@@ -10,6 +10,8 @@ import { logAiProviderError } from "./ai/provider/http";
 import { getAiProviderState, getPrimaryAiProvider } from "./ai/provider/registry";
 import type { AiProvider } from "./ai/provider/types";
 import { resolvePromptGroup, type PromptGroup } from "./ai/prompt-group-router";
+import { postProcessCreateTaskPayloadAsync } from "./ai/postprocess/create-task-normalize";
+import { applyCreateTaskTitleDescriptionFix } from "./fix-ai-intent-create-task";
 import { fixAiIntentBeforeValidation } from "./fix-ai-intent-deadline";
 import {
   warnLongCreateTaskTitleWithoutDescription,
@@ -472,10 +474,29 @@ export async function parseTextIntent(
     return { ok: false, kind: extracted.kind };
   }
 
-  const fixed = fixAiIntentBeforeValidation(extracted.parsed, {
+  let fixed = fixAiIntentBeforeValidation(extracted.parsed, {
     baseDate: extracted.context.currentDate,
     userText: userText.trim(),
   });
+
+  if (
+    typeof fixed === "object" &&
+    fixed !== null &&
+    !Array.isArray(fixed) &&
+    (fixed as { intent?: unknown }).intent === "create_task" &&
+    typeof (fixed as { payload?: unknown }).payload === "object" &&
+    (fixed as { payload?: unknown }).payload !== null &&
+    !Array.isArray((fixed as { payload?: unknown }).payload)
+  ) {
+    const fixedObj = fixed as { payload: Record<string, unknown> };
+    const payload = { ...fixedObj.payload };
+    await postProcessCreateTaskPayloadAsync(payload, {
+      userText: userText.trim(),
+      baseDate: extracted.context.currentDate,
+    });
+    applyCreateTaskTitleDescriptionFix(payload);
+    fixed = { ...fixedObj, payload };
+  }
 
   const validated = safeParseAiIntent(fixed);
   if (!validated.success) {

@@ -1,34 +1,50 @@
 import type { AiIntent } from "./ai-contracts";
 import { devLog } from "./dev-log";
+import {
+  resolveCreateTaskDeadlineAsync,
+  resolveCreateTaskDeadlineTrivial,
+} from "./ai/postprocess/create-task-normalize";
 
 type CreateTaskPayload = Extract<AiIntent, { intent: "create_task" }>["payload"];
 import {
   coerceDeadlineDateLoose,
   extractDeadlineFromRussianText,
-  hasRussianDateHint,
-  resolveDeadlineFromUserMessage,
+  isIsoDateString,
   stripDeadlineMarkersFromText,
   todayIsoDate,
 } from "./parse-ru-date";
 
-/** Дополняет payload, если модель положила «завтра» в description вместо deadlineDate. */
-export function normalizeCreateTaskPayload(
+/** Дополняет payload; не перетирает deadline, уже заданный post-processing. */
+export async function normalizeCreateTaskPayload(
   payload: CreateTaskPayload,
   opts?: { userText?: string; baseDate?: string },
-): CreateTaskPayload {
+): Promise<CreateTaskPayload> {
   const baseDate = opts?.baseDate ?? todayIsoDate();
   let { title, description, deadlineDate, ...rest } = payload;
 
   const userText = opts?.userText?.trim();
-  if (userText && hasRussianDateHint(userText)) {
-    const fromUser = resolveDeadlineFromUserMessage(userText, baseDate);
-    if (fromUser) deadlineDate = fromUser;
+  const existingDeadline =
+    typeof deadlineDate === "string" && isIsoDateString(deadlineDate.trim())
+      ? deadlineDate.trim()
+      : undefined;
+
+  if (!existingDeadline && userText) {
+    const resolved = await resolveCreateTaskDeadlineAsync(
+      { title, description, deadlineDate },
+      userText,
+      baseDate,
+    );
+    if (resolved.deadlineDate) {
+      deadlineDate = resolved.deadlineDate;
+    }
+  } else if (existingDeadline) {
+    deadlineDate = existingDeadline;
   } else if (deadlineDate) {
     deadlineDate = coerceDeadlineDateLoose(deadlineDate, baseDate);
   }
 
   const combined = [title, description].filter(Boolean).join(" ");
-  if (!deadlineDate) {
+  if (!deadlineDate && combined) {
     const extracted = extractDeadlineFromRussianText(combined, baseDate);
     if (extracted.deadlineDate) {
       deadlineDate = extracted.deadlineDate;
@@ -46,6 +62,32 @@ export function normalizeCreateTaskPayload(
           ? cleanedDesc
           : undefined;
     }
+  }
+
+  return { ...rest, title, description, deadlineDate };
+}
+
+/** Sync normalize без LLM (если deadline уже есть). */
+export function normalizeCreateTaskPayloadSync(
+  payload: CreateTaskPayload,
+  opts?: { userText?: string; baseDate?: string },
+): CreateTaskPayload {
+  const baseDate = opts?.baseDate ?? todayIsoDate();
+  let { title, description, deadlineDate, ...rest } = payload;
+
+  const userText = opts?.userText?.trim();
+  const existingDeadline =
+    typeof deadlineDate === "string" && isIsoDateString(deadlineDate.trim())
+      ? deadlineDate.trim()
+      : undefined;
+
+  if (!existingDeadline && userText) {
+    const trivial = resolveCreateTaskDeadlineTrivial(userText, baseDate);
+    if (trivial.deadlineDate) deadlineDate = trivial.deadlineDate;
+  } else if (existingDeadline) {
+    deadlineDate = existingDeadline;
+  } else if (deadlineDate) {
+    deadlineDate = coerceDeadlineDateLoose(deadlineDate, baseDate);
   }
 
   return { ...rest, title, description, deadlineDate };

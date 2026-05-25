@@ -1,6 +1,6 @@
 import { normalizeBasicTaskTitle } from "../deterministic/basic-create-task-text";
 import {
-  extractOrdinalWeekdayNextMonth,
+  extractOrdinalWeekdayDate,
   hasRussianDateHint,
   stripDeadlineMarkersFromText,
   type OrdinalWeekdayNextMonthMatch,
@@ -120,7 +120,7 @@ export function recoverCreateTaskTitleFromOriginalText(
   if (opts.matchedText) {
     text = stripMatchedDateExpression(text, opts.matchedText);
   } else if (opts.baseDate) {
-    const ordinal = extractOrdinalWeekdayNextMonth(text, opts.baseDate);
+    const ordinal = extractOrdinalWeekdayDate(text, opts.baseDate);
     if (ordinal) text = stripMatchedDateExpression(text, ordinal.matchedText);
   }
 
@@ -192,7 +192,7 @@ export function cleanupDescriptionAfterDeadline(
     cleaned = stripMatchedDateExpression(cleaned, opts.matchedText);
   }
   if (opts.baseDate) {
-    const ordinal = extractOrdinalWeekdayNextMonth(cleaned, opts.baseDate);
+    const ordinal = extractOrdinalWeekdayDate(cleaned, opts.baseDate);
     if (ordinal) cleaned = stripMatchedDateExpression(cleaned, ordinal.matchedText);
   }
 
@@ -225,7 +225,7 @@ export function extractSupplementalDescriptionFromUserText(
   if (opts.matchedText) {
     text = stripMatchedDateExpression(text, opts.matchedText);
   } else if (opts.baseDate) {
-    const ordinal = extractOrdinalWeekdayNextMonth(text, opts.baseDate);
+    const ordinal = extractOrdinalWeekdayDate(text, opts.baseDate);
     if (ordinal) text = stripMatchedDateExpression(text, ordinal.matchedText);
   }
 
@@ -264,7 +264,7 @@ export function stripDateFromTitle(
   if (ordinalMatch) {
     out = stripMatchedDateExpression(out, ordinalMatch.matchedText);
   } else if (baseDate) {
-    const ordinal = extractOrdinalWeekdayNextMonth(out, baseDate);
+    const ordinal = extractOrdinalWeekdayDate(out, baseDate);
     if (ordinal) out = stripMatchedDateExpression(out, ordinal.matchedText);
   }
   const stripped = stripDeadlineMarkersFromText(out);

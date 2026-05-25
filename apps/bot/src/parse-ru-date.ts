@@ -23,6 +23,23 @@ export function parseRuDate(input: string): string | null {
   return `${year}-${mm}-${dd}`;
 }
 
+/** Парсит DD.MM относительно baseDate: текущий год, если дата не в прошлом, иначе следующий. */
+export function parseRuDateInFuture(input: string, baseDate: string): string | null {
+  const m = input.trim().match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/);
+  if (!m) return null;
+
+  if (m[3]) return parseRuDate(input);
+
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const [baseYear] = baseDate.split("-").map(Number);
+  const currentYearIso = parseRuDate(`${day}.${month}.${baseYear}`);
+  if (!currentYearIso) return null;
+  if (currentYearIso >= baseDate) return currentYearIso;
+
+  return parseRuDate(`${day}.${month}.${baseYear + 1}`);
+}
+
 /** Сегодня в UTC как YYYY-MM-DD. */
 export function todayIsoDate(): string {
   const now = new Date();
@@ -79,9 +96,9 @@ export function nthDayOfNextCalendarMonth(baseIso: string, day: number): string 
   return `${yy}-${mm}-${dd}`;
 }
 
-const NEXT_CALENDAR_MONTH_RE =
+export const NEXT_CALENDAR_MONTH_RE =
   /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?|следующ(?:ий|ем)\s+месяц(?:е)?/iu;
-const THROUGH_ONE_MONTH_RE = /через\s+месяц/iu;
+export const THROUGH_ONE_MONTH_RE = /через\s+месяц/iu;
 const NEXT_MONTH_DAY_RE =
   /(?:в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?.*?(?:до\s+)?(\d{1,2})\s*числ/iu;
 
@@ -179,7 +196,7 @@ export type OrdinalWeekdayNextMonthMatch = {
   matchedText: string;
   matchedStart: number;
   matchedEnd: number;
-  source: "ordinal-weekday-next-month";
+  source: "ordinal-weekday-next-month" | "ordinal-weekday-named-month";
 };
 
 const ORDINAL_NEXT_MONTH_FRAGMENT =
@@ -203,6 +220,29 @@ const ORDINAL_REVERSED_ORDER_RE = new RegExp(
   "giu",
 );
 
+const MONTH_NAME_FRAGMENT =
+  "(?:январ(?:я|е)?|феврал(?:я|е)?|март(?:а|е)?|апрел(?:я|е)?|ма(?:я|е)|июн(?:я|е)?|июл(?:я|е)?|август(?:а|е)?|сентябр(?:я|е)?|октябр(?:я|е)?|ноябр(?:я|е)?|декабр(?:я|е)?)";
+
+const MONTH_NAME_PATTERNS: ReadonlyArray<{ pattern: RegExp; month: number }> = [
+  { pattern: /январ/u, month: 1 },
+  { pattern: /феврал/u, month: 2 },
+  { pattern: /март/u, month: 3 },
+  { pattern: /апрел/u, month: 4 },
+  { pattern: /ма(?:я|е)$/u, month: 5 },
+  { pattern: /июн/u, month: 6 },
+  { pattern: /июл/u, month: 7 },
+  { pattern: /август/u, month: 8 },
+  { pattern: /сентябр/u, month: 9 },
+  { pattern: /октябр/u, month: 10 },
+  { pattern: /ноябр/u, month: 11 },
+  { pattern: /декабр/u, month: 12 },
+];
+
+const ORDINAL_NAMED_MONTH_RE = new RegExp(
+  `${ORDINAL_OPTIONAL_PREP}(${ORDINAL_ORDINAL_FRAGMENT})\\s+(${ORDINAL_WEEKDAY_FRAGMENT})\\s+(${MONTH_NAME_FRAGMENT})`,
+  "giu",
+);
+
 type OrdinalWeekdayKind = 1 | 2 | 3 | 4 | "last";
 
 function parseOrdinalWeekdayKind(fragment: string): OrdinalWeekdayKind | null {
@@ -219,6 +259,43 @@ function lastDayOfCalendarMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+function resolveOrdinalWeekdayInCalendarMonth(
+  year: number,
+  month: number,
+  targetDow: number,
+  ordinal: OrdinalWeekdayKind,
+): string | null {
+  const monthIndex = month - 1;
+  const daysInMonth = lastDayOfCalendarMonth(year, month);
+
+  let firstDowDay = 1;
+  while (firstDowDay <= daysInMonth) {
+    const dow = new Date(Date.UTC(year, monthIndex, firstDowDay)).getUTCDay();
+    if (dow === targetDow) break;
+    firstDowDay++;
+  }
+  if (firstDowDay > daysInMonth) return null;
+
+  const targetDay =
+    ordinal === "last"
+      ? (() => {
+          let last = firstDowDay;
+          let candidate = firstDowDay + 7;
+          while (candidate <= daysInMonth) {
+            last = candidate;
+            candidate += 7;
+          }
+          return last;
+        })()
+      : firstDowDay + 7 * (ordinal - 1);
+
+  if (targetDay > daysInMonth) return null;
+
+  const mm = String(month).padStart(2, "0");
+  const dd = String(targetDay).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
+
 /** N-й (или последний) weekday в следующем календарном месяце относительно baseDate. */
 export function resolveOrdinalWeekdayInNextMonth(
   baseDate: string,
@@ -227,35 +304,7 @@ export function resolveOrdinalWeekdayInNextMonth(
 ): string | null {
   const monthStart = firstDayOfNextCalendarMonth(baseDate);
   const [y, m] = monthStart.split("-").map(Number);
-  const monthIndex = m - 1;
-  const daysInMonth = lastDayOfCalendarMonth(y, m);
-
-  let firstDowDay = 1;
-  while (firstDowDay <= daysInMonth) {
-    const dow = new Date(Date.UTC(y, monthIndex, firstDowDay)).getUTCDay();
-    if (dow === targetDow) break;
-    firstDowDay++;
-  }
-  if (firstDowDay > daysInMonth) return null;
-
-  if (ordinal === "last") {
-    let last = firstDowDay;
-    let candidate = firstDowDay + 7;
-    while (candidate <= daysInMonth) {
-      last = candidate;
-      candidate += 7;
-    }
-    const mm = String(m).padStart(2, "0");
-    const dd = String(last).padStart(2, "0");
-    return `${y}-${mm}-${dd}`;
-  }
-
-  const targetDay = firstDowDay + 7 * (ordinal - 1);
-  if (targetDay > daysInMonth) return null;
-
-  const mm = String(m).padStart(2, "0");
-  const dd = String(targetDay).padStart(2, "0");
-  return `${y}-${mm}-${dd}`;
+  return resolveOrdinalWeekdayInCalendarMonth(y, m, targetDow, ordinal);
 }
 
 function tryExtractOrdinalWeekdayMatch(
@@ -300,14 +349,75 @@ export function extractOrdinalWeekdayNextMonth(
   return tryExtractOrdinalWeekdayMatch(trimmed, baseDate, ORDINAL_REVERSED_ORDER_RE);
 }
 
+function parseMonthName(fragment: string): number | null {
+  const lower = fragment.toLowerCase().replace(/ё/g, "е");
+  for (const { pattern, month } of MONTH_NAME_PATTERNS) {
+    if (pattern.test(lower)) return month;
+  }
+  return null;
+}
+
+function resolveNamedMonthYear(baseDate: string, targetIsoHint?: string): number {
+  const [baseYear] = baseDate.split("-").map(Number);
+  if (targetIsoHint && targetIsoHint >= baseDate) return baseYear;
+  if (targetIsoHint) return baseYear + 1;
+  return baseYear;
+}
+
+/** «Первая пятница июля» относительно baseDate: текущий год, если дата не в прошлом, иначе следующий. */
+export function extractOrdinalWeekdayNamedMonth(
+  text: string,
+  baseDate: string,
+): OrdinalWeekdayNextMonthMatch | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  ORDINAL_NAMED_MONTH_RE.lastIndex = 0;
+  const match = ORDINAL_NAMED_MONTH_RE.exec(trimmed);
+  if (!match) return null;
+
+  const ordinal = parseOrdinalWeekdayKind(match[1] ?? "");
+  const dow = getWeekdayMentionDow(match[2] ?? "");
+  const month = parseMonthName(match[3] ?? "");
+  if (ordinal === null || dow === null || month === null) return null;
+
+  const [baseYear] = baseDate.split("-").map(Number);
+  const currentYearDate = resolveOrdinalWeekdayInCalendarMonth(baseYear, month, dow, ordinal);
+  const year = resolveNamedMonthYear(baseDate, currentYearDate ?? undefined);
+  const deadlineDate =
+    year === baseYear
+      ? currentYearDate
+      : resolveOrdinalWeekdayInCalendarMonth(year, month, dow, ordinal);
+  if (!deadlineDate) return null;
+
+  const matchedText = match[0];
+  return {
+    deadlineDate,
+    matchedText,
+    matchedStart: match.index,
+    matchedEnd: match.index + matchedText.length,
+    source: "ordinal-weekday-named-month",
+  };
+}
+
+export function extractOrdinalWeekdayDate(
+  text: string,
+  baseDate: string,
+): OrdinalWeekdayNextMonthMatch | null {
+  return (
+    extractOrdinalWeekdayNextMonth(text, baseDate) ??
+    extractOrdinalWeekdayNamedMonth(text, baseDate)
+  );
+}
+
 /** Есть ли в тексте явная отсылка к сроку (день недели, завтра, дата). */
 export function hasRussianDateHint(text: string): boolean {
   const lower = text.toLowerCase();
   if (/послезавтра|завтра|сегодня/u.test(lower)) return true;
   if (THROUGH_ONE_MONTH_RE.test(lower) || NEXT_CALENDAR_MONTH_RE.test(lower)) return true;
   if (getWeekdayMentionDow(text) !== null) return true;
-  if (/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/iu.test(text)) return true;
-  if (/\d{4}-\d{2}-\d{2}/.test(text) || /\d{1,2}\.\d{1,2}\.\d{4}/.test(text)) return true;
+  if (/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}(?:\.\d{4})?/iu.test(text)) return true;
+  if (/\d{4}-\d{2}-\d{2}/.test(text) || /\d{1,2}\.\d{1,2}(?:\.\d{4})?/.test(text)) return true;
   return false;
 }
 
@@ -319,7 +429,7 @@ export function resolveDeadlineFromUserMessage(
   const trimmed = userText.trim();
   if (!trimmed) return null;
 
-  const ordinal = extractOrdinalWeekdayNextMonth(trimmed, baseDate);
+  const ordinal = extractOrdinalWeekdayDate(trimmed, baseDate);
   if (ordinal) return ordinal.deadlineDate;
 
   const dow = getWeekdayMentionDow(trimmed);
@@ -341,15 +451,18 @@ export function coerceDeadlineDateLoose(
 
   const baseHint = trimmed.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? baseDate;
 
-  const weekday = extractWeekdayFromText(trimmed, baseHint);
-  if (weekday) return weekday;
+  const ordinal = extractOrdinalWeekdayDate(trimmed, baseHint);
+  if (ordinal) return ordinal.deadlineDate;
 
   const relative = extractDeadlineFromRussianText(trimmed, baseHint);
   if (relative.deadlineDate) return relative.deadlineDate;
 
-  const ruMatch = trimmed.match(/(\d{1,2}\.\d{1,2}\.\d{4})/);
+  const weekday = extractWeekdayFromText(trimmed, baseHint);
+  if (weekday) return weekday;
+
+  const ruMatch = trimmed.match(/(\d{1,2}\.\d{1,2}(?:\.\d{4})?)/);
   if (ruMatch) {
-    const iso = parseRuDate(ruMatch[1]);
+    const iso = parseRuDateInFuture(ruMatch[1], baseHint);
     if (iso) return iso;
   }
 
@@ -363,8 +476,8 @@ export function extractDeadlineFromRussianText(
 ): { deadlineDate: string | null } {
   const lower = text.toLowerCase();
 
-  const weekday = extractWeekdayFromText(text, baseDate);
-  if (weekday) return { deadlineDate: weekday };
+  const ordinal = extractOrdinalWeekdayDate(text, baseDate);
+  if (ordinal) return { deadlineDate: ordinal.deadlineDate };
 
   const monthRelative = extractMonthRelativeDeadline(text, baseDate);
   if (monthRelative.deadlineDate) return monthRelative;
@@ -379,14 +492,17 @@ export function extractDeadlineFromRussianText(
     return { deadlineDate: baseDate };
   }
 
-  const absMatch = text.match(/(?:до|к|на|в)\s+(\d{1,2}\.\d{1,2}\.\d{4})/iu);
+  const absMatch = text.match(/(?:до|к|на|в)?\s*(\d{1,2}\.\d{1,2}(?:\.\d{4})?)/iu);
   if (absMatch) {
-    const iso = parseRuDate(absMatch[1]);
+    const iso = parseRuDateInFuture(absMatch[1], baseDate);
     if (iso) return { deadlineDate: iso };
   }
 
   const isoInText = text.match(/(\d{4}-\d{2}-\d{2})/);
   if (isoInText) return { deadlineDate: isoInText[1] };
+
+  const weekday = extractWeekdayFromText(text, baseDate);
+  if (weekday) return { deadlineDate: weekday };
 
   return { deadlineDate: null };
 }
@@ -414,6 +530,13 @@ function stripPrepositionalDeadlinePhrases(s: string): string {
     ),
     " ",
   );
+  out = out.replace(
+    new RegExp(
+      `${DEADLINE_PREP_BOUNDARY}(?:на|к|ко|до|в)\\s+${ORDINAL_WEEKDAY_FRAGMENT}${DEADLINE_PREP_END}`,
+      "giu",
+    ),
+    " ",
+  );
   for (const { pattern } of WEEKDAY_PATTERNS) {
     out = out.replace(
       new RegExp(
@@ -437,13 +560,18 @@ export function stripDeadlineMarkersFromText(text: string): string | undefined {
   );
   s = s.replace(ORDINAL_STANDARD_ORDER_RE, " ");
   s = s.replace(ORDINAL_REVERSED_ORDER_RE, " ");
+  s = s.replace(ORDINAL_NAMED_MONTH_RE, " ");
   for (const { pattern } of WEEKDAY_PATTERNS) {
     s = s.replace(
       new RegExp(`${DEADLINE_PREP_BOUNDARY}(?:${pattern.source})${DEADLINE_PREP_END}`, "giu"),
       " ",
     );
   }
-  s = s.replace(/(?:до|к|на|в)\s+\d{1,2}\.\d{1,2}\.\d{4}/giu, "");
+  s = s.replace(
+    new RegExp(`${DEADLINE_PREP_BOUNDARY}${ORDINAL_WEEKDAY_FRAGMENT}${DEADLINE_PREP_END}`, "giu"),
+    " ",
+  );
+  s = s.replace(/(?:до|к|на|в)?\s*\d{1,2}\.\d{1,2}(?:\.\d{4})?/giu, "");
   s = s.replace(/\d{4}-\d{2}-\d{2}/g, "");
   s = s.trim().replace(/\s{2,}/g, " ");
   s = s.replace(/^\s*(?:на|к|до|в)\s+/iu, "").trim();
