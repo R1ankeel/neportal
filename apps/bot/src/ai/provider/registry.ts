@@ -1,5 +1,8 @@
 import type { AiProvider, AiProviderId, AiProviderState } from "./types";
+import { createQwenProvider, getQwenAiProviderState } from "./qwen-provider";
 import { createYandexGptProvider, getYandexAiProviderState } from "./yandex-provider";
+
+const SUPPORTED_PROVIDERS: ReadonlySet<string> = new Set(["yandex", "qwen"]);
 
 function normalizeProviderId(raw: string | undefined): string {
   return (raw?.trim() || "yandex").toLowerCase();
@@ -11,29 +14,39 @@ function warnUnknownProvider(requested: string): void {
   );
 }
 
-/** Текущий primary provider id из AI_PROVIDER (default: yandex). */
-export function resolveAiProviderId(): AiProviderId {
-  const id = normalizeProviderId(process.env.AI_PROVIDER);
-  if (id === "yandex") return "yandex";
+function parseAiProviderId(raw: string | undefined): AiProviderId {
+  const id = normalizeProviderId(raw);
+  if (SUPPORTED_PROVIDERS.has(id)) {
+    return id as AiProviderId;
+  }
   warnUnknownProvider(id);
   return "yandex";
 }
 
+/** Текущий primary provider id из AI_PROVIDER (default: yandex). */
+export function resolveAiProviderId(): AiProviderId {
+  return parseAiProviderId(process.env.AI_PROVIDER);
+}
+
 /** Состояние primary provider (enabled / model) без создания HTTP-клиента. */
 export function getAiProviderState(): AiProviderState {
-  const requested = normalizeProviderId(process.env.AI_PROVIDER);
-  if (requested !== "yandex" && requested !== "") {
-    warnUnknownProvider(requested);
+  const id = resolveAiProviderId();
+  switch (id) {
+    case "qwen":
+      return getQwenAiProviderState();
+    case "yandex":
+    default:
+      return getYandexAiProviderState();
   }
-  return getYandexAiProviderState();
 }
 
 /** Primary AI provider для completion-вызовов. */
 export function getPrimaryAiProvider(): AiProvider {
   const id = resolveAiProviderId();
   switch (id) {
+    case "qwen":
+      return createQwenProvider();
     case "yandex":
-      return createYandexGptProvider();
     default:
       return createYandexGptProvider();
   }

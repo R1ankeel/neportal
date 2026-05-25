@@ -57,7 +57,10 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
-| `AI_PROVIDER` | `yandex` | Primary AI provider (`AI_PROVIDER` controls which backend handles `parseTextIntent` and other completions). Сейчас: только `yandex`. Неизвестное значение → предупреждение в лог и fallback на `yandex` |
+| `AI_PROVIDER` | `yandex` | Primary AI provider для `parseTextIntent` и других completions. Значения: `yandex` (по умолчанию), `qwen`. Неизвестное значение → предупреждение в лог и fallback на `yandex` |
+| `QWEN_API_KEY` | — | API key Qwen/DashScope; **обязателен** при `AI_PROVIDER=qwen` |
+| `QWEN_BASE_URL` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | Базовый URL OpenAI-compatible API |
+| `QWEN_MODEL` | `qwen-plus` | Имя модели в `chat/completions` |
 | `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
 | `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
 | `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
@@ -74,7 +77,9 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` → `gpt://{folder}/yandexgpt/latest` |
 | `YANDEX_SPEECHKIT_API_KEY` | Заготовка; голос в боте **не реализован** |
 
-Пустая строка и `change_me` считаются «переменная не задана». Без Yandex бот отвечает на произвольный текст: использовать slash-команды.
+Пустая строка и `change_me` считаются «переменная не задана». Без настроенного AI provider бот отвечает на произвольный текст: использовать slash-команды.
+
+**Qwen:** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
 
 Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md#yandexgpt-опционально).
 

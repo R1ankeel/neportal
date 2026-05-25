@@ -1,4 +1,4 @@
-export type AiProviderId = "yandex";
+export type AiProviderId = "yandex" | "qwen";
 
 export type AiTokenUsage = {
   inputTextTokens: number;
