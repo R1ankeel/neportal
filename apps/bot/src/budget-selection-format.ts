@@ -31,6 +31,6 @@ export function formatBudgetSelectionMessage(
     if (index < candidates.length - 1) lines.push("");
   });
 
-  lines.push("", "Напишите номер бюджета или «отмена».");
+  lines.push("", "Выберите кнопкой ниже или отправьте номер бюджета. Для отмены напишите «отмена».");
   return lines.join("\n");
 }

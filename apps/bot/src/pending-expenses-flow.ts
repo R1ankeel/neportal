@@ -11,6 +11,7 @@ import {
   startPendingExpenseReceiptSelection,
   type PendingExpenseCandidate,
 } from "./pending-expense-receipt-selection";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export function formatExpenseDescription(description: string | null | undefined): string {
   const trimmed = description?.trim();
@@ -55,7 +56,7 @@ export function formatPendingExpensesList(expenses: PendingExpenseCandidate[]): 
 
   lines.push(
     "",
-    "Напишите номер расхода, к которому хотите загрузить чек, или «отмена».",
+    "Выберите расход кнопкой ниже или отправьте номер. Для отмены напишите «отмена».",
   );
   return lines.join("\n");
 }
@@ -75,7 +76,7 @@ export async function showPendingExpenses(
 
   const candidates = expenses.map(toCandidate);
   startPendingExpenseReceiptSelection(telegramUserId, candidates);
-  await ctx.reply(formatPendingExpensesList(candidates));
+  await replyWithActiveChoiceKeyboard(ctx, telegramUserId, formatPendingExpensesList(candidates));
 }
 
 export function formatReceiptUploadPrompt(amount: number, description: string | null | undefined): string {

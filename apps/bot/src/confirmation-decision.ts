@@ -11,6 +11,7 @@ import {
   getPendingConfirmation,
   type PendingConfirmation,
 } from "./pending-intent";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export type ConfirmationDecision = "confirm" | "edit" | "cancel";
 
@@ -116,7 +117,7 @@ export async function handleConfirmationDecision(
     }
 
     const editMessage = enterConfirmationEditMode(telegramUserId, pending);
-    await ctx.reply(editMessage);
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, editMessage);
     return { handled: true };
   }
 

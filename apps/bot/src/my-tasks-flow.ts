@@ -9,6 +9,7 @@ import { formatIsoDateRu } from "./parse-ru-date";
 import { SELF_HINT_MARKER, isSelfHint } from "./resolve-users-by-hint";
 import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export const ONLY_OWN_TASKS_MESSAGE = "Вы можете смотреть только свои задачи.";
 
@@ -167,7 +168,11 @@ export async function replyWithTasksForHint(
       match.users.map(apiUserToCandidate),
       payload,
     );
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return;
   }
 

@@ -27,6 +27,6 @@ export function formatTaskCandidates(candidates: TaskCandidate[]): string {
     if (index < candidates.length - 1) lines.push("");
   });
 
-  lines.push("", "Напишите номер задачи.");
+  lines.push("", "Выберите кнопкой ниже или отправьте номер задачи.");
   return lines.join("\n");
 }

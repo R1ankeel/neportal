@@ -9,6 +9,7 @@ import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejec
 import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
+import { createChoiceId } from "./choice-id";
 
 export type AbsenceCandidate = {
   id: string;
@@ -25,6 +26,7 @@ export type CancelAbsenceSelectionPayload = {
 };
 
 export type PendingAbsenceSelection = {
+  choiceId: string;
   type: "select_absence_for_cancel";
   candidates: AbsenceCandidate[];
   payload: CancelAbsenceSelectionPayload;
@@ -66,6 +68,7 @@ export function startPendingAbsenceSelection(
   clearPendingCreateTaskAssignee(telegramUserId);
   clearPendingAbsenceDelegation(telegramUserId);
   pendingAbsenceSelectionByTelegramUserId.set(telegramUserId, {
+    choiceId: createChoiceId(),
     type: "select_absence_for_cancel",
     candidates,
     payload,

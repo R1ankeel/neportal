@@ -14,8 +14,10 @@ import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
 import { clearPendingExpenseReceiptSelection } from "./pending-expense-receipt-selection";
 import { clearPendingExpenseReceiptUpload } from "./pending-expense-receipt-upload";
 import type { BudgetCandidate } from "./budget-resolver";
+import { createChoiceId } from "./choice-id";
 
 export type PendingBudgetSelection = {
+  choiceId: string;
   type: "select_budget_for_expense";
   candidates: BudgetCandidate[];
   payload: ExpenseSelectionPayload;
@@ -40,7 +42,7 @@ export function isPendingBudgetSelectionExpired(pending: PendingBudgetSelection)
 
 export function startPendingBudgetSelection(
   telegramUserId: number,
-  pending: Omit<PendingBudgetSelection, "type" | "createdAt">,
+  pending: Omit<PendingBudgetSelection, "choiceId" | "type" | "createdAt">,
 ): void {
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskStatusDetails(telegramUserId);
@@ -60,6 +62,7 @@ export function startPendingBudgetSelection(
   pendingByTelegramUserId.set(telegramUserId, {
     type: "select_budget_for_expense",
     ...pending,
+    choiceId: createChoiceId(),
     createdAt: Date.now(),
   });
 }

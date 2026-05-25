@@ -9,6 +9,7 @@ import { fetchBudgets } from "./api";
 import type { ResolvedCreateExpense } from "./intent-resolver";
 import { getPendingConfirmation } from "./pending-intent";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export async function startBudgetSelectionFromExpenseConfirmation(
   ctx: Context,
@@ -46,7 +47,9 @@ export async function startBudgetSelectionFromExpenseConfirmation(
     },
   });
 
-  await ctx.reply(
+  await replyWithActiveChoiceKeyboard(
+    ctx,
+    telegramUserId,
     formatBudgetSelectionMessage(accessible.map(apiBudgetToCandidate), {
       fromConfirmation: true,
     }),

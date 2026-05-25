@@ -39,6 +39,7 @@ import {
   notifyTransferPending,
   notifyTransferRejected,
 } from "./task-notifications";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 const TRANSFER_PARTS_RE = /\s*(?:\||—|–|-)\s*/u;
 
@@ -203,7 +204,11 @@ export async function handleTransferSlashCommand(
         comment: parsed.comment,
       },
     );
-    await ctx.reply(formatUserCandidates(userMatch.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(userMatch.users.map(apiUserToCandidate)),
+    );
     return { kind: "user_selection_started" };
   }
 

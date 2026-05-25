@@ -40,6 +40,7 @@ import {
 } from "./user-hint-resolution";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { fetchUsers } from "./api";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 type ParsedEdit = { key: string; value: string };
 
@@ -126,7 +127,9 @@ async function reconfirmAfterEdit(
             source: "TELEGRAM_TEXT",
           },
         });
-        await ctx.reply(
+        await replyWithActiveChoiceKeyboard(
+          ctx,
+          telegramUserId,
           formatBudgetSelectionMessage(expenseResult.candidates, {
             ambiguous: expenseResult.ambiguous,
           }),
@@ -310,7 +313,11 @@ async function handleAwaitValue(
   const fieldKey = editPending.field;
   if (!fieldKey) {
     setConfirmationEditStep(telegramUserId, "select_field");
-    await ctx.reply(formatFieldSelectionMessage(editPending.fields));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatFieldSelectionMessage(editPending.fields),
+    );
     return true;
   }
 
@@ -358,7 +365,11 @@ export async function handlePendingConfirmationEditMessage(
   if (isConfirmationEdit(text)) {
     if (editPending.fields.length > 0) {
       setConfirmationEditStep(telegramUserId, "select_field");
-      await ctx.reply(formatFieldSelectionMessage(editPending.fields));
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramUserId,
+        formatFieldSelectionMessage(editPending.fields),
+      );
     } else {
       await ctx.reply(getLegacyEditHint(editPending.originalConfirmation.intent));
     }

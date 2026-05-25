@@ -8,6 +8,7 @@ import {
 } from "./pending-user-selection";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export async function handleCancelAbsenceSlashCommand(
   ctx: Context,
@@ -38,7 +39,11 @@ export async function handleCancelAbsenceSlashCommand(
       match.users.map(apiUserToCandidate),
       { intent: "cancel_absence" },
     );
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return;
   }
 

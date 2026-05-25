@@ -10,6 +10,7 @@ import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 import { clearPendingBudgetSelection } from "./pending-budget-selection";
+import { createChoiceId } from "./choice-id";
 
 export type PendingTaskSelectionType =
   | "select_task_for_complete"
@@ -51,6 +52,7 @@ export type TaskCandidate = {
 };
 
 export type PendingTaskSelection = {
+  choiceId: string;
   type: PendingTaskSelectionType;
   candidates: TaskCandidate[];
   payload: TaskSelectionPayload;
@@ -99,7 +101,10 @@ export function setPendingTaskSelection(
   telegramUserId: number,
   pending: PendingTaskSelection,
 ): void {
-  pendingSelectionByTelegramUserId.set(telegramUserId, pending);
+  pendingSelectionByTelegramUserId.set(telegramUserId, {
+    ...pending,
+    choiceId: pending.choiceId ?? createChoiceId(),
+  });
 }
 
 export function clearPendingTaskSelection(telegramUserId: number): void {
@@ -129,6 +134,7 @@ export function startPendingTaskSelection(
   clearPendingAbsenceSelection(telegramUserId);
   clearPendingBudgetSelection(telegramUserId);
   setPendingTaskSelection(telegramUserId, {
+    choiceId: createChoiceId(),
     type,
     candidates,
     payload,

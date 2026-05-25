@@ -14,6 +14,7 @@ import {
 import { isPendingDetailsCancel } from "./pending-task-status-details";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 function isBareNumberReply(text: string): boolean {
   return /^\d+$/.test(text.trim());
@@ -79,7 +80,11 @@ export async function handlePendingCreateTaskAssigneeMessage(
         creatorId: pending.creatorId,
       },
     );
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return true;
   }
 

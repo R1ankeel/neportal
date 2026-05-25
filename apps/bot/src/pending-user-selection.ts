@@ -11,6 +11,7 @@ import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
 import { clearPendingBudgetSelection } from "./pending-budget-selection";
 import { clearPendingAbsenceSelection } from "./pending-absence-selection";
+import { createChoiceId } from "./choice-id";
 
 export type PendingUserSelectionType =
   | "select_user_for_task_assignee"
@@ -115,6 +116,7 @@ export type UserSelectionPayload =
   | TaskListUserSelectionPayload;
 
 export type PendingUserSelection = {
+  choiceId: string;
   type: PendingUserSelectionType;
   candidates: UserCandidate[];
   payload: UserSelectionPayload;
@@ -145,7 +147,10 @@ export function setPendingUserSelection(
   telegramUserId: number,
   pending: PendingUserSelection,
 ): void {
-  pendingUserSelectionByTelegramUserId.set(telegramUserId, pending);
+  pendingUserSelectionByTelegramUserId.set(telegramUserId, {
+    ...pending,
+    choiceId: pending.choiceId ?? createChoiceId(),
+  });
 }
 
 export function clearPendingUserSelection(telegramUserId: number): void {
@@ -176,6 +181,7 @@ export function startPendingUserSelection(
   clearPendingAbsenceSelection(telegramUserId);
   clearPendingBudgetSelection(telegramUserId);
   setPendingUserSelection(telegramUserId, {
+    choiceId: createChoiceId(),
     type,
     candidates,
     payload,

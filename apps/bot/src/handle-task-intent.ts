@@ -16,6 +16,7 @@ import {
   buildResolvedCompleteTask,
   startPendingTaskStatusDetails,
 } from "./task-status-flow";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 /** AI intents complete_task / cancel_task / start_task / set_task_deadline с выбором задачи. */
 export async function handleTaskActionIntent(
@@ -59,7 +60,7 @@ export async function handleTaskActionIntent(
   });
 
   if (resolution.kind !== "found") {
-    await ctx.reply(resolveResultToMessage(resolution));
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, resolveResultToMessage(resolution));
     return;
   }
 

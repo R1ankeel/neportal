@@ -20,6 +20,7 @@ import {
 import { isManagerOrOwner } from "./task-transfer-flow";
 import { notifyReassign } from "./task-notifications";
 import { resolveUserByHint } from "./user-hint-resolution";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 const REASSIGN_PARTS_RE = /\s*(?:\||—|–|-)\s*/u;
 
@@ -128,7 +129,7 @@ export async function continueReassignAfterUsersResolved(
   });
 
   if (resolution.kind !== "found") {
-    await ctx.reply(resolveResultToMessage(resolution));
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, resolveResultToMessage(resolution));
     return;
   }
 
@@ -209,7 +210,11 @@ export async function handleReassignSlashCommand(
         fromMatch.users.map(apiUserToCandidate),
         selectionPayload,
       );
-      await ctx.reply(formatUserCandidates(fromMatch.users.map(apiUserToCandidate)));
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramUserId,
+        formatUserCandidates(fromMatch.users.map(apiUserToCandidate)),
+      );
       return { kind: "user_selection_started" };
     }
     fromUser = fromMatch.user;
@@ -237,7 +242,11 @@ export async function handleReassignSlashCommand(
       toMatch.users.map(apiUserToCandidate),
       selectionPayload,
     );
-    await ctx.reply(formatUserCandidates(toMatch.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(toMatch.users.map(apiUserToCandidate)),
+    );
     return { kind: "user_selection_started" };
   }
 

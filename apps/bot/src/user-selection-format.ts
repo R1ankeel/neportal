@@ -11,7 +11,7 @@ export function formatUserCandidates(candidates: UserCandidate[]): string {
     lines.push(`${n}. ${user.fullName} · ${user.role}${username}`);
   });
 
-  lines.push("", "Напишите номер сотрудника.");
+  lines.push("", "Выберите кнопкой ниже или отправьте номер сотрудника.");
   return lines.join("\n");
 }
 

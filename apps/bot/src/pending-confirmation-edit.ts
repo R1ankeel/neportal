@@ -1,12 +1,14 @@
 import type { AiIntent } from "./ai-contracts";
 import type { EditableField } from "./confirmation/editable-fields";
 import type { PendingAiIntent } from "./pending-intent";
+import { createChoiceId } from "./choice-id";
 
 export type ConfirmationEditStep = "select_field" | "await_value";
 
 export type PendingConfirmationEdit = {
   telegramUserId: number;
   confirmationId?: string;
+  choiceId: string;
   intent: AiIntent["intent"];
   step: ConfirmationEditStep;
   field?: string;
@@ -39,6 +41,7 @@ export function startPendingConfirmationEdit(
   pendingEditByTelegramUserId.set(telegramUserId, {
     telegramUserId,
     intent: originalConfirmation.intent.intent,
+    choiceId: createChoiceId(),
     step: "select_field",
     fields,
     originalConfirmation,
@@ -54,6 +57,9 @@ export function setConfirmationEditStep(
   const pending = pendingEditByTelegramUserId.get(telegramUserId);
   if (!pending) return;
   pending.step = step;
+  if (step === "select_field") {
+    pending.choiceId = createChoiceId();
+  }
   if (field !== undefined) {
     pending.field = field;
   } else {

@@ -115,7 +115,7 @@ export function formatFieldSelectionMessage(fields: EditableField[]): string {
   for (let i = 0; i < fields.length; i++) {
     lines.push(`${i + 1}. ${fields[i].label}`);
   }
-  lines.push("", "Напишите номер пункта.");
+  lines.push("", "Выберите кнопкой ниже или отправьте номер пункта.");
   return lines.join("\n");
 }
 

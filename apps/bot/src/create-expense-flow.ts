@@ -14,6 +14,7 @@ import type { ResolvedCreateExpense } from "./intent-resolver";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export type ExpenseSelectionPayload = {
   amount: number;
@@ -142,7 +143,9 @@ export async function beginCreateExpenseFlow(
         source: "TELEGRAM_TEXT",
       },
     });
-    await ctx.reply(
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
       formatBudgetSelectionMessage(result.candidates, {
         ambiguous: result.ambiguous,
       }),

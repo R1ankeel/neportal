@@ -20,6 +20,7 @@ function isAssigneeSelfHint(hint: string): boolean {
   return t === SELF_HINT_MARKER || isSelfHint(t);
 }
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export function resolveUserByHint(
   users: ApiUser[],
@@ -68,7 +69,11 @@ export async function resolveUserHintWithSelection(
     match.users.map(apiUserToCandidate),
     payload,
   );
-  await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+  await replyWithActiveChoiceKeyboard(
+    ctx,
+    telegramUserId,
+    formatUserCandidates(match.users.map(apiUserToCandidate)),
+  );
   return { status: "selection_started" };
 }
 

@@ -23,6 +23,7 @@ import {
   setPendingTaskCommentMissingTask,
 } from "./pending-task-comment-details";
 import { validateAddTaskCommentPayload } from "./validate-add-task-comment-payload";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 const QUESTION_MISSING_TASK = "К какой задаче добавить комментарий?";
 
@@ -71,7 +72,7 @@ export async function handleAddTaskCommentIntent(
   );
 
   if (resolution.kind !== "found") {
-    await ctx.reply(resolveResultToMessage(resolution));
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, resolveResultToMessage(resolution));
     return;
   }
 

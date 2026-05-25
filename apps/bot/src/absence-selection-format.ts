@@ -16,6 +16,6 @@ export function formatAbsenceCandidates(candidates: AbsenceCandidate[]): string 
     if (index < candidates.length - 1) lines.push("");
   });
 
-  lines.push("", "Напишите номер.");
+  lines.push("", "Выберите кнопкой ниже или отправьте номер.");
   return lines.join("\n");
 }

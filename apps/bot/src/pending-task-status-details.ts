@@ -13,7 +13,7 @@ const pendingDetailsByTelegramUserId = new Map<number, PendingTaskStatusDetails>
 
 export const PENDING_TASK_STATUS_DETAILS_TTL_MS = 30 * 60 * 1000;
 
-const DETAILS_CANCEL_RE = /^(?:отмена|отмени|нет|стоп)$/iu;
+const DETAILS_CANCEL_RE = /^(?:отмена|отмени|отменить|cancel|нет|стоп|назад)$/iu;
 
 export function isPendingDetailsCancel(text: string): boolean {
   return DETAILS_CANCEL_RE.test(text.trim());

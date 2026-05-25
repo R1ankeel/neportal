@@ -13,6 +13,7 @@ import {
 import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export function parseSickSlashPayload(
   payload: string,
@@ -162,7 +163,11 @@ export async function handleSickSlashCommand(ctx: Context, payload: string): Pro
       endDate: endIso,
       documentNumber,
     });
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return;
   }
 
@@ -224,7 +229,11 @@ export async function handleVacationSlashCommand(ctx: Context, payload: string):
       startDate: startIso,
       endDate: endIso,
     });
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return;
   }
 

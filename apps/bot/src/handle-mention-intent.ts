@@ -18,6 +18,7 @@ import {
   resolveResultToMessage,
   resolveTaskByTitle,
 } from "./resolve-task-by-title";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 /** AI intent mention_in_task с выбором задачи и уточнением текста. */
 export async function handleMentionInTaskIntent(
@@ -64,7 +65,7 @@ export async function handleMentionInTaskIntent(
   );
 
   if (resolution.kind !== "found") {
-    await ctx.reply(resolveResultToMessage(resolution));
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, resolveResultToMessage(resolution));
     return;
   }
 

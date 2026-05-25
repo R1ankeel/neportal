@@ -32,6 +32,7 @@ import { devLogTransferCommentFixChecks } from "./fix-ai-intent-transfer-comment
 import { devLogCreateTaskTitleDescriptionChecks } from "./normalize-create-task-title-description.dev";
 import { devLogCreateTaskNormalizeChecks } from "./ai/postprocess/create-task-normalize.dev";
 import { devLogConfirmationKeyboardChecks } from "./confirmation-keyboard.dev";
+import { devLogChoiceKeyboardChecks } from "./choice-keyboard.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
@@ -64,6 +65,8 @@ import { replyWithTasksForHint } from "./my-tasks-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import { handleConfirmationCallback } from "./confirmation-callback";
+import { handleChoiceCallback } from "./choice-callback";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -200,7 +203,11 @@ bot.command("link", async (ctx) => {
         match.users.map(apiUserToCandidate),
         { intent: "link_telegram" },
       );
-      await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramId,
+        formatUserCandidates(match.users.map(apiUserToCandidate)),
+      );
       return;
     }
 
@@ -427,7 +434,7 @@ bot.command("done", async (ctx) => {
       "DONE",
     );
     if (result.kind === "reply") {
-      await ctx.reply(result.message);
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       return;
     }
 
@@ -467,7 +474,7 @@ async function runStartTaskSlash(ctx: Context, payload: string): Promise<void> {
       payload,
     );
     if (result.kind === "reply") {
-      await ctx.reply(result.message);
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       return;
     }
 
@@ -514,7 +521,7 @@ bot.command("cancel", async (ctx) => {
       "CANCELLED",
     );
     if (result.kind === "reply") {
-      await ctx.reply(result.message);
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       return;
     }
 
@@ -555,7 +562,7 @@ bot.command("comment", async (ctx) => {
       payload,
     );
     if (result.kind === "reply" || result.kind === "awaiting_text") {
-      await ctx.reply(result.message);
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       return;
     }
 
@@ -600,7 +607,7 @@ bot.command("mention", async (ctx) => {
       result.kind === "user_selection_started"
     ) {
       if (result.kind !== "user_selection_started") {
-        await ctx.reply(result.message);
+        await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       }
       return;
     }
@@ -647,7 +654,7 @@ bot.command("transfer", async (ctx) => {
       result.kind === "user_selection_started"
     ) {
       if (result.kind !== "user_selection_started") {
-        await ctx.reply(result.message);
+        await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       }
       return;
     }
@@ -690,7 +697,7 @@ bot.command("reassign", async (ctx) => {
     );
     if (result.kind === "reply" || result.kind === "user_selection_started") {
       if (result.kind !== "user_selection_started") {
-        await ctx.reply(result.message);
+        await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
       }
       return;
     }
@@ -735,7 +742,7 @@ bot.command("deadline", async (ctx) => {
       payload,
     );
     if (usageOrNull) {
-      await ctx.reply(usageOrNull);
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, usageOrNull);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -874,6 +881,7 @@ bot.on("message:document", async (ctx) => {
 });
 
 bot.on("callback_query:data", async (ctx) => {
+  await handleChoiceCallback(ctx);
   await handleConfirmationCallback(ctx);
 });
 
@@ -900,6 +908,7 @@ async function main() {
     devLogTransferCommentFixChecks();
     devLogCreateTaskTitleDescriptionChecks();
     devLogConfirmationKeyboardChecks();
+    devLogChoiceKeyboardChecks();
     await devLogCreateTaskNormalizeChecks();
   }
   startTaskNotificationScheduler(bot);

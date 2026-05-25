@@ -16,6 +16,7 @@ import {
   resolveUserHintWithSelection,
 } from "./user-hint-resolution";
 import { resolveResultToMessage, resolveTaskByTitle } from "./resolve-task-by-title";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export async function handleTransferTaskIntent(
   ctx: Context,
@@ -61,7 +62,7 @@ export async function handleTransferTaskIntent(
   );
 
   if (resolution.kind !== "found") {
-    await ctx.reply(resolveResultToMessage(resolution));
+    await replyWithActiveChoiceKeyboard(ctx, telegramUserId, resolveResultToMessage(resolution));
     return;
   }
 

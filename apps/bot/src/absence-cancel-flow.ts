@@ -23,6 +23,7 @@ import {
   startPendingUserSelection,
 } from "./pending-user-selection";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export function canCancelAbsence(actor: ApiUser, absenceUserId: string): boolean {
   if (actor.role === "OWNER" || actor.role === "MANAGER") return true;
@@ -166,7 +167,7 @@ export async function continueCancelAbsenceForUser(
     cancelledById: linked.id,
     cancellationReason,
   });
-  await ctx.reply(formatAbsenceCandidates(candidates));
+  await replyWithActiveChoiceKeyboard(ctx, telegramUserId, formatAbsenceCandidates(candidates));
 }
 
 export async function handleCancelAbsenceIntent(
@@ -227,7 +228,11 @@ export async function handleCancelAbsenceIntent(
         cancellationReason,
       },
     );
-    await ctx.reply(formatUserCandidates(match.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(match.users.map(apiUserToCandidate)),
+    );
     return;
   }
 

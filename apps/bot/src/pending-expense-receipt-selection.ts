@@ -12,6 +12,7 @@ import { clearPendingTaskTransferComment } from "./pending-task-transfer-comment
 import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decision";
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingUserSelection } from "./pending-user-selection";
+import { createChoiceId } from "./choice-id";
 
 export type PendingExpenseCandidate = {
   id: string;
@@ -23,6 +24,7 @@ export type PendingExpenseCandidate = {
 };
 
 export type PendingExpenseReceiptSelection = {
+  choiceId: string;
   expenses: PendingExpenseCandidate[];
   createdAt: number;
 };
@@ -70,6 +72,7 @@ export function startPendingExpenseReceiptSelection(
 ): void {
   clearOtherPendingStates(telegramUserId);
   pendingByTelegramUserId.set(telegramUserId, {
+    choiceId: createChoiceId(),
     expenses,
     createdAt: Date.now(),
   });

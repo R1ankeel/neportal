@@ -12,6 +12,7 @@ import {
   startPendingUserSelection,
 } from "./pending-user-selection";
 import { formatUserCandidates } from "./user-selection-format";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 import type { Context } from "grammy";
 import type { ResolvedMentionInTask } from "./intent-resolver";
 import { clearPendingConfirmation } from "./pending-intent";
@@ -188,7 +189,11 @@ export async function handleMentionSlashCommand(
         text: parsed.text,
       },
     );
-    await ctx.reply(formatUserCandidates(userMatch.users.map(apiUserToCandidate)));
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      formatUserCandidates(userMatch.users.map(apiUserToCandidate)),
+    );
     return { kind: "user_selection_started" };
   }
 
