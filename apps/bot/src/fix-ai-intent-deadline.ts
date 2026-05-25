@@ -5,6 +5,7 @@ import { applyCancelAbsenceUserSelfFix } from "./fix-ai-intent-cancel-absence-us
 import { applyCreateTaskAssigneeSelfFix } from "./fix-ai-intent-assignee";
 import { applyAddTaskCommentPayloadFix } from "./fix-ai-intent-add-task-comment";
 import { applyTransferTaskCommentFix } from "./fix-ai-intent-transfer-comment";
+import { postProcessCreateTaskPayload } from "./ai/postprocess/create-task-normalize";
 import {
   applyCreateTaskPayloadCompatibilityFix,
   applyCreateTaskTitleDescriptionFix,
@@ -79,9 +80,12 @@ export function fixAiIntentBeforeValidation(
 
   if (intent === "create_task") {
     applyCreateTaskPayloadCompatibilityFix(p);
-    applyCreateTaskTitleDescriptionFix(p);
     applyCreateTaskAssigneeSelfFix(p, opts.userText);
-    applyDeadlineFields(p, intent as string, opts);
+    postProcessCreateTaskPayload(p, {
+      userText: opts.userText ?? "",
+      baseDate: opts.baseDate,
+    });
+    applyCreateTaskTitleDescriptionFix(p);
   } else if (intent === "create_absence") {
     applyCreateAbsenceUserSelfFix(p, opts.userText);
     applyCreateAbsenceDateFix(p, opts.userText, opts.baseDate);

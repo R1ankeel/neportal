@@ -30,6 +30,7 @@ import { devLogAiProviderHardeningChecks } from "./ai-provider-hardening.dev";
 import { devLogCreateTaskAssigneeResolveChecks } from "./create-task-assignee-resolve.dev";
 import { devLogTransferCommentFixChecks } from "./fix-ai-intent-transfer-comment.dev";
 import { devLogCreateTaskTitleDescriptionChecks } from "./normalize-create-task-title-description.dev";
+import { devLogCreateTaskNormalizeChecks } from "./ai/postprocess/create-task-normalize.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
@@ -892,6 +893,7 @@ async function main() {
     devLogCreateTaskAssigneeResolveChecks();
     devLogTransferCommentFixChecks();
     devLogCreateTaskTitleDescriptionChecks();
+    devLogCreateTaskNormalizeChecks();
   }
   startTaskNotificationScheduler(bot);
 

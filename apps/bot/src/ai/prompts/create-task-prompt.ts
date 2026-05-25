@@ -3,9 +3,10 @@ export const CREATE_TASK_PROMPT = `Intent: create_task.
 Payload: { projectHint?, assigneeHint?, assigneeUserId?, title, description?, deadlineDate? }
 
 Правила:
-- assigneeHint отдельно от title; «мне» → "__self__"; даты → deadlineDate.
-- title — короткое главное действие (3–8 слов), без лишних деталей.
-- description — причины, доп. шаги, контекст; не дублируй title.
+- assigneeHint отдельно от title; «мне» → "__self__"; фразы срока → только deadlineDate.
+- title — действие/результат задачи, не дата и не «первая пятница следующего месяца».
+- description — только доп. детали исполнения; если их нет — null/пусто; не дублируй title и не повторяй фразу срока.
+- Не помещай deadline phrase в title или description.
 - Несколько действий через запятые: первое → title, остальные → description.
 - Не склеивай весь длинный запрос в title. Убери «создай задачу», «пусть» из title.
 
