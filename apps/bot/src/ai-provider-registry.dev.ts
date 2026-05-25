@@ -9,6 +9,7 @@ import {
   mapQwenChatCompletionResponse,
   parseQwenOpenAiUsage,
   qwenStateForDiagnostics,
+  resolveQwenFolderId,
 } from "./ai/provider/qwen-provider";
 
 type EnvSnapshot = Record<string, string | undefined>;
@@ -67,11 +68,19 @@ function devCheckResolveAiProviderId(): void {
 }
 
 function devCheckGetPrimaryAiProvider(): void {
-  withEnv({ AI_PROVIDER: "qwen", QWEN_API_KEY: "test-key-dev-only" }, () => {
+  withEnv(
+    {
+      AI_PROVIDER: "qwen",
+      QWEN_API_KEY: "test-key-dev-only",
+      QWEN_MODEL: "gpt://test-folder/qwen-test/latest",
+      QWEN_AUTH_TYPE: "api-key",
+    },
+    () => {
     const provider = getPrimaryAiProvider();
     const ok = provider.id === "qwen";
     devLog(`getPrimaryAiProvider qwen ${ok ? "OK" : "FAIL"}`, { id: provider.id });
-  });
+    },
+  );
 
   withEnv({ AI_PROVIDER: undefined }, () => {
     const provider = getPrimaryAiProvider();
@@ -81,7 +90,13 @@ function devCheckGetPrimaryAiProvider(): void {
 }
 
 function devCheckQwenStateNoSecrets(): void {
-  withEnv({ QWEN_API_KEY: "secret-should-not-appear", QWEN_MODEL: "qwen-plus" }, () => {
+  withEnv(
+    {
+      QWEN_API_KEY: "secret-should-not-appear",
+      QWEN_MODEL: "gpt://folder-id/qwen-model/latest",
+      QWEN_AUTH_TYPE: "api-key",
+    },
+    () => {
     const state = getQwenState();
     const diag = JSON.stringify(qwenStateForDiagnostics(state));
     const leaksKey = diag.includes("secret-should-not-appear");
@@ -92,7 +107,8 @@ function devCheckQwenStateNoSecrets(): void {
       hasApiKeyField,
       preview: diag.slice(0, 200),
     });
-  });
+    },
+  );
 
   withEnv({ QWEN_API_KEY: undefined, AI_PROVIDER: "qwen" }, () => {
     const providerState = getAiProviderState();
@@ -104,6 +120,12 @@ function devCheckQwenStateNoSecrets(): void {
       providerState,
     });
   });
+}
+
+function devCheckQwenFolderFromModelUri(): void {
+  const got = resolveQwenFolderId("gpt://my-folder/qwen3/latest");
+  const ok = got === "my-folder";
+  devLog(`resolveQwenFolderId ${ok ? "OK" : "FAIL"}`, { got });
 }
 
 function devCheckQwenUsageMapping(): void {
@@ -122,16 +144,16 @@ function devCheckQwenUsageMapping(): void {
 function devCheckQwenResponseMapping(): void {
   const result = mapQwenChatCompletionResponse(
     {
-      model: "qwen-plus",
+      model: "gpt://folder/qwen/latest",
       choices: [{ message: { content: '{"intent":"unknown"}' } }],
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
     },
-    "qwen-plus-fallback",
+    "gpt://folder/qwen-fallback/latest",
   );
   const ok =
     result.provider === "qwen" &&
     result.text.includes("unknown") &&
-    result.model === "qwen-plus" &&
+    result.model === "gpt://folder/qwen/latest" &&
     result.usage?.totalTokens === 3;
   devLog(`mapQwenChatCompletionResponse ${ok ? "OK" : "FAIL"}`, {
     provider: result.provider,
@@ -153,7 +175,7 @@ function devCheckQwenCompleteMissingKey(): void {
       } catch (e) {
         message = e instanceof Error ? e.message : String(e);
       }
-      const ok = message.includes("QWEN_API_KEY");
+      const ok = message.includes("QWEN_API_KEY") || message.includes("QWEN_MODEL");
       devLog(`qwen complete missing key ${ok ? "OK" : "FAIL"}`, { message });
     })();
   });
@@ -164,6 +186,7 @@ export function devLogAiProviderRegistryChecks(): void {
   devCheckResolveAiProviderId();
   devCheckGetPrimaryAiProvider();
   devCheckQwenStateNoSecrets();
+  devCheckQwenFolderFromModelUri();
   devCheckQwenUsageMapping();
   devCheckQwenResponseMapping();
   devCheckQwenCompleteMissingKey();

@@ -1,13 +1,17 @@
 import type { AiCompletionParams, AiCompletionResult, AiProvider, AiProviderState, AiTokenUsage } from "./types";
 
-const DEFAULT_QWEN_BASE_URL =
-  "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
-const DEFAULT_QWEN_MODEL = "qwen-plus";
+/** Yandex Cloud AI Studio — OpenAI-compatible endpoint. */
+const DEFAULT_QWEN_BASE_URL = "https://ai.api.cloud.yandex.net/v1";
+const DEFAULT_QWEN_AUTH_TYPE = "api-key";
+
+export type QwenAuthType = "api-key" | "iam-token";
 
 export type QwenConfig = {
-  apiKey: string;
+  credential: string;
+  authType: QwenAuthType;
   baseUrl: string;
   model: string;
+  folderId?: string;
 };
 
 export type QwenDisabledReason = "missing_env" | "placeholder_env";
@@ -19,6 +23,7 @@ export type QwenState =
       reason: QwenDisabledReason;
       baseUrl: string;
       model: string;
+      authType: QwenAuthType;
       hasApiKey: boolean;
     };
 
@@ -83,44 +88,106 @@ export function parseQwenOpenAiUsage(usage: unknown): AiTokenUsage | null {
   };
 }
 
+function resolveQwenAuthType(): QwenAuthType {
+  const raw = (process.env.QWEN_AUTH_TYPE?.trim() || DEFAULT_QWEN_AUTH_TYPE).toLowerCase();
+  if (raw === "iam-token" || raw === "iam") return "iam-token";
+  if (raw !== "api-key" && process.env.BOT_DEV_LOG !== "0") {
+    console.warn(`[yandex-gpt] unknown QWEN_AUTH_TYPE="${raw}", using api-key`);
+  }
+  return "api-key";
+}
+
 function resolveQwenBaseUrl(): string {
   const raw = process.env.QWEN_BASE_URL?.trim();
   return isPlaceholder(raw) ? DEFAULT_QWEN_BASE_URL : raw!;
 }
 
 function resolveQwenModel(): string {
-  const raw = process.env.QWEN_MODEL?.trim();
-  return isPlaceholder(raw) ? DEFAULT_QWEN_MODEL : raw!;
+  return process.env.QWEN_MODEL?.trim() ?? "";
+}
+
+/** folder_id из gpt://<folder>/... или YANDEX_CLOUD_FOLDER_ID. */
+export function resolveQwenFolderId(model: string): string | undefined {
+  const fromUri = model.match(/^gpt:\/\/([^/]+)\//i)?.[1]?.trim();
+  if (fromUri && !isPlaceholder(fromUri)) return fromUri;
+
+  const fromEnv = process.env.YANDEX_CLOUD_FOLDER_ID?.trim();
+  if (!isPlaceholder(fromEnv)) return fromEnv;
+  return undefined;
+}
+
+function resolveQwenCredential(authType: QwenAuthType): string | null {
+  const qwenKey = process.env.QWEN_API_KEY?.trim();
+
+  if (authType === "iam-token") {
+    if (!isPlaceholder(qwenKey)) return qwenKey!;
+    const iam = process.env.YANDEX_CLOUD_IAM_TOKEN?.trim();
+    if (!isPlaceholder(iam)) return iam!;
+    return null;
+  }
+
+  if (!isPlaceholder(qwenKey)) return qwenKey!;
+  return null;
+}
+
+function buildAuthorizationHeader(config: QwenConfig): string {
+  if (config.authType === "api-key") {
+    return `Api-Key ${config.credential}`;
+  }
+  return `Bearer ${config.credential}`;
+}
+
+function buildQwenRequestHeaders(config: QwenConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    Authorization: buildAuthorizationHeader(config),
+  };
+  if (config.folderId) {
+    headers["x-folder-id"] = config.folderId;
+  }
+  return headers;
 }
 
 export function getQwenState(): QwenState {
   const baseUrl = resolveQwenBaseUrl();
   const model = resolveQwenModel();
-  const apiKeyRaw = process.env.QWEN_API_KEY?.trim();
-  const hasApiKey = !isPlaceholder(apiKeyRaw);
+  const authType = resolveQwenAuthType();
+  const credential = resolveQwenCredential(authType);
+  const hasApiKey = credential !== null;
+  const modelOk = !isPlaceholder(model);
 
-  if (!hasApiKey) {
+  if (!hasApiKey || !modelOk) {
+    const apiKeyRaw = process.env.QWEN_API_KEY?.trim();
     return {
       enabled: false,
-      reason: isPlaceholder(apiKeyRaw) && apiKeyRaw === "change_me"
-        ? "placeholder_env"
-        : "missing_env",
+      reason:
+        isPlaceholder(apiKeyRaw) && apiKeyRaw === "change_me"
+          ? "placeholder_env"
+          : "missing_env",
       baseUrl,
-      model,
-      hasApiKey: false,
+      model: modelOk ? model : "(not set)",
+      authType,
+      hasApiKey,
     };
   }
 
+  const folderId = resolveQwenFolderId(model);
+
   if (process.env.BOT_DEV_LOG !== "0") {
-    console.log(`[yandex-gpt] qwen baseUrl=${baseUrl} model=${model}`);
+    console.log(
+      `[yandex-gpt] qwen baseUrl=${baseUrl} authType=${authType} model=${model}${folderId ? ` folderId=${folderId}` : ""}`,
+    );
   }
 
   return {
     enabled: true,
     config: {
-      apiKey: apiKeyRaw!,
+      credential: credential!,
+      authType,
       baseUrl: baseUrl.replace(/\/$/, ""),
       model,
+      folderId,
     },
   };
 }
@@ -145,7 +212,9 @@ export function qwenStateForDiagnostics(state: QwenState): Record<string, unknow
       configured: true,
       hasApiKey: true,
       baseUrl: state.config.baseUrl,
+      authType: state.config.authType,
       model: state.config.model,
+      folderId: state.config.folderId ?? null,
     };
   }
   return {
@@ -153,6 +222,7 @@ export function qwenStateForDiagnostics(state: QwenState): Record<string, unknow
     configured: false,
     hasApiKey: state.hasApiKey,
     baseUrl: state.baseUrl,
+    authType: state.authType,
     model: state.model,
     reason: state.reason,
   };
@@ -165,8 +235,8 @@ function buildChatCompletionsUrl(baseUrl: string): string {
 function extractRequestId(headers: Headers, body: unknown): string | undefined {
   const fromHeader =
     headers.get("x-request-id") ??
-    headers.get("x-dashscope-requestid") ??
-    headers.get("x-fc-request-id");
+    headers.get("x-requestid") ??
+    headers.get("x-dashscope-requestid");
   if (fromHeader?.trim()) return fromHeader.trim();
 
   if (typeof body === "object" && body !== null && !Array.isArray(body)) {
@@ -228,11 +298,7 @@ async function callQwenCompletion(
   const url = buildChatCompletionsUrl(config.baseUrl);
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
+    headers: buildQwenRequestHeaders(config),
     body: JSON.stringify({
       model: config.model,
       messages: [
@@ -272,7 +338,7 @@ async function callQwenCompletion(
   return { ...result, latencyMs: Date.now() - startedAt };
 }
 
-/** HTTP-адаптер Qwen OpenAI-compatible API (DashScope). */
+/** HTTP-адаптер Qwen через Yandex Cloud AI Studio (OpenAI-compatible). */
 export function createQwenProvider(): AiProvider {
   const state = getQwenState();
   const config = state.enabled ? state.config : null;
@@ -282,7 +348,7 @@ export function createQwenProvider(): AiProvider {
     async complete(params: AiCompletionParams): Promise<AiCompletionResult> {
       if (!config) {
         throw new Error(
-          "Qwen is not configured (missing QWEN_API_KEY). Set QWEN_API_KEY or use AI_PROVIDER=yandex.",
+          "Qwen (Yandex Cloud) is not configured. Set QWEN_API_KEY, QWEN_MODEL (gpt://<folder>/<model>/latest) or use AI_PROVIDER=yandex.",
         );
       }
       return callQwenCompletion(config, params);

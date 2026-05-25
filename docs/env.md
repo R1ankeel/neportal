@@ -58,9 +58,10 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
 | `AI_PROVIDER` | `yandex` | Primary AI provider для `parseTextIntent` и других completions. Значения: `yandex` (по умолчанию), `qwen`. Неизвестное значение → предупреждение в лог и fallback на `yandex` |
-| `QWEN_API_KEY` | — | API key Qwen/DashScope; **обязателен** при `AI_PROVIDER=qwen` |
-| `QWEN_BASE_URL` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` | Базовый URL OpenAI-compatible API |
-| `QWEN_MODEL` | `qwen-plus` | Имя модели в `chat/completions` |
+| `QWEN_API_KEY` | — | Секретный API-ключ из Yandex Cloud; **обязателен** при `AI_PROVIDER=qwen` и `QWEN_AUTH_TYPE=api-key` |
+| `QWEN_BASE_URL` | `https://ai.api.cloud.yandex.net/v1` | OpenAI-compatible endpoint Yandex Cloud AI Studio |
+| `QWEN_AUTH_TYPE` | `api-key` | `api-key` (`Authorization: Api-Key`) или `iam-token` (`Bearer`; при отсутствии `QWEN_API_KEY` — `YANDEX_CLOUD_IAM_TOKEN`) |
+| `QWEN_MODEL` | — | URI модели, напр. `gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest`; folder можно не дублировать, если задан `YANDEX_CLOUD_FOLDER_ID` |
 | `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
 | `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
 | `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
@@ -79,7 +80,7 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 
 Пустая строка и `change_me` считаются «переменная не задана». Без настроенного AI provider бот отвечает на произвольный текст: использовать slash-команды.
 
-**Qwen:** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
+**Qwen (Yandex Cloud):** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. Модель и каталог — в формате Yandex (`gpt://…`). При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
 
 Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md#yandexgpt-опционально).
 
