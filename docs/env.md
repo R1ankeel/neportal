@@ -137,3 +137,30 @@ pnpm db:studio
 ```
 
 При старте API/бота в консоли: `Loaded env from: <путь>` — если путь неверный, проверьте `cwd` терминала.
+
+## SpeechKit Async STT (long audio via Object Storage)
+
+Short voice keeps using sync STT (`stt/v1/stt:recognize`).
+Long voice can use async STT (`stt/v2/longRunningRecognize`) through Yandex Object Storage.
+
+```env
+YANDEX_SPEECHKIT_ASYNC_ENABLED=false
+YANDEX_SPEECHKIT_ASYNC_MODEL=general
+YANDEX_SPEECHKIT_ASYNC_POLL_INTERVAL_MS=2000
+YANDEX_SPEECHKIT_ASYNC_TIMEOUT_MS=120000
+YANDEX_SPEECHKIT_ASYNC_MAX_DURATION_SEC=600
+YANDEX_SPEECHKIT_ASYNC_MAX_FILE_SIZE_MB=100
+YANDEX_SPEECHKIT_ASYNC_DELETE_OBJECT=true
+YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET=
+YANDEX_SPEECHKIT_OBJECT_STORAGE_PREFIX=speechkit/tmp/
+YANDEX_STORAGE_ENDPOINT=https://storage.yandexcloud.net
+YANDEX_STORAGE_REGION=ru-central1
+YANDEX_STORAGE_ACCESS_KEY_ID=
+YANDEX_STORAGE_SECRET_ACCESS_KEY=
+```
+
+Notes:
+- Async mode is disabled by default.
+- Bot may run outside Yandex Cloud; Object Storage is used as temporary transport for long audio.
+- Keep bucket private and configure lifecycle cleanup as backup.
+- Deferred mode is not enabled by default (`YANDEX_SPEECHKIT_ASYNC_MODEL=general`).

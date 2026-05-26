@@ -923,3 +923,40 @@ REST для scheduler (вызывает бот):
 - Уведомления по задачам — in-process scheduler в боте; позже worker/BullMQ.
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
 - Деплой в Yandex Cloud для MVP **не требуется** — только внешние API Yandex Cloud (Foundation Models / AI Studio) и SpeechKit из локального бота.
+
+## Long Voice Recognition (Async SpeechKit)
+
+For short Telegram voice messages bot uses sync SpeechKit STT.
+For long voice messages, when async mode is enabled, bot:
+1. Downloads file from Telegram.
+2. Uploads temporary object to Yandex Object Storage (`speechkit/tmp/...`).
+3. Starts async SpeechKit v2 recognition.
+4. Polls operation until done (bounded timeout).
+5. Deletes temporary object (best-effort).
+6. Sends recognized text into the same semantic pipeline as short voice.
+
+If async mode is disabled, long voice is rejected with a user-facing message.
+
+Environment variables:
+
+```env
+YANDEX_SPEECHKIT_ASYNC_ENABLED=false
+YANDEX_SPEECHKIT_ASYNC_MODEL=general
+YANDEX_SPEECHKIT_ASYNC_POLL_INTERVAL_MS=2000
+YANDEX_SPEECHKIT_ASYNC_TIMEOUT_MS=120000
+YANDEX_SPEECHKIT_ASYNC_MAX_DURATION_SEC=600
+YANDEX_SPEECHKIT_ASYNC_MAX_FILE_SIZE_MB=100
+YANDEX_SPEECHKIT_ASYNC_DELETE_OBJECT=true
+YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET=
+YANDEX_SPEECHKIT_OBJECT_STORAGE_PREFIX=speechkit/tmp/
+YANDEX_STORAGE_ENDPOINT=https://storage.yandexcloud.net
+YANDEX_STORAGE_REGION=ru-central1
+YANDEX_STORAGE_ACCESS_KEY_ID=
+YANDEX_STORAGE_SECRET_ACCESS_KEY=
+```
+
+Smoke helper:
+
+```bash
+pnpm --filter @neportal/bot exec tsx src/speech/speechkit-async-smoke.ts ./long.ogg
+```

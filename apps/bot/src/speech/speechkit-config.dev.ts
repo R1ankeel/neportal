@@ -25,6 +25,13 @@ function withEnv(patch: Record<string, string | undefined>, fn: () => void): voi
     "YANDEX_SPEECHKIT_FOLDER_ID",
     "SPEECHKIT_API_KEY",
     "SPEECHKIT_FOLDER_ID",
+    "YANDEX_SPEECHKIT_ASYNC_ENABLED",
+    "YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET",
+    "YANDEX_STORAGE_ACCESS_KEY_ID",
+    "YANDEX_STORAGE_SECRET_ACCESS_KEY",
+    "YANDEX_STORAGE_ENDPOINT",
+    "YANDEX_STORAGE_REGION",
+    "YANDEX_SPEECHKIT_OBJECT_STORAGE_PREFIX",
     ...Object.keys(patch),
   ];
   const snap = snapshotEnv(keys);
@@ -47,13 +54,20 @@ function checkDefaultState(): void {
       YANDEX_SPEECHKIT_FOLDER_ID: undefined,
       SPEECHKIT_API_KEY: undefined,
       SPEECHKIT_FOLDER_ID: undefined,
+      YANDEX_SPEECHKIT_ASYNC_ENABLED: undefined,
     },
     () => {
       const state = getSpeechKitState();
-      const ok = state.enabled === false && state.configured === false;
+      const ok =
+        state.enabled === false
+        && state.configured === false
+        && state.asyncEnabled === false
+        && state.asyncConfigured === false;
       devLog(`speechkit default state ${ok ? "OK" : "FAIL"}`, {
         enabled: state.enabled,
         configured: state.configured,
+        asyncEnabled: state.asyncEnabled,
+        asyncConfigured: state.asyncConfigured,
       });
     },
   );
@@ -86,11 +100,43 @@ function checkStateHasNoSecret(): void {
       YANDEX_SPEECHKIT_ENABLED: "true",
       YANDEX_SPEECHKIT_API_KEY: "super-secret-key",
       YANDEX_SPEECHKIT_FOLDER_ID: "folder-1",
+      YANDEX_SPEECHKIT_ASYNC_ENABLED: "true",
+      YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET: "bucket",
+      YANDEX_STORAGE_ACCESS_KEY_ID: "AKIA-SECRET",
+      YANDEX_STORAGE_SECRET_ACCESS_KEY: "SUPER-SECRET",
     },
     () => {
       const stateJson = JSON.stringify(getSpeechKitState());
-      const ok = !stateJson.includes("super-secret-key");
+      const ok =
+        !stateJson.includes("super-secret-key")
+        && !stateJson.includes("AKIA-SECRET")
+        && !stateJson.includes("SUPER-SECRET");
       devLog(`speechkit state has no api key ${ok ? "OK" : "FAIL"}`);
+    },
+  );
+}
+
+function checkAsyncNeedsStorageConfig(): void {
+  withEnv(
+    {
+      YANDEX_SPEECHKIT_ENABLED: "true",
+      YANDEX_SPEECHKIT_API_KEY: "key",
+      YANDEX_SPEECHKIT_FOLDER_ID: "folder",
+      YANDEX_SPEECHKIT_ASYNC_ENABLED: "true",
+      YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET: undefined,
+      YANDEX_STORAGE_ACCESS_KEY_ID: undefined,
+      YANDEX_STORAGE_SECRET_ACCESS_KEY: undefined,
+      YANDEX_STORAGE_ENDPOINT: undefined,
+      YANDEX_STORAGE_REGION: undefined,
+    },
+    () => {
+      const state = getSpeechKitState();
+      const ok = state.asyncEnabled === true && state.asyncConfigured === false;
+      devLog(`speechkit async requires storage ${ok ? "OK" : "FAIL"}`, {
+        asyncEnabled: state.asyncEnabled,
+        asyncConfigured: state.asyncConfigured,
+        missingEnv: state.missingEnv,
+      });
     },
   );
 }
@@ -112,6 +158,6 @@ export function devLogSpeechKitConfigChecks(): void {
   checkDefaultState();
   checkMissingEnvWhenEnabled();
   checkStateHasNoSecret();
+  checkAsyncNeedsStorageConfig();
   checkFileSizeValidation();
 }
-

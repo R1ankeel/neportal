@@ -19,6 +19,21 @@ export type SpeechKitState = {
   provider: "yandex-speechkit";
   enabled: boolean;
   configured: boolean;
+  asyncEnabled: boolean;
+  asyncConfigured: boolean;
+  objectStorageConfigured: boolean;
+  asyncModel: string;
+  asyncPollIntervalMs: number;
+  asyncTimeoutMs: number;
+  asyncMaxDurationSec: number;
+  asyncMaxFileSizeMb: number;
+  asyncDeleteObject: boolean;
+  objectStorageBucket?: string;
+  objectStoragePrefix: string;
+  storageEndpoint?: string;
+  storageRegion?: string;
+  hasStorageAccessKey: boolean;
+  hasStorageSecretKey: boolean;
   hasApiKey: boolean;
   hasFolderId: boolean;
   authType: "api-key";
@@ -41,6 +56,10 @@ export type SpeechKitErrorCode =
   | "SPEECHKIT_EMPTY_RESULT"
   | "SPEECHKIT_RESPONSE_PARSE_ERROR"
   | "SPEECHKIT_FILE_TOO_LARGE"
+  | "SPEECHKIT_ASYNC_START_ERROR"
+  | "SPEECHKIT_ASYNC_TIMEOUT"
+  | "SPEECHKIT_ASYNC_POLL_ERROR"
+  | "SPEECHKIT_STORAGE_NOT_CONFIGURED"
   | "SPEECHKIT_UNKNOWN_ERROR";
 
 export type SpeechKitErrorOptions = {
@@ -80,4 +99,3 @@ export class SpeechKitError extends Error {
     }
   }
 }
-

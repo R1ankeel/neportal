@@ -7,11 +7,26 @@ import { getPendingTaskStatusDetails } from "../pending-task-status-details";
 import { cleanupRecognizedVoiceText } from "./voice-text-cleanup";
 import { getSpeechKitState } from "./speechkit-config";
 import { recognizeOggOpus } from "./speechkit-client";
+import { recognizeOggOpusAsyncFromObject } from "./speechkit-async-client";
 import { SpeechKitError } from "./types";
 import { hasBlockingPendingState } from "./voice-pending-guard";
+import { deleteObjectBestEffort, uploadTempObject } from "../storage/yandex-object-storage";
 
 function previewText(text: string, max = 80): string {
   return text.slice(0, max);
+}
+
+export function resolveVoiceRecognitionMode(params: {
+  durationSec: number;
+  syncMaxDurationSec: number;
+  asyncEnabled: boolean;
+  asyncConfigured: boolean;
+  asyncMaxDurationSec: number;
+}): "sync" | "async" | "reject_async_disabled" | "reject_async_too_long" {
+  if (params.durationSec <= params.syncMaxDurationSec) return "sync";
+  if (!params.asyncEnabled || !params.asyncConfigured) return "reject_async_disabled";
+  if (params.durationSec > params.asyncMaxDurationSec) return "reject_async_too_long";
+  return "async";
 }
 
 export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean> {
@@ -48,11 +63,33 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
     return true;
   }
 
-  if (voice.duration > speechState.maxDurationSec) {
+  const recognitionMode = resolveVoiceRecognitionMode({
+    durationSec: voice.duration,
+    syncMaxDurationSec: speechState.maxDurationSec,
+    asyncEnabled: speechState.asyncEnabled,
+    asyncConfigured: speechState.asyncConfigured,
+    asyncMaxDurationSec: speechState.asyncMaxDurationSec,
+  });
+  const useAsyncForLongVoice = recognitionMode === "async";
+  if (recognitionMode === "reject_async_disabled") {
     await ctx.reply(
-      `Голосовое слишком длинное. Пока я обрабатываю сообщения до ${speechState.maxDurationSec} сек. Отправьте короче или напишите текстом.`,
+      `Голосовое слишком длинное. Пока я обрабатываю короткие сообщения до ${speechState.maxDurationSec} сек.`,
     );
     return true;
+  }
+  if (recognitionMode === "reject_async_too_long") {
+    const maxMinutes = Math.floor(speechState.asyncMaxDurationSec / 60);
+    await ctx.reply(`Голосовое слишком длинное. Максимум ${maxMinutes} минут.`);
+    return true;
+  }
+
+  if (useAsyncForLongVoice) {
+    if (!speechState.asyncEnabled || !speechState.asyncConfigured) {
+      await ctx.reply(
+        `Голосовое слишком длинное. Пока я обрабатываю короткие сообщения до ${speechState.maxDurationSec} сек.`,
+      );
+      return true;
+    }
   }
 
   try {
@@ -65,15 +102,39 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
     const audioBuffer = await downloadTelegramFileBuffer({ filePath: file.file_path });
     const fileSizeBytes = audioBuffer.byteLength;
 
-    const maxFileSizeBytes = speechState.maxFileSizeMb * 1024 * 1024;
+    const maxFileSizeMb = useAsyncForLongVoice
+      ? speechState.asyncMaxFileSizeMb
+      : speechState.maxFileSizeMb;
+    const maxFileSizeBytes = maxFileSizeMb * 1024 * 1024;
     if (fileSizeBytes > maxFileSizeBytes) {
       await ctx.reply(
-        `Голосовое слишком большое. Пока я обрабатываю файлы до ${speechState.maxFileSizeMb} МБ. Отправьте короче или напишите текстом.`,
+        `Файл слишком большой. Пока я обрабатываю файлы до ${maxFileSizeMb} МБ.`,
       );
       return true;
     }
 
-    const recognized = await recognizeOggOpus({ audioBuffer });
+    let recognized;
+    if (useAsyncForLongVoice) {
+      await ctx.reply("Голосовое длинное, распознаю. Это может занять немного времени...");
+      let uploaded: { bucket: string; key: string; objectUri: string } | null = null;
+      try {
+        uploaded = await uploadTempObject({
+          buffer: audioBuffer,
+          contentType: "audio/ogg",
+          extension: "ogg",
+          source: "telegram-voice",
+        });
+        recognized = await recognizeOggOpusAsyncFromObject({
+          objectUri: uploaded.objectUri,
+        });
+      } finally {
+        if (uploaded && speechState.asyncDeleteObject) {
+          await deleteObjectBestEffort(uploaded.bucket, uploaded.key);
+        }
+      }
+    } else {
+      recognized = await recognizeOggOpus({ audioBuffer });
+    }
     const text = recognized.text.trim();
     if (!text) {
       await ctx.reply("Не удалось распознать голосовое сообщение. Попробуйте ещё раз или напишите текстом.");
@@ -157,6 +218,16 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
           return true;
         case "SPEECHKIT_EMPTY_RESULT":
           await ctx.reply("Не удалось распознать голосовое сообщение. Попробуйте ещё раз или напишите текстом.");
+          return true;
+        case "SPEECHKIT_ASYNC_START_ERROR":
+        case "SPEECHKIT_ASYNC_POLL_ERROR":
+          await ctx.reply("Не удалось распознать длинное голосовое из-за временной ошибки. Попробуйте позже или отправьте текстом.");
+          return true;
+        case "SPEECHKIT_ASYNC_TIMEOUT":
+          await ctx.reply("Распознавание длинного голосового заняло слишком много времени. Попробуйте ещё раз позже.");
+          return true;
+        case "SPEECHKIT_STORAGE_NOT_CONFIGURED":
+          await ctx.reply("Длинные голосовые пока не поддерживаются в этой конфигурации.");
           return true;
         case "SPEECHKIT_HTTP_ERROR":
         case "SPEECHKIT_NETWORK_ERROR":
