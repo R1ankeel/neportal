@@ -29,6 +29,25 @@ function normalizeWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+const SELF_ASSIGNEE_PATTERNS: RegExp[] = [
+  /\bмне\b/iu,
+  /\bна\s+меня\b/iu,
+  /\bдля\s+меня\b/iu,
+  /\bсебе\b/iu,
+  /\bсам\s+себе\b/iu,
+  /\bмоя\s+задач\w*/iu,
+  /\bсозда[йм]\w*\s+мне\b/iu,
+  /\bпостав\w*\s+мне\b/iu,
+  /\bназнач\w*\s+на\s+меня\b/iu,
+  /\bперекин\w*\s+на\s+меня\b/iu,
+  /\bзапиш\w*\s+на\s+меня\b/iu,
+];
+
+export function containsSelfAssigneeMarker(text: string): boolean {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  return SELF_ASSIGNEE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 function isShortText(text: string): boolean {
   const normalized = normalizeWhitespace(text);
   if (!normalized) return true;
@@ -163,7 +182,10 @@ const SYSTEM_PROMPT =
   "Удали только слова-паразиты, очевидные повторы и мусор распознавания. " +
   "Не удаляй и не переформулируй intent команды. " +
   "Если пользователь сказал 'запиши заметку', 'создай задачу', 'добавь расход', 'напиши комментарий' и т.п., сохрани этот intent явно. " +
+  "Никогда не удаляй маркеры назначения на себя: 'мне', 'на меня', 'для меня', 'себе', 'сам себе'. " +
+  "Эти слова определяют исполнителя задачи и должны быть сохранены буквально по смыслу. " +
   "Сохрани смысл, имена, даты, суммы, числа, названия задач и тип команды. " +
+  "Сохрани назначение задачи (кто исполнитель) без изменений. " +
   "Не добавляй новых фактов. Верни command-like текст, а не только контент. " +
   "Верни только JSON {\"text\":\"...\"}.";
 
@@ -187,6 +209,7 @@ export async function cleanupRecognizedVoiceText(
 
   const deterministic = cleanupFillerWords(original);
   const deterministicSafe = ensureIntentMarkerPreserved(original, deterministic);
+  const originalHasSelfMarker = containsSelfAssigneeMarker(original);
 
   if (!shouldUseAiCleanup(original, options)) {
     return {
@@ -225,6 +248,22 @@ export async function cleanupRecognizedVoiceText(
     }
 
     const intentSafe = ensureIntentMarkerPreserved(original, cleaned);
+    const cleanedHasSelfMarker = containsSelfAssigneeMarker(cleaned);
+    if (originalHasSelfMarker && !cleanedHasSelfMarker) {
+      console.info("[voice] voice-cleanup-self-marker-fallback", {
+        source: "voice-cleanup-self-marker-fallback",
+        originalHasSelfMarker: true,
+        cleanedHasSelfMarker: false,
+        originalChars: original.length,
+        cleanedChars: cleaned.length,
+      });
+      return {
+        text: original,
+        source: "fallback",
+        changed: false,
+      };
+    }
+
     const safeText = intentSafe === original ? deterministicSafe : intentSafe;
 
     return {

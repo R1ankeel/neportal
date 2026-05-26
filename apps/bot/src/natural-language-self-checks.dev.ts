@@ -16,7 +16,11 @@ import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-text";
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import { scoreTaskTitleMatch } from "./task-search-text";
-import { cleanupFillerWords, ensureIntentMarkerPreserved } from "./speech/voice-text-cleanup";
+import {
+  cleanupFillerWords,
+  containsSelfAssigneeMarker,
+  ensureIntentMarkerPreserved,
+} from "./speech/voice-text-cleanup";
 import { parseEditVoiceCommand } from "./confirmation/parse-edit-voice-command";
 
 function withAliases(fullName: string, id: string): ApiUser {
@@ -300,6 +304,43 @@ function devCheckVoiceCleanupIntentPreservation(): void {
   }
 }
 
+function devCheckVoiceCleanupSelfAssigneePreservation(): void {
+  const markerCases = [
+    "Создай мне задачу проверить поставщика",
+    "Поставь на меня задачу проверить склад",
+    "Добавь себе задачу купить рыбу",
+  ];
+
+  for (const input of markerCases) {
+    const cleaned = cleanupFillerWords(input);
+    const hasMarker = containsSelfAssigneeMarker(cleaned);
+    devLog(`voice cleanup self-marker keep ${hasMarker ? "OK" : "FAIL"}`, {
+      input,
+      cleaned,
+      hasMarker,
+    });
+  }
+
+  const original = "Создаем мне задачу проверить поставщика на надежность";
+  const badCleaned = "Создай задачу проверить поставщика на надежность";
+  const originalHas = containsSelfAssigneeMarker(original);
+  const cleanedHas = containsSelfAssigneeMarker(badCleaned);
+  const fallbackExpected = originalHas && !cleanedHas;
+  devLog(`voice cleanup self-marker fallback ${fallbackExpected ? "OK" : "FAIL"}`, {
+    originalHasSelfMarker: originalHas,
+    cleanedHasSelfMarker: cleanedHas,
+    originalChars: original.length,
+    cleanedChars: badCleaned.length,
+  });
+
+  const explicitAssignee = "Создай задачу Маше проверить склад";
+  const explicitHasSelfMarker = containsSelfAssigneeMarker(explicitAssignee);
+  devLog(`voice cleanup self-marker explicit assignee unaffected ${!explicitHasSelfMarker ? "OK" : "FAIL"}`, {
+    explicitAssignee,
+    explicitHasSelfMarker,
+  });
+}
+
 function devCheckEditVoiceParser(): void {
   const shouldParse: Array<{ input: string; field: string; valuePart: string }> = [
     {
@@ -367,5 +408,6 @@ export function devLogNaturalLanguageSelfChecks(): void {
   devCheckBudgetReceiptEdit();
   devCheckCreateTaskAssignee();
   devCheckVoiceCleanupIntentPreservation();
+  devCheckVoiceCleanupSelfAssigneePreservation();
   devCheckEditVoiceParser();
 }
