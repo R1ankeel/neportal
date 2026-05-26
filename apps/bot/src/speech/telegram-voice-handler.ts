@@ -3,6 +3,7 @@ import { devLog } from "../dev-log";
 import { downloadTelegramFileBuffer, safeTelegramFileDownloadError } from "../telegram/download-telegram-file";
 import { handleTextSemanticMessage } from "../ai-message";
 import { getPendingConfirmationEdit } from "../pending-confirmation-edit";
+import { getPendingTaskStatusDetails } from "../pending-task-status-details";
 import { cleanupRecognizedVoiceText } from "./voice-text-cleanup";
 import { getSpeechKitState } from "./speechkit-config";
 import { recognizeOggOpus } from "./speechkit-client";
@@ -80,10 +81,15 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
     }
 
     const editPending = getPendingConfirmationEdit(telegramUserId);
+    const taskStatusPending = getPendingTaskStatusDetails(telegramUserId);
     const cleanupMode =
       editPending?.step === "await_value"
         ? { mode: "value" as const, valueFieldKey: editPending.field }
-        : { mode: "semantic" as const };
+        : taskStatusPending?.type === "awaiting_completion_result"
+          ? { mode: "value" as const, valueFieldKey: "completionResult" }
+          : taskStatusPending?.type === "awaiting_cancellation_reason"
+            ? { mode: "value" as const, valueFieldKey: "cancellationReason" }
+            : { mode: "semantic" as const };
     const cleanupResult = await cleanupRecognizedVoiceText(text, cleanupMode);
     const finalText = cleanupResult.text;
 

@@ -35,6 +35,7 @@ import {
   buildResolvedCompleteTask,
   startPendingTaskStatusDetails,
 } from "./task-status-flow";
+import { buildTaskStatusDetailsCancelKeyboard } from "./task-status-details-cancel";
 
 function syntheticDeadlineIntent(resolved: ResolvedSetTaskDeadline): AiIntent {
   return {
@@ -83,7 +84,9 @@ export async function continueAfterTaskSelection(
       task,
       "awaiting_completion_result",
     );
-    await ctx.reply(question);
+    await ctx.reply(question, {
+      reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+    });
     return;
   }
 
@@ -128,7 +131,9 @@ export async function continueAfterTaskSelection(
       task,
       "awaiting_cancellation_reason",
     );
-    await ctx.reply(question);
+    await ctx.reply(question, {
+      reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+    });
     return;
   }
 

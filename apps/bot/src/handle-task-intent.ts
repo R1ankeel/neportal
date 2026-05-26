@@ -17,6 +17,7 @@ import {
   startPendingTaskStatusDetails,
 } from "./task-status-flow";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { buildTaskStatusDetailsCancelKeyboard } from "./task-status-details-cancel";
 
 /** AI intents complete_task / cancel_task / start_task / set_task_deadline с выбором задачи. */
 export async function handleTaskActionIntent(
@@ -102,7 +103,9 @@ export async function handleTaskActionIntent(
       task,
       "awaiting_completion_result",
     );
-    await ctx.reply(question);
+    await ctx.reply(question, {
+      reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+    });
     return;
   }
 
@@ -118,6 +121,8 @@ export async function handleTaskActionIntent(
       task,
       "awaiting_cancellation_reason",
     );
-    await ctx.reply(question);
+    await ctx.reply(question, {
+      reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+    });
   }
 }

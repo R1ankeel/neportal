@@ -61,6 +61,9 @@ import { handleReassignSlashCommand } from "./task-reassign-flow";
 import { handleTransferSlashCommand } from "./task-transfer-flow";
 import { handleStartTaskSlashCommand } from "./task-start-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
+import { getPendingTaskStatusDetails } from "./pending-task-status-details";
+import { buildTaskStatusDetailsCancelKeyboard, handleTaskStatusDetailsCancelCallback } from "./task-status-details-cancel";
+import { devLogVoicePendingGuardChecks } from "./speech/voice-pending-guard.dev";
 import { replyWithTasksForHint } from "./my-tasks-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -439,7 +442,13 @@ bot.command("done", async (ctx) => {
       "DONE",
     );
     if (result.kind === "reply") {
-      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
+      if (getPendingTaskStatusDetails(telegramUserId)) {
+        await ctx.reply(result.message, {
+          reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+        });
+      } else {
+        await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
+      }
       return;
     }
 
@@ -479,7 +488,13 @@ async function runStartTaskSlash(ctx: Context, payload: string): Promise<void> {
       payload,
     );
     if (result.kind === "reply") {
-      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
+      if (getPendingTaskStatusDetails(telegramUserId)) {
+        await ctx.reply(result.message, {
+          reply_markup: buildTaskStatusDetailsCancelKeyboard(),
+        });
+      } else {
+        await replyWithActiveChoiceKeyboard(ctx, telegramUserId, result.message);
+      }
       return;
     }
 
@@ -890,6 +905,7 @@ bot.on("message:voice", async (ctx) => {
 });
 
 bot.on("callback_query:data", async (ctx) => {
+  if (await handleTaskStatusDetailsCancelCallback(ctx)) return;
   await handleChoiceCallback(ctx);
   await handleConfirmationCallback(ctx);
 });
@@ -918,6 +934,7 @@ async function main() {
     devLogCreateTaskTitleDescriptionChecks();
     devLogConfirmationKeyboardChecks();
     devLogChoiceKeyboardChecks();
+    devLogVoicePendingGuardChecks();
     await devLogSafeCallbackChecks();
     await devLogCreateTaskNormalizeChecks();
   }
