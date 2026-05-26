@@ -1,4 +1,4 @@
-import { requestAiJson } from "../yandex-gpt";
+﻿import { requestAiJson } from "../yandex-gpt";
 
 export type VoiceTextCleanupSource = "ai" | "none" | "fallback";
 
@@ -11,6 +11,12 @@ export type VoiceTextCleanupResult = {
 export type CleanupRecognizedVoiceTextOptions = {
   mode?: "semantic" | "value";
   valueFieldKey?: string;
+};
+
+type IntentMarker = {
+  key: string;
+  equivalentKeys: string[];
+  patterns: RegExp[];
 };
 
 function isValidPayload(parsed: unknown): parsed is { text: string } {
@@ -32,6 +38,109 @@ function isShortText(text: string): boolean {
   return false;
 }
 
+const FILLER_PATTERNS: RegExp[] = [
+  /\bну\b/giu,
+  /\bкороче\b/giu,
+  /\bтипа\b/giu,
+  /\bэто\s+самое\b/giu,
+  /\bкак\s+бы\b/giu,
+  /\bзначит\b/giu,
+  /\bв\s+общем\b/giu,
+  /\bээ+\b/giu,
+  /\bмм+\b/giu,
+];
+
+const INTENT_MARKERS: IntentMarker[] = [
+  {
+    key: "create_task",
+    equivalentKeys: ["create_task"],
+    patterns: [/\bсоздай\s+задач\w*/iu, /\bпоставь\s+задач\w*/iu, /\bназначь\s+задач\w*/iu],
+  },
+  {
+    key: "create_note",
+    equivalentKeys: ["create_note"],
+    patterns: [/\bзапиш[иь]\s+замет\w*/iu, /\bсоздай\s+замет\w*/iu, /\bдобавь\s+замет\w*/iu],
+  },
+  {
+    key: "create_expense",
+    equivalentKeys: ["create_expense"],
+    patterns: [/\bдобавь\s+расход\w*/iu, /\bпотратил\w*/iu, /\bоплатил\w*/iu],
+  },
+  {
+    key: "add_comment",
+    equivalentKeys: ["add_comment"],
+    patterns: [/\bнапиш[иь]\s+комментар\w*/iu, /\bдобавь\s+комментар\w*/iu],
+  },
+  {
+    key: "show_tasks",
+    equivalentKeys: ["show_tasks"],
+    patterns: [/\bпокажи\s+задач\w*/iu],
+  },
+  {
+    key: "transfer_task",
+    equivalentKeys: ["transfer_task", "reassign_task"],
+    patterns: [/\bпередай\s+задач\w*/iu, /\bпереназначь\s+задач\w*/iu],
+  },
+  {
+    key: "edit_task",
+    equivalentKeys: ["edit_task"],
+    patterns: [/\bизмени\s+описан\w*/iu, /\bизмени\s+дедлайн\w*/iu, /\bизмени\s+исполнител\w*/iu],
+  },
+  {
+    key: "sick_leave",
+    equivalentKeys: ["sick_leave"],
+    patterns: [/\bя\s+заболел\w*/iu],
+  },
+  {
+    key: "vacation",
+    equivalentKeys: ["vacation"],
+    patterns: [/\bдобавь\s+отпуск\w*/iu],
+  },
+];
+
+function findIntentMarkerKeys(text: string): string[] {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  const found = new Set<string>();
+  for (const marker of INTENT_MARKERS) {
+    if (marker.patterns.some((pattern) => pattern.test(normalized))) {
+      found.add(marker.key);
+    }
+  }
+  return Array.from(found);
+}
+
+function hasEquivalentIntentMarker(text: string, markerKey: string): boolean {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  const marker = INTENT_MARKERS.find((item) => item.key === markerKey);
+  if (!marker) return false;
+  const equivalents = new Set(marker.equivalentKeys);
+  for (const item of INTENT_MARKERS) {
+    if (!equivalents.has(item.key)) continue;
+    if (item.patterns.some((pattern) => pattern.test(normalized))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function cleanupFillerWords(text: string): string {
+  let next = text;
+  for (const filler of FILLER_PATTERNS) {
+    next = next.replace(filler, " ");
+  }
+  next = next.replace(/[,.!?;:]\s*([,.!?;:]\s*)+/g, ". ");
+  next = next.replace(/\s{2,}/g, " ");
+  next = next.replace(/\s+([,.;!?])/g, "$1");
+  return normalizeWhitespace(next);
+}
+
+export function ensureIntentMarkerPreserved(original: string, cleaned: string): string {
+  const originalMarkers = findIntentMarkerKeys(original);
+  if (originalMarkers.length === 0) return cleaned;
+  const allPreserved = originalMarkers.every((key) => hasEquivalentIntentMarker(cleaned, key));
+  return allPreserved ? cleaned : original;
+}
+
 function shouldUseAiCleanup(
   text: string,
   options?: CleanupRecognizedVoiceTextOptions,
@@ -51,14 +160,17 @@ function shouldUseAiCleanup(
 
 const SYSTEM_PROMPT =
   "Ты очищаешь распознанный голосовой текст для бизнес-бота. " +
-  "Удали слова-паразиты, очевидные повторы и мусор распознавания. " +
-  "Сохрани смысл, имена, даты, суммы, числа, названия задач и намерение. " +
-  "Не добавляй новых фактов. Верни только JSON {\"text\":\"...\"}.";
+  "Удали только слова-паразиты, очевидные повторы и мусор распознавания. " +
+  "Не удаляй и не переформулируй intent команды. " +
+  "Если пользователь сказал 'запиши заметку', 'создай задачу', 'добавь расход', 'напиши комментарий' и т.п., сохрани этот intent явно. " +
+  "Сохрани смысл, имена, даты, суммы, числа, названия задач и тип команды. " +
+  "Не добавляй новых фактов. Верни command-like текст, а не только контент. " +
+  "Верни только JSON {\"text\":\"...\"}.";
 
 function buildUserPrompt(text: string): string {
   return [
     "Input:",
-    `"${text}"`,
+    `\"${text}\"`,
     "Output JSON:",
     "{\"text\":\"...\"}",
   ].join("\n");
@@ -73,8 +185,15 @@ export async function cleanupRecognizedVoiceText(
     return { text: "", source: "none", changed: false };
   }
 
+  const deterministic = cleanupFillerWords(original);
+  const deterministicSafe = ensureIntentMarkerPreserved(original, deterministic);
+
   if (!shouldUseAiCleanup(original, options)) {
-    return { text: original, source: "none", changed: false };
+    return {
+      text: deterministicSafe,
+      source: "none",
+      changed: deterministicSafe !== original,
+    };
   }
 
   try {
@@ -84,25 +203,40 @@ export async function cleanupRecognizedVoiceText(
       userPrompt: buildUserPrompt(original),
       userText: original,
       temperature: 0,
-      maxTokens: 120,
+      maxTokens: 140,
       validate: isValidPayload,
     });
 
     if (!result.ok || !isValidPayload(result.parsed)) {
-      return { text: original, source: "fallback", changed: false };
+      return {
+        text: deterministicSafe,
+        source: "fallback",
+        changed: deterministicSafe !== original,
+      };
     }
 
     const cleaned = normalizeWhitespace(result.parsed.text);
     if (!cleaned) {
-      return { text: original, source: "fallback", changed: false };
+      return {
+        text: deterministicSafe,
+        source: "fallback",
+        changed: deterministicSafe !== original,
+      };
     }
 
+    const intentSafe = ensureIntentMarkerPreserved(original, cleaned);
+    const safeText = intentSafe === original ? deterministicSafe : intentSafe;
+
     return {
-      text: cleaned,
+      text: safeText || original,
       source: "ai",
-      changed: cleaned !== original,
+      changed: (safeText || original) !== original,
     };
   } catch {
-    return { text: original, source: "fallback", changed: false };
+    return {
+      text: deterministicSafe,
+      source: "fallback",
+      changed: deterministicSafe !== original,
+    };
   }
 }

@@ -16,6 +16,7 @@ import { parseCreateTaskQuery } from "./parse-create-task-query";
 import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-text";
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import { scoreTaskTitleMatch } from "./task-search-text";
+import { cleanupFillerWords, ensureIntentMarkerPreserved } from "./speech/voice-text-cleanup";
 
 function withAliases(fullName: string, id: string): ApiUser {
   return {
@@ -246,6 +247,58 @@ function devCheckCreateTaskAssignee(): void {
   devLog(`basic create_task на сегодня not assignee ${naTodayNotAssignee ? "OK" : "FAIL"}`);
 }
 
+function devCheckVoiceCleanupIntentPreservation(): void {
+  const cases: Array<{
+    input: string;
+    mustContainOneOf?: string[];
+    mustContainAll?: string[];
+    mustNotContain?: string[];
+  }> = [
+    {
+      input: "ну короче нужно записать заметку типа короче нужно купить рыбу завтра на корпоратив",
+      mustContainOneOf: ["заметк"],
+      mustContainAll: ["купить рыбу завтра на корпоратив"],
+      mustNotContain: ["короче", "типа"],
+    },
+    {
+      input: "ну короче создай задачу Маше купить рыбу",
+      mustContainOneOf: ["создай", "задач"],
+      mustNotContain: ["короче"],
+    },
+    {
+      input: "типа потратил тысячу пятьсот на рекламу",
+      mustContainOneOf: ["потратил", "расход"],
+      mustNotContain: ["типа"],
+    },
+    {
+      input: "напиши комментарий к задаче купить трубы короче нужны трубы диаметром 5 и 3",
+      mustContainAll: ["комментар", "нужны трубы диаметром 5 и 3"],
+      mustNotContain: ["короче"],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const cleaned = cleanupFillerWords(testCase.input);
+    const safe = ensureIntentMarkerPreserved(testCase.input, cleaned);
+    const normalized = safe.toLowerCase();
+    const oneOfOk = !testCase.mustContainOneOf
+      || testCase.mustContainOneOf.some((fragment) => normalized.includes(fragment));
+    const allOk = !testCase.mustContainAll
+      || testCase.mustContainAll.every((fragment) => normalized.includes(fragment));
+    const notContainOk = !testCase.mustNotContain
+      || testCase.mustNotContain.every((fragment) => !normalized.includes(fragment));
+    const ok = oneOfOk && allOk && notContainOk;
+    devLog(`voice cleanup intent ${ok ? "OK" : "FAIL"}`, {
+      input: testCase.input,
+      cleaned,
+      safe,
+      mustContainOneOf: testCase.mustContainOneOf,
+      mustContainAll: testCase.mustContainAll,
+      mustNotContain: testCase.mustNotContain,
+    });
+  }
+}
+
 export function devLogNaturalLanguageSelfChecks(): void {
   devCheckUserHintCleanup();
   devCheckTaskMatching();
@@ -253,4 +306,5 @@ export function devLogNaturalLanguageSelfChecks(): void {
   devCheckTransferParser();
   devCheckBudgetReceiptEdit();
   devCheckCreateTaskAssignee();
+  devCheckVoiceCleanupIntentPreservation();
 }
