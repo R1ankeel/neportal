@@ -17,6 +17,7 @@ import { rawTitleHasNoiseMarkers } from "./ai/deterministic/basic-create-task-te
 import { SELF_HINT_MARKER } from "./resolve-users-by-hint";
 import { scoreTaskTitleMatch } from "./task-search-text";
 import { cleanupFillerWords, ensureIntentMarkerPreserved } from "./speech/voice-text-cleanup";
+import { parseEditVoiceCommand } from "./confirmation/parse-edit-voice-command";
 
 function withAliases(fullName: string, id: string): ApiUser {
   return {
@@ -299,6 +300,40 @@ function devCheckVoiceCleanupIntentPreservation(): void {
   }
 }
 
+function devCheckEditVoiceParser(): void {
+  const shouldParse: Array<{ input: string; field: string; valuePart: string }> = [
+    { input: "дедлайн на пятницу", field: "deadline", valuePart: "пятницу" },
+    { input: "дедлайн пятница", field: "deadline", valuePart: "пятница" },
+    { input: "срок завтра", field: "deadline", valuePart: "завтра" },
+    { input: "исполнитель Ваня", field: "assignee", valuePart: "ваня" },
+    { input: "исполнителя Машу", field: "assignee", valuePart: "машу" },
+    { input: "описание нужны трубы диаметром 5 и 3", field: "description", valuePart: "трубы диаметром 5 и 3" },
+    { input: "название купить рыбу", field: "title", valuePart: "купить рыбу" },
+    { input: "проект Реклама VK", field: "project", valuePart: "реклама vk" },
+  ];
+
+  for (const testCase of shouldParse) {
+    const parsed = parseEditVoiceCommand(testCase.input);
+    const ok =
+      !!parsed
+      && parsed.field === testCase.field
+      && parsed.valueText.toLowerCase().includes(testCase.valuePart);
+    devLog(`edit voice parser parse ${ok ? "OK" : "FAIL"}`, {
+      input: testCase.input,
+      parsed,
+      expectedField: testCase.field,
+      expectedValuePart: testCase.valuePart,
+    });
+  }
+
+  const shouldNotParse = ["четыре", "пункт четыре", "первый пункт"];
+  for (const input of shouldNotParse) {
+    const parsed = parseEditVoiceCommand(input);
+    const ok = parsed === null;
+    devLog(`edit voice parser no-menu-voice ${ok ? "OK" : "FAIL"}`, { input, parsed });
+  }
+}
+
 export function devLogNaturalLanguageSelfChecks(): void {
   devCheckUserHintCleanup();
   devCheckTaskMatching();
@@ -307,4 +342,5 @@ export function devLogNaturalLanguageSelfChecks(): void {
   devCheckBudgetReceiptEdit();
   devCheckCreateTaskAssignee();
   devCheckVoiceCleanupIntentPreservation();
+  devCheckEditVoiceParser();
 }

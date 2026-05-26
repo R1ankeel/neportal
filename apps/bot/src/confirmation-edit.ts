@@ -41,7 +41,7 @@ import {
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { fetchUsers } from "./api";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
-import { parseEditVoiceCommand } from "./confirmation/parse-edit-voice-command";
+import { parseEditVoiceCommand, parseEditVoiceFieldOnly } from "./confirmation/parse-edit-voice-command";
 
 type ParsedEdit = { key: string; value: string };
 
@@ -378,8 +378,13 @@ export async function handlePendingConfirmationEditMessage(
   if (editPending.step === "select_field" && options?.source === "voice") {
     const parsedVoiceEdit = parseEditVoiceCommand(text);
     if (!parsedVoiceEdit) {
+      const fieldOnly = parseEditVoiceFieldOnly(text);
+      if (fieldOnly) {
+        await ctx.reply(`Укажите новое значение, например: ${fieldOnly.example}.`);
+        return true;
+      }
       await ctx.reply(
-        "Я не понял, что именно изменить. Для выбора поля используйте кнопки ниже или отправьте номер. Голосом можно сказать, например: измени описание на ....",
+        "Для выбора поля используйте кнопки ниже или отправьте номер текстом. Голосом можно сказать, например: дедлайн на пятницу.",
       );
       return true;
     }
