@@ -5,6 +5,7 @@ import { getSpeechKitState } from "./speechkit-config";
 import { recognizeOggOpus } from "./speechkit-client";
 import { SpeechKitError } from "./types";
 import { hasBlockingPendingState } from "./voice-pending-guard";
+import { handleTextSemanticMessage } from "../ai-message";
 
 function previewText(text: string, max = 80): string {
   return text.slice(0, max);
@@ -90,9 +91,18 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
       });
     }
 
-    await ctx.reply(
-      `🎙 Распознал:\n"${text}"\n\nПока голосовые команды работают в тестовом режиме. На следующем этапе я смогу выполнять эту команду как обычный текст.`,
-    );
+    await ctx.reply(`🎙 Распознал:\n"${text}"`);
+    try {
+      await handleTextSemanticMessage(ctx, text, {
+        source: "voice",
+        recognizedFromVoice: true,
+      });
+    } catch (pipelineError) {
+      console.error("[voice] semantic pipeline failed", {
+        error: safeTelegramFileDownloadError(pipelineError),
+      });
+      await ctx.reply("Распознать получилось, но обработать команду не удалось. Попробуйте отправить её текстом.");
+    }
     return true;
   } catch (err) {
     if (err instanceof SpeechKitError) {
@@ -139,4 +149,3 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
     return true;
   }
 }
-

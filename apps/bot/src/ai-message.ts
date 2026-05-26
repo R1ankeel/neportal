@@ -49,36 +49,50 @@ import { handleLinkByUsernameConfirmation } from "./start-binding";
 import { getAiProviderState } from "./ai/provider/registry";
 import { parseTextIntent } from "./yandex-gpt";
 
-export async function handlePlainTextMessage(ctx: Context): Promise<void> {
-  const text = ctx.message?.text?.trim();
+export type TextMessageSource = "text" | "voice";
+
+export type HandleTextMessageOptions = {
+  source?: TextMessageSource;
+  recognizedFromVoice?: boolean;
+};
+
+export async function handleTextSemanticMessage(
+  ctx: Context,
+  text: string,
+  options?: HandleTextMessageOptions,
+): Promise<void> {
+  void options;
+  const normalizedText = text.trim();
   const telegramUserId = ctx.from?.id;
-  if (!text || !telegramUserId) return;
+  if (!normalizedText || !telegramUserId) return;
 
-  if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, text)) {
+  const inputText = normalizedText;
+
+  if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingExpenseReceiptUploadMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingExpenseReceiptUploadMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingExpenseReceiptSelectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingExpenseReceiptSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
   const pending = getPendingConfirmation(telegramUserId);
   if (pending) {
     if (pending.type === "confirm_link_by_username") {
-      await handleLinkByUsernameConfirmation(ctx, pending, text, telegramUserId);
+      await handleLinkByUsernameConfirmation(ctx, pending, inputText, telegramUserId);
       return;
     }
 
     if (pending.type === "confirm_absence_delegation_distribution") {
-      if (isConfirmationNo(text)) {
+      if (isConfirmationNo(inputText)) {
         await handleConfirmationDecision(ctx, telegramUserId, "cancel");
         return;
       }
-      if (isConfirmationYes(text)) {
+      if (isConfirmationYes(inputText)) {
         await handleConfirmationDecision(ctx, telegramUserId, "confirm");
         return;
       }
@@ -86,22 +100,22 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
       return;
     }
 
-    if (pending.type === "ai_intent" && isConfirmationEdit(text)) {
+    if (pending.type === "ai_intent" && isConfirmationEdit(inputText)) {
       await handleConfirmationDecision(ctx, telegramUserId, "edit");
       return;
     }
 
-    if (isConfirmationCancel(text)) {
+    if (isConfirmationCancel(inputText)) {
       await handleConfirmationDecision(ctx, telegramUserId, "cancel");
       return;
     }
 
-    if (isConfirmationYes(text)) {
+    if (isConfirmationYes(inputText)) {
       await handleConfirmationDecision(ctx, telegramUserId, "confirm");
       return;
     }
 
-    if (isConfirmationNo(text)) {
+    if (isConfirmationNo(inputText)) {
       if (pending.type === "ai_intent" && pending.resolved.intent === "create_expense") {
         await handleCreateExpenseBudgetRejection(ctx, telegramUserId, pending);
         return;
@@ -119,51 +133,51 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  if (await handlePendingBudgetSelectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingBudgetSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskStatusDetailsMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskStatusDetailsMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskCommentDetailsMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskCommentDetailsMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskMentionDetailsMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskMentionDetailsMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskTransferCommentMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskTransferCommentMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskTransferRejectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskTransferRejectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskTransferDecisionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskTransferDecisionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingAbsenceSelectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingAbsenceSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingCreateTaskAssigneeMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingCreateTaskAssigneeMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (await handlePendingUserSelectionMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingUserSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
@@ -173,11 +187,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, text)) {
+  if (await handlePendingAbsenceDelegationMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 
-  if (parsePendingExpensesQuery(text)) {
+  if (parsePendingExpensesQuery(inputText)) {
     try {
       await showPendingExpenses(ctx, linked, telegramUserId, 10);
     } catch (e) {
@@ -190,7 +204,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const taskListQuery = parseTaskListQuery(text);
+  const taskListQuery = parseTaskListQuery(inputText);
   if (taskListQuery?.type === "my") {
     try {
       const reply = await formatMyTasksReply(linked.id, 5);
@@ -213,42 +227,42 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const createBudgetIntent = parseCreateBudgetCommand(text);
+  const createBudgetIntent = parseCreateBudgetCommand(inputText);
   if (createBudgetIntent) {
-    await routeParsedAiIntent(ctx, linked, telegramUserId, text, createBudgetIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, createBudgetIntent);
     return;
   }
 
-  const expenseIntent = parseExpenseQuery(text);
+  const expenseIntent = parseExpenseQuery(inputText);
   if (expenseIntent) {
-    await routeParsedAiIntent(ctx, linked, telegramUserId, text, expenseIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, expenseIntent);
     return;
   }
 
   const usersForTransfer = await fetchUsers();
 
-  const reassignIntent = parseTaskReassignQuery(text, linked.role, {
+  const reassignIntent = parseTaskReassignQuery(inputText, linked.role, {
     users: usersForTransfer,
     currentUser: linked,
   });
   if (reassignIntent) {
-    await routeParsedAiIntent(ctx, linked, telegramUserId, text, reassignIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, reassignIntent);
     return;
   }
 
-  const createTaskIntent = await finalizeBasicCreateTask(text);
+  const createTaskIntent = await finalizeBasicCreateTask(inputText);
   if (createTaskIntent) {
-    await routeParsedAiIntent(ctx, linked, telegramUserId, text, createTaskIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, createTaskIntent);
     return;
   }
 
-  const transferLikeIntent = parseTaskTransferLikeQuery(text, {
+  const transferLikeIntent = parseTaskTransferLikeQuery(inputText, {
     preferReassign: isManagerOrOwner(linked.role),
     users: usersForTransfer,
     currentUser: linked,
   });
   if (transferLikeIntent) {
-    await routeParsedAiIntent(ctx, linked, telegramUserId, text, transferLikeIntent);
+    await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, transferLikeIntent);
     return;
   }
 
@@ -258,7 +272,7 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  const parsed = await parseTextIntent(text, { linkedUserId: linked.id });
+  const parsed = await parseTextIntent(inputText, { linkedUserId: linked.id });
   if (!parsed.ok) {
     if (parsed.kind === "disabled") {
       await ctx.reply("AI-парсер пока не настроен. Используйте команды /demo.");
@@ -272,5 +286,11 @@ export async function handlePlainTextMessage(ctx: Context): Promise<void> {
     return;
   }
 
-  await routeParsedAiIntent(ctx, linked, telegramUserId, text, parsed.intent);
+  await routeParsedAiIntent(ctx, linked, telegramUserId, inputText, parsed.intent);
+}
+
+export async function handlePlainTextMessage(ctx: Context): Promise<void> {
+  const text = ctx.message?.text?.trim();
+  if (!text) return;
+  await handleTextSemanticMessage(ctx, text, { source: "text", recognizedFromVoice: false });
 }
