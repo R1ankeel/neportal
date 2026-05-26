@@ -41,7 +41,11 @@ import {
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { fetchUsers } from "./api";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
-import { parseEditVoiceCommand, parseEditVoiceFieldOnly } from "./confirmation/parse-edit-voice-command";
+import {
+  isVoiceMenuSelectionLike,
+  parseEditVoiceCommand,
+  parseEditVoiceFieldOnly,
+} from "./confirmation/parse-edit-voice-command";
 
 type ParsedEdit = { key: string; value: string };
 
@@ -371,41 +375,52 @@ export async function handlePendingConfirmationEditMessage(
     return true;
   }
 
-  if (await tryLegacyKeyValueEdit(ctx, telegramUserId, editPending, text)) {
-    return true;
-  }
-
-  if (editPending.step === "select_field" && options?.source === "voice") {
+  if (editPending.step === "select_field") {
     const parsedVoiceEdit = parseEditVoiceCommand(text);
-    if (!parsedVoiceEdit) {
-      const fieldOnly = parseEditVoiceFieldOnly(text);
-      if (fieldOnly) {
-        await ctx.reply(`Укажите новое значение, например: ${fieldOnly.example}.`);
+    if (parsedVoiceEdit) {
+      const fieldExists = editPending.fields.some((field) => field.key === parsedVoiceEdit.field);
+      if (!fieldExists) {
+        await replyWithActiveChoiceKeyboard(
+          ctx,
+          telegramUserId,
+          "Это поле нельзя изменить в текущем действии. Выберите поле кнопкой ниже.",
+        );
         return true;
       }
-      await ctx.reply(
-        "Для выбора поля используйте кнопки ниже или отправьте номер текстом. Голосом можно сказать, например: дедлайн на пятницу.",
+
+      const applyResult = await applyFieldEdit(
+        editPending.originalConfirmation.intent,
+        parsedVoiceEdit.field,
+        parsedVoiceEdit.valueText,
       );
+      if (!applyResult.ok) {
+        await ctx.reply(applyResult.message);
+        return true;
+      }
+
+      await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
       return true;
     }
 
-    const fieldExists = editPending.fields.some((field) => field.key === parsedVoiceEdit.field);
-    if (!fieldExists) {
-      await ctx.reply("Это поле нельзя изменить в текущем действии. Выберите поле кнопкой ниже.");
+    if (options?.source === "voice") {
+      const fieldOnly = parseEditVoiceFieldOnly(text);
+      if (fieldOnly) {
+        await replyWithActiveChoiceKeyboard(
+          ctx,
+          telegramUserId,
+          `Укажите новое значение, например: ${fieldOnly.example}.`,
+        );
+        return true;
+      }
+      const message = isVoiceMenuSelectionLike(text)
+        ? "Для выбора поля используйте кнопки ниже или отправьте номер текстом. Голосом можно сказать, например: описание: проверить склад на соответствие ГОСТ."
+        : "Я не понял, что именно изменить. Выберите поле кнопкой ниже или скажите, например: описание: проверить склад на соответствие ГОСТ.";
+      await replyWithActiveChoiceKeyboard(ctx, telegramUserId, message);
       return true;
     }
+  }
 
-    const applyResult = await applyFieldEdit(
-      editPending.originalConfirmation.intent,
-      parsedVoiceEdit.field,
-      parsedVoiceEdit.valueText,
-    );
-    if (!applyResult.ok) {
-      await ctx.reply(applyResult.message);
-      return true;
-    }
-
-    await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
+  if (await tryLegacyKeyValueEdit(ctx, telegramUserId, editPending, text)) {
     return true;
   }
 

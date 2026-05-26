@@ -302,6 +302,31 @@ function devCheckVoiceCleanupIntentPreservation(): void {
 
 function devCheckEditVoiceParser(): void {
   const shouldParse: Array<{ input: string; field: string; valuePart: string }> = [
+    {
+      input: "добавь описание: проверить склад на соответствие ГОСТ",
+      field: "description",
+      valuePart: "проверить склад на соответствие гост",
+    },
+    {
+      input: "добавь описание проверить склад на соответствие ГОСТ",
+      field: "description",
+      valuePart: "проверить склад на соответствие гост",
+    },
+    {
+      input: "добавь в описание проверить склад на соответствие ГОСТ",
+      field: "description",
+      valuePart: "проверить склад на соответствие гост",
+    },
+    {
+      input: "допиши описание проверить склад на соответствие ГОСТ",
+      field: "description",
+      valuePart: "проверить склад на соответствие гост",
+    },
+    {
+      input: "описание проверить склад на соответствие ГОСТ",
+      field: "description",
+      valuePart: "проверить склад на соответствие гост",
+    },
     { input: "дедлайн на пятницу", field: "deadline", valuePart: "пятницу" },
     { input: "дедлайн пятница", field: "deadline", valuePart: "пятница" },
     { input: "срок завтра", field: "deadline", valuePart: "завтра" },
