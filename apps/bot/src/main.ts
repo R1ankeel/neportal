@@ -69,6 +69,7 @@ import { handleChoiceCallback } from "./choice-callback";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 import { logBotMiddlewareError } from "./telegram-error-log";
 import { devLogSafeCallbackChecks } from "./telegram/safe-callback.dev";
+import { handleTelegramVoiceMessage } from "./speech/telegram-voice-handler";
 
 const envPath = loadRootEnv();
 if (envPath) {
@@ -882,6 +883,10 @@ bot.on("message:document", async (ctx) => {
     originalFilename: doc.file_name,
     mimeType: doc.mime_type,
   });
+});
+
+bot.on("message:voice", async (ctx) => {
+  await handleTelegramVoiceMessage(ctx);
 });
 
 bot.on("callback_query:data", async (ctx) => {

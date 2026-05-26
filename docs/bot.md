@@ -913,8 +913,10 @@ REST для scheduler (вызывает бот):
 - LLM **не выполняет** действия — только парсит текст; API вызывает бот после «да».
 - Без привязки `telegramId` рабочие команды и AI **не выполняются** (`NOT_LINKED_MESSAGE`). Доступны: `/start`, `/demo`, `/me`, `/link` (dev).
 - `/link` — только для dev; в продукте — username в Web + `/start`.
-- SpeechKit foundation добавлен изолированно (sync STT client + config/state + smoke helper), но voice flow Telegram в runtime ещё не подключён.
-- `YANDEX_SPEECHKIT_ENABLED=false` по умолчанию; поведение бота для пользователей не меняется до отдельного этапа подключения `message:voice`.
+- Stage 5.2: Telegram `message:voice` подключён в тестовом режиме intake-only: бот распознаёт короткое voice через SpeechKit и возвращает текст пользователю.
+- На этом этапе intent execution из voice не выполняется: распознанный текст не отправляется в `parseTextIntent`/business flow.
+- Если активен `pending` с кнопками/ожиданием ответа, voice не обходит state-machine: нужно завершить текущее действие кнопками или текстом.
+- `YANDEX_SPEECHKIT_ENABLED=false` по умолчанию: при выключенном флаге бот мягко отвечает, что голос временно недоступен.
 - Bot runtime не требует запуска в Yandex Cloud: Yandex Cloud используется как внешний API-провайдер (YandexGPT/Qwen/SpeechKit).
 - Для short voice MVP Object Storage не нужен; async/long audio и Object Storage добавляются позже.
 - Уведомления по задачам — in-process scheduler в боте; позже worker/BullMQ.
