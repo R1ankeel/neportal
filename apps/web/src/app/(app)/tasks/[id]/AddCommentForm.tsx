@@ -22,16 +22,19 @@ export function AddCommentForm({
   const [selectedMention, setSelectedMention] = useState<{ id: string; fullName: string } | null>(null);
   const [menu, setMenu] = useState<{ query: string; start: number; end: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasPendingRef = useRef(false);
 
   const mentionToken = selectedMention ? `@${selectedMention.fullName}` : null;
 
   useEffect(() => {
-    if (state.saved) {
+    const justFinishedSuccess = wasPendingRef.current && !pending && state.ok;
+    if (justFinishedSuccess) {
       setText("");
       setSelectedMention(null);
       setMenu(null);
     }
-  }, [state.saved]);
+    wasPendingRef.current = pending;
+  }, [pending, state.ok]);
 
   useEffect(() => {
     if (mentionToken && !text.includes(mentionToken)) {
@@ -43,6 +46,7 @@ export function AddCommentForm({
     if (!menu) return [];
     const q = menu.query.trim().toLowerCase();
     const filtered = users.filter((u) => {
+      if (u.id === authorId) return false;
       if (!q) return true;
       return (
         u.fullName.toLowerCase().includes(q) ||
@@ -50,7 +54,7 @@ export function AddCommentForm({
       );
     });
     return filtered.slice(0, 8);
-  }, [menu, users]);
+  }, [authorId, menu, users]);
 
   function detectMention(value: string, cursor: number) {
     const beforeCursor = value.slice(0, cursor);

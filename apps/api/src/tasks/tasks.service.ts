@@ -275,6 +275,8 @@ export class TasksService {
     await this.notifyAssigneeCommentUpdated({
       taskId: existing.task.id,
       taskTitle: existing.task.title,
+      oldText: existing.text,
+      newText: text,
       assignee: existing.task.assignee,
       editorId: editor.id,
     });
@@ -285,14 +287,16 @@ export class TasksService {
   private async notifyAssigneeCommentUpdated(params: {
     taskId: string;
     taskTitle: string;
+    oldText: string;
+    newText: string;
     assignee: { id: string; telegramId: string | null } | null;
     editorId: string;
   }): Promise<void> {
-    const { taskId, taskTitle, assignee, editorId } = params;
+    const { taskId, taskTitle, oldText, newText, assignee, editorId } = params;
     if (!assignee?.telegramId) return;
     if (assignee.id === editorId) return;
 
-    const text = buildTaskCommentUpdatedMessage(taskTitle);
+    const text = buildTaskCommentUpdatedMessage(taskTitle, oldText, newText);
 
     try {
       await this.telegramNotify.sendMessage(assignee.telegramId, text);

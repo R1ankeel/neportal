@@ -17,7 +17,8 @@ export async function addTaskComment(
   const taskId = String(formData.get("taskId") ?? "");
   const authorId = String(formData.get("authorId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
-  const mentionedUserId = String(formData.get("mentionedUserId") ?? "").trim();
+  const mentionedUserIdRaw = String(formData.get("mentionedUserId") ?? "").trim();
+  const mentionedUserId = mentionedUserIdRaw === authorId ? "" : mentionedUserIdRaw;
 
   if (!taskId) return { ok: false, message: "Не указана задача" };
   if (!authorId) return { ok: false, message: "Не указан автор" };
