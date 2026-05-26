@@ -11,6 +11,8 @@ const SECRET_PATTERNS: RegExp[] = [
   /\byc1_[A-Za-z0-9_-]{8,}\b/g,
   // token/api_key/apiKey fields in JSON-like strings
   /(["']?(?:api_key|apiKey|token)["']?\s*[:=]\s*["']?)([^"'\s,}]+)/gi,
+  // explicit SpeechKit env var assignment
+  /\b(YANDEX_SPEECHKIT_API_KEY\s*[:=]\s*)([^\s,;"]+)/gi,
 ];
 
 export function sanitizeLogString(value: string): string {
@@ -19,6 +21,9 @@ export function sanitizeLogString(value: string): string {
       return sanitized.replace(pattern, `$1 ${REDACTED}`);
     }
     if (pattern.source.includes("(?:api_key|apiKey|token)")) {
+      return sanitized.replace(pattern, `$1${REDACTED}`);
+    }
+    if (pattern.source.includes("YANDEX_SPEECHKIT_API_KEY")) {
       return sanitized.replace(pattern, `$1${REDACTED}`);
     }
     return sanitized.replace(pattern, REDACTED);

@@ -80,7 +80,28 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | `YANDEX_GPT_API_KEY` | `Authorization: Api-Key` (**приоритет**) |
 | `YANDEX_CLOUD_IAM_TOKEN` | `Authorization: Bearer`, если API key пуст |
 | `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` → `gpt://{folder}/yandexgpt/latest` |
-| `YANDEX_SPEECHKIT_API_KEY` | Заготовка; голос в боте **не реализован** |
+| `YANDEX_SPEECHKIT_API_KEY` | API key для SpeechKit STT (`Authorization: Api-Key`) |
+
+### Yandex SpeechKit STT (MVP foundation)
+
+```env
+YANDEX_SPEECHKIT_ENABLED=false
+YANDEX_SPEECHKIT_API_KEY=
+YANDEX_SPEECHKIT_FOLDER_ID=
+YANDEX_SPEECHKIT_AUTH_TYPE=api-key
+YANDEX_SPEECHKIT_LANGUAGE=ru-RU
+YANDEX_SPEECHKIT_FORMAT=oggopus
+YANDEX_SPEECHKIT_TIMEOUT_MS=30000
+YANDEX_SPEECHKIT_MAX_DURATION_SEC=30
+YANDEX_SPEECHKIT_MAX_FILE_SIZE_MB=1
+```
+
+- MVP использует только sync STT для коротких voice-файлов.
+- Bot runtime может работать вне Yandex Cloud; Yandex Cloud используется как внешний API-провайдер.
+- Для short voice MVP Object Storage не требуется.
+- Object Storage и async/long audio добавляются в следующих этапах.
+- До включения Telegram voice flow SpeechKit остаётся выключенным (`YANDEX_SPEECHKIT_ENABLED=false`).
+- Backward aliases поддерживаются как fallback: `SPEECHKIT_API_KEY`, `SPEECHKIT_FOLDER_ID` (основные переменные — `YANDEX_SPEECHKIT_*`).
 
 Пустая строка и `change_me` считаются «переменная не задана». Без настроенного AI provider бот отвечает на произвольный текст: использовать slash-команды.
 
