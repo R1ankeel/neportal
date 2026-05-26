@@ -62,7 +62,7 @@ export async function updateTaskDeadline(
   const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/deadline`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ deadlineAt }),
+    body: JSON.stringify({ deadlineAt, notifyAssignee: true }),
   });
 
   if (!res.ok) {

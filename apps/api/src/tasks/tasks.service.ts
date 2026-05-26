@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
 import {
   TaskCommentSource,
@@ -17,12 +17,20 @@ import {
   RejectTaskTransferDto,
 } from "./dto/task-transfer.dto";
 import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
+import { TelegramNotifyService } from "../telegram/telegram-notify.service";
+import {
+  buildTaskDeadlineChangedMessage,
+  calendarDateKey,
+} from "./task-deadline-notify.util";
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly telegramNotify: TelegramNotifyService,
   ) {}
 
   private orgId() {
@@ -580,25 +588,67 @@ export class TasksService {
   async updateDeadline(id: string, dto: UpdateTaskDeadlineDto) {
     const existing = await this.prisma.task.findFirst({
       where: { id, organizationId: this.orgId() },
+      include: {
+        assignee: { select: { id: true, telegramId: true } },
+      },
     });
     if (!existing) {
       throw new NotFoundException(`Task with id "${id}" not found`);
     }
+
+    const oldDateKey = calendarDateKey(existing.deadlineAt);
 
     let deadlineAt: Date | null = null;
     if (dto.deadlineAt != null) {
       deadlineAt = this.endOfDay(this.parseDateInput(dto.deadlineAt));
     }
 
-    return this.prisma.task.update({
+    const newDateKey = calendarDateKey(deadlineAt);
+
+    const updated = await this.prisma.task.update({
       where: { id },
       data: { deadlineAt },
       include: {
         creator: { select: { id: true, fullName: true } },
-        assignee: { select: { id: true, fullName: true } },
+        assignee: { select: { id: true, fullName: true, telegramId: true } },
         project: { select: { id: true, name: true } },
       },
     });
+
+    if (dto.notifyAssignee && oldDateKey !== newDateKey) {
+      await this.notifyAssigneeDeadlineChanged({
+        taskId: id,
+        title: existing.title,
+        oldDateKey,
+        newDateKey,
+        assignee: updated.assignee,
+      });
+    }
+
+    return updated;
+  }
+
+  private async notifyAssigneeDeadlineChanged(params: {
+    taskId: string;
+    title: string;
+    oldDateKey: string | null;
+    newDateKey: string | null;
+    assignee: { id: string; telegramId: string | null } | null;
+  }): Promise<void> {
+    const { assignee, oldDateKey, newDateKey, title, taskId } = params;
+    if (!assignee?.telegramId) return;
+
+    const text = buildTaskDeadlineChangedMessage(title, oldDateKey, newDateKey);
+    if (!text) return;
+
+    try {
+      await this.telegramNotify.sendMessage(assignee.telegramId, text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Failed to notify assignee about deadline change for task ${taskId}: ${msg}`,
+      );
+    }
   }
 
   async findTransfers(taskId: string) {

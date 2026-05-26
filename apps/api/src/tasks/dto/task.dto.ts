@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { TaskStatus } from "@neportal/database";
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -81,4 +82,13 @@ export class UpdateTaskDeadlineDto {
   @ValidateIf((_, value) => value != null)
   @IsDateString()
   deadlineAt?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Отправить исполнителю Telegram при фактическом изменении дедлайна (Web). Bot не передаёт.",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyAssignee?: boolean;
 }
