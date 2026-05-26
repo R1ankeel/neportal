@@ -61,14 +61,17 @@ export async function handleTextSemanticMessage(
   text: string,
   options?: HandleTextMessageOptions,
 ): Promise<void> {
-  void options;
   const normalizedText = text.trim();
   const telegramUserId = ctx.from?.id;
   if (!normalizedText || !telegramUserId) return;
 
   const inputText = normalizedText;
 
-  if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, inputText)) {
+  if (
+    await handlePendingConfirmationEditMessage(ctx, telegramUserId, inputText, {
+      source: options?.source ?? "text",
+    })
+  ) {
     return;
   }
 

@@ -20,6 +20,20 @@ function isBareNumberReply(text: string): boolean {
   return /^\d+$/.test(text.trim());
 }
 
+function resolveAssigneeByNumber(
+  text: string,
+  pending: ReturnType<typeof getPendingCreateTaskAssignee>,
+): "self" | { userId: string } | null {
+  if (!pending || !isBareNumberReply(text)) return null;
+  const index = Number(text.trim()) - 1;
+  if (!Number.isSafeInteger(index) || index < 0 || index >= pending.candidates.length) {
+    return null;
+  }
+  const candidate = pending.candidates[index];
+  if (!candidate) return null;
+  return candidate.kind === "self" ? "self" : { userId: candidate.userId };
+}
+
 /**
  * Ожидание исполнителя для create_task (открытый ответ: «мне» или имя).
  * Возвращает true, если сообщение обработано.
@@ -44,15 +58,26 @@ export async function handlePendingCreateTaskAssigneeMessage(
     return true;
   }
 
-  if (isBareNumberReply(text)) {
-    await ctx.reply(CREATE_TASK_ASSIGNEE_OPEN_REPLY);
-    return true;
-  }
-
   const linked = await getLinkedUserByTelegramId(telegramUserId);
   if (!linked) {
     clearPendingCreateTaskAssignee(telegramUserId);
     await ctx.reply(NOT_LINKED_MESSAGE);
+    return true;
+  }
+
+  const numberChoice = resolveAssigneeByNumber(text, pending);
+  if (numberChoice === "self") {
+    clearPendingCreateTaskAssignee(telegramUserId);
+    await confirmCreateTaskWithAssigneeId(ctx, telegramUserId, pending, linked.id);
+    return true;
+  }
+  if (numberChoice && "userId" in numberChoice) {
+    clearPendingCreateTaskAssignee(telegramUserId);
+    await confirmCreateTaskWithAssigneeId(ctx, telegramUserId, pending, numberChoice.userId);
+    return true;
+  }
+  if (isBareNumberReply(text)) {
+    await ctx.reply(CREATE_TASK_ASSIGNEE_OPEN_REPLY);
     return true;
   }
 

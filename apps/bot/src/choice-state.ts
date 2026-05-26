@@ -4,6 +4,7 @@ import { getPendingConfirmationEdit } from "./pending-confirmation-edit";
 import { getPendingExpenseReceiptSelection } from "./pending-expense-receipt-selection";
 import { getPendingTaskSelection } from "./pending-task-selection";
 import { getPendingUserSelection } from "./pending-user-selection";
+import { getPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
 
@@ -13,7 +14,8 @@ export type ActiveChoiceKind =
   | "budget"
   | "absence"
   | "task"
-  | "user";
+  | "user"
+  | "create_task_assignee";
 
 export type ActiveChoice = {
   kind: ActiveChoiceKind;
@@ -89,6 +91,18 @@ export function getActiveChoice(telegramUserId: number): ActiveChoice | null {
       choiceId: user.choiceId,
       optionCount: user.candidates.length,
       labels: user.candidates.map((candidate) => candidate.fullName),
+    };
+  }
+
+  const assignee = getPendingCreateTaskAssignee(telegramUserId);
+  if (assignee && assignee.candidates.length > 0) {
+    return {
+      kind: "create_task_assignee",
+      choiceId: assignee.choiceId,
+      optionCount: assignee.candidates.length,
+      labels: assignee.candidates.map((candidate) =>
+        candidate.kind === "self" ? "👤 Мне" : candidate.label,
+      ),
     };
   }
 

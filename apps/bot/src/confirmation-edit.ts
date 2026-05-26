@@ -41,6 +41,7 @@ import {
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
 import { fetchUsers } from "./api";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { parseEditVoiceCommand } from "./confirmation/parse-edit-voice-command";
 
 type ParsedEdit = { key: string; value: string };
 
@@ -340,6 +341,7 @@ export async function handlePendingConfirmationEditMessage(
   ctx: Context,
   telegramUserId: number,
   text: string,
+  options?: { source?: "text" | "voice" },
 ): Promise<boolean> {
   const editPending = getPendingConfirmationEdit(telegramUserId);
   if (!editPending) return false;
@@ -353,13 +355,6 @@ export async function handlePendingConfirmationEditMessage(
   if (isConfirmationNo(text)) {
     clearPendingConfirmationEdit(telegramUserId);
     return false;
-  }
-
-  if (isEditFlowCancel(text)) {
-    clearPendingConfirmationEdit(telegramUserId);
-    clearPendingConfirmation(telegramUserId);
-    await ctx.reply("Ок, действие отменено.");
-    return true;
   }
 
   if (isConfirmationEdit(text)) {
@@ -377,6 +372,42 @@ export async function handlePendingConfirmationEditMessage(
   }
 
   if (await tryLegacyKeyValueEdit(ctx, telegramUserId, editPending, text)) {
+    return true;
+  }
+
+  if (editPending.step === "select_field" && options?.source === "voice") {
+    const parsedVoiceEdit = parseEditVoiceCommand(text);
+    if (!parsedVoiceEdit) {
+      await ctx.reply(
+        "Я не понял, что именно изменить. Для выбора поля используйте кнопки ниже или отправьте номер. Голосом можно сказать, например: измени описание на ....",
+      );
+      return true;
+    }
+
+    const fieldExists = editPending.fields.some((field) => field.key === parsedVoiceEdit.field);
+    if (!fieldExists) {
+      await ctx.reply("Это поле нельзя изменить в текущем действии. Выберите поле кнопкой ниже.");
+      return true;
+    }
+
+    const applyResult = await applyFieldEdit(
+      editPending.originalConfirmation.intent,
+      parsedVoiceEdit.field,
+      parsedVoiceEdit.valueText,
+    );
+    if (!applyResult.ok) {
+      await ctx.reply(applyResult.message);
+      return true;
+    }
+
+    await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
+    return true;
+  }
+
+  if (isEditFlowCancel(text)) {
+    clearPendingConfirmationEdit(telegramUserId);
+    clearPendingConfirmation(telegramUserId);
+    await ctx.reply("Ок, действие отменено.");
     return true;
   }
 

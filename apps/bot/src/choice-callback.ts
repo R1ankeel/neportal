@@ -6,6 +6,7 @@ import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-sel
 import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-expense-receipt-selection";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
 import { handlePendingUserSelectionMessage } from "./handle-pending-user-selection";
+import { handlePendingCreateTaskAssigneeMessage } from "./handle-pending-create-task-assignee";
 import { parseChoiceCallbackData } from "./telegram/keyboards/choice-keyboard";
 import { safeAnswerCallbackQuery } from "./telegram/safe-answer-callback";
 import { safeEditMessageReplyMarkup } from "./telegram/safe-edit-message-reply-markup";
@@ -25,6 +26,7 @@ async function dispatchChoiceText(
   if (await handlePendingAbsenceSelectionMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingUserSelectionMessage(ctx, telegramUserId, text)) return true;
+  if (await handlePendingCreateTaskAssigneeMessage(ctx, telegramUserId, text)) return true;
   return false;
 }
 

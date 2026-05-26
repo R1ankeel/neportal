@@ -1,11 +1,13 @@
-import type { Context } from "grammy";
+﻿import type { Context } from "grammy";
 import { devLog } from "../dev-log";
 import { downloadTelegramFileBuffer, safeTelegramFileDownloadError } from "../telegram/download-telegram-file";
+import { handleTextSemanticMessage } from "../ai-message";
+import { getPendingConfirmationEdit } from "../pending-confirmation-edit";
+import { cleanupRecognizedVoiceText } from "./voice-text-cleanup";
 import { getSpeechKitState } from "./speechkit-config";
 import { recognizeOggOpus } from "./speechkit-client";
 import { SpeechKitError } from "./types";
 import { hasBlockingPendingState } from "./voice-pending-guard";
-import { handleTextSemanticMessage } from "../ai-message";
 
 function previewText(text: string, max = 80): string {
   return text.slice(0, max);
@@ -21,7 +23,7 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
     return true;
   }
 
-  if (hasBlockingPendingState(telegramUserId)) {
+  if (hasBlockingPendingState(telegramUserId, { allowCreateTaskAssigneeInput: true })) {
     await ctx.reply(
       "Сейчас нужно завершить текущее действие. Используйте кнопки ниже или напишите ответ текстом.",
     );
@@ -77,23 +79,40 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
       return true;
     }
 
+    const editPending = getPendingConfirmationEdit(telegramUserId);
+    const cleanupMode =
+      editPending?.step === "await_value"
+        ? { mode: "value" as const, valueFieldKey: editPending.field }
+        : { mode: "semantic" as const };
+    const cleanupResult = await cleanupRecognizedVoiceText(text, cleanupMode);
+    const finalText = cleanupResult.text;
+
     console.info("[voice] speechkit recognize success", {
       provider: recognized.provider,
       durationSec: voice.duration,
       fileSizeBytes,
       durationMs: recognized.durationMs,
       recognizedTextChars: text.length,
+      cleanedTextChars: finalText.length,
+      cleanupSource: cleanupResult.source,
+      changed: cleanupResult.changed,
     });
+
     if (process.env.BOT_DEV_LOG !== "0") {
       devLog("voice recognized preview", {
         provider: recognized.provider,
         recognizedTextPreview: previewText(text),
+        cleanedTextPreview: previewText(finalText),
+        cleanupSource: cleanupResult.source,
+        changed: cleanupResult.changed,
       });
     }
 
-    await ctx.reply(`🎙 Распознал:\n"${text}"`);
+    const textToShow = cleanupResult.changed ? finalText : text;
+    await ctx.reply(`🎙 Распознал:\n"${textToShow}"`);
+
     try {
-      await handleTextSemanticMessage(ctx, text, {
+      await handleTextSemanticMessage(ctx, finalText, {
         source: "voice",
         recognizedFromVoice: true,
       });
@@ -103,6 +122,7 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
       });
       await ctx.reply("Распознать получилось, но обработать команду не удалось. Попробуйте отправить её текстом.");
     }
+
     return true;
   } catch (err) {
     if (err instanceof SpeechKitError) {

@@ -9,7 +9,7 @@ import {
   createTaskAssigneeNeedsClarification,
   resolveCreateTaskAssigneeInIntent,
 } from "./create-task-assignee-resolve";
-import { questionForCreateTaskAssignee } from "./create-task-assignee-flow";
+import { questionForCreateTaskAssigneeWithButtons } from "./create-task-assignee-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
@@ -22,10 +22,13 @@ import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { setPendingConfirmation } from "./pending-intent";
+import type { CreateTaskAssigneeCandidate } from "./pending-create-task-assignee";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
 import { validateIntentForRouting } from "./validate-parsed-intent";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 const CONFIDENCE_THRESHOLD = 0.7;
+const CREATE_TASK_ASSIGNEE_LIST_LIMIT = 7;
 
 /** Общая маршрутизация после разбора intent (LLM или детерминированный парсер). */
 export async function routeParsedAiIntent(
@@ -145,14 +148,43 @@ export async function routeParsedAiIntent(
       await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
       return;
     }
+    const allUsers = await fetchUsers();
+    const employeeCandidates = allUsers.filter((u) => u.id !== linked.id);
+    const withEmployeeList = employeeCandidates.length > 0 && employeeCandidates.length <= CREATE_TASK_ASSIGNEE_LIST_LIMIT;
+    const candidates: CreateTaskAssigneeCandidate[] = [{ kind: "self" }];
+    if (withEmployeeList) {
+      for (const user of employeeCandidates) {
+        candidates.push({ kind: "user", userId: user.id, label: user.fullName });
+      }
+    }
+
     startPendingCreateTaskAssignee(telegramUserId, {
+      candidates,
       projectHint: activeIntent.payload.projectHint,
       title: activeIntent.payload.title,
       description: activeIntent.payload.description,
       deadlineDate: activeIntent.payload.deadlineDate,
       creatorId: linked.id,
     });
-    await ctx.reply(questionForCreateTaskAssignee(activeIntent.payload.title));
+    if (withEmployeeList) {
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramUserId,
+        questionForCreateTaskAssigneeWithButtons({
+          title: activeIntent.payload.title,
+          withEmployeeList: true,
+        }),
+      );
+      return;
+    }
+    await replyWithActiveChoiceKeyboard(
+      ctx,
+      telegramUserId,
+      questionForCreateTaskAssigneeWithButtons({
+        title: activeIntent.payload.title,
+        withEmployeeList: false,
+      }),
+    );
     return;
   }
 

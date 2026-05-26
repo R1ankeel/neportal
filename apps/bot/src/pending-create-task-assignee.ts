@@ -8,9 +8,16 @@ import { clearPendingTaskTransferDecision } from "./pending-task-transfer-decisi
 import { clearPendingTaskTransferRejection } from "./pending-task-transfer-rejection";
 import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingBudgetSelection } from "./pending-budget-selection";
+import { createChoiceId } from "./choice-id";
+
+export type CreateTaskAssigneeCandidate =
+  | { kind: "self" }
+  | { kind: "user"; userId: string; label: string };
 
 export type PendingCreateTaskAssignee = {
   type: "awaiting_create_task_assignee";
+  choiceId: string;
+  candidates: CreateTaskAssigneeCandidate[];
   projectHint?: string;
   title: string;
   description?: string;
@@ -33,7 +40,10 @@ export function setPendingCreateTaskAssignee(
   telegramUserId: number,
   pending: PendingCreateTaskAssignee,
 ): void {
-  pendingByTelegramUserId.set(telegramUserId, pending);
+  pendingByTelegramUserId.set(telegramUserId, {
+    ...pending,
+    choiceId: pending.choiceId || createChoiceId(),
+  });
 }
 
 export function clearPendingCreateTaskAssignee(telegramUserId: number): void {
@@ -49,7 +59,7 @@ export function isPendingCreateTaskAssigneeExpired(
 /** Сбросить другие pending и сохранить ожидание исполнителя для create_task. */
 export function startPendingCreateTaskAssignee(
   telegramUserId: number,
-  data: Omit<PendingCreateTaskAssignee, "type" | "createdAt">,
+  data: Omit<PendingCreateTaskAssignee, "type" | "createdAt" | "choiceId">,
 ): void {
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskSelection(telegramUserId);
@@ -64,6 +74,7 @@ export function startPendingCreateTaskAssignee(
   setPendingCreateTaskAssignee(telegramUserId, {
     type: "awaiting_create_task_assignee",
     ...data,
+    choiceId: createChoiceId(),
     createdAt: Date.now(),
   });
 }

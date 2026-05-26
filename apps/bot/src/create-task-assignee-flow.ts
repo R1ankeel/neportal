@@ -14,6 +14,16 @@ export function questionForCreateTaskAssignee(title: string): string {
   return `Кому назначить задачу «${title}»?\n\nНапишите имя сотрудника или «мне».`;
 }
 
+export function questionForCreateTaskAssigneeWithButtons(params: {
+  title: string;
+  withEmployeeList: boolean;
+}): string {
+  if (params.withEmployeeList) {
+    return `Кому назначить задачу «${params.title}»?\n\nВыберите сотрудника кнопкой или напишите имя текстом.`;
+  }
+  return `Кому назначить задачу «${params.title}»?\n\nНажмите «👤 Мне» или напишите имя сотрудника текстом.`;
+}
+
 export const CREATE_TASK_ASSIGNEE_OPEN_REPLY =
   "Напишите имя сотрудника или «мне».";
 
