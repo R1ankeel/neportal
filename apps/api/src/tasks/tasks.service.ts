@@ -37,7 +37,10 @@ import {
   buildTaskDeadlineChangedMessage,
   calendarDateKey,
 } from "./task-deadline-notify.util";
-import { buildTaskCommentUpdatedMessage } from "./task-comment-notify.util";
+import {
+  buildTaskCommentCreatedMessage,
+  buildTaskCommentUpdatedMessage,
+} from "./task-comment-notify.util";
 import { buildTaskMentionRequestedMessage } from "./task-mention-notify.util";
 
 @Injectable()
@@ -215,16 +218,44 @@ export class TasksService {
       throw new BadRequestException("text must not be empty");
     }
 
-    return this.prisma.taskComment.create({
-      data: {
-        organizationId: org,
-        taskId,
-        authorId: dto.authorId,
-        text,
-        source: dto.source ?? TaskCommentSource.WEB,
-      },
-      include: this.commentInclude,
+    const result = await this.prisma.$transaction(async (tx) => {
+      const comment = await tx.taskComment.create({
+        data: {
+          organizationId: org,
+          taskId,
+          authorId: dto.authorId,
+          text,
+          source: dto.source ?? TaskCommentSource.WEB,
+        },
+        include: this.commentInclude,
+      });
+
+      const task = await tx.task.findFirstOrThrow({
+        where: { id: taskId, organizationId: org },
+        select: {
+          id: true,
+          title: true,
+          assignee: { select: this.taskUserNotifySelect },
+        },
+      });
+
+      return { comment, task };
     });
+
+    if (dto.notifyAssignee) {
+      await this.notifyTaskCommentCreated({
+        taskId,
+        taskTitle: result.task.title,
+        commentText: result.comment.text,
+        authorId: dto.authorId,
+        assignee: result.task.assignee,
+        mentionedUsers: [],
+        notifyAssignee: true,
+        notifyMentioned: false,
+      });
+    }
+
+    return result.comment;
   }
 
   async updateComment(taskId: string, commentId: string, dto: UpdateTaskCommentDto) {
@@ -246,6 +277,11 @@ export class TasksService {
             id: true,
             title: true,
             assignee: { select: this.taskUserNotifySelect },
+          },
+        },
+        mentions: {
+          include: {
+            mentionedUser: { select: this.taskUserNotifySelect },
           },
         },
       },
@@ -272,37 +308,152 @@ export class TasksService {
       include: this.commentInclude,
     });
 
-    await this.notifyAssigneeCommentUpdated({
+    const explicitMentionedIds = (dto.mentionedUserIds ?? [])
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    let mentionedUsers: Array<{ id: string; telegramId: string | null }> = [];
+    if (explicitMentionedIds.length > 0) {
+      const uniqIds = Array.from(new Set(explicitMentionedIds));
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: uniqIds }, organizationId: org },
+        select: this.taskUserNotifySelect,
+      });
+      if (users.length !== uniqIds.length) {
+        const found = new Set(users.map((u) => u.id));
+        const missing = uniqIds.find((id) => !found.has(id));
+        throw new NotFoundException(`User with id "${missing ?? "unknown"}" not found in this organization`);
+      }
+      mentionedUsers = users;
+    } else {
+      mentionedUsers = existing.mentions.map((m) => m.mentionedUser);
+    }
+
+    await this.notifyTaskCommentUpdated({
       taskId: existing.task.id,
       taskTitle: existing.task.title,
       oldText: existing.text,
       newText: text,
       assignee: existing.task.assignee,
       editorId: editor.id,
+      mentionedUsers,
+      notifyAssignee: dto.notifyAssignee !== false,
+      notifyMentioned: dto.notifyMentioned !== false,
     });
 
     return updated;
   }
 
-  private async notifyAssigneeCommentUpdated(params: {
+  private async notifyTaskCommentCreated(params: {
+    taskId: string;
+    taskTitle: string;
+    commentText: string;
+    assignee: { id: string; telegramId: string | null } | null;
+    authorId: string;
+    mentionedUsers: Array<{ id: string; telegramId: string | null }>;
+    notifyAssignee: boolean;
+    notifyMentioned: boolean;
+  }): Promise<void> {
+    const {
+      taskId,
+      taskTitle,
+      commentText,
+      assignee,
+      authorId,
+      mentionedUsers,
+      notifyAssignee,
+      notifyMentioned,
+    } = params;
+
+    const mentionedMap = new Map<string, string>();
+    for (const user of mentionedUsers) {
+      if (!notifyMentioned) break;
+      if (!user.telegramId || user.id === authorId) continue;
+      if (!mentionedMap.has(user.id)) {
+        mentionedMap.set(user.id, user.telegramId);
+      }
+    }
+
+    for (const [userId, telegramId] of mentionedMap) {
+      const mentionText = buildTaskMentionRequestedMessage(taskTitle, commentText);
+      try {
+        await this.telegramNotify.sendMessage(telegramId, mentionText);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to notify mentioned user ${userId} for task ${taskId}: ${msg}`);
+      }
+    }
+
+    if (
+      notifyAssignee &&
+      assignee?.telegramId &&
+      assignee.id !== authorId &&
+      !mentionedMap.has(assignee.id)
+    ) {
+      const assigneeText = buildTaskCommentCreatedMessage(taskTitle, commentText);
+      try {
+        await this.telegramNotify.sendMessage(assignee.telegramId, assigneeText);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to notify assignee about new comment for task ${taskId}: ${msg}`);
+      }
+    }
+  }
+
+  private async notifyTaskCommentUpdated(params: {
     taskId: string;
     taskTitle: string;
     oldText: string;
     newText: string;
     assignee: { id: string; telegramId: string | null } | null;
     editorId: string;
+    mentionedUsers: Array<{ id: string; telegramId: string | null }>;
+    notifyAssignee: boolean;
+    notifyMentioned: boolean;
   }): Promise<void> {
-    const { taskId, taskTitle, oldText, newText, assignee, editorId } = params;
-    if (!assignee?.telegramId) return;
-    if (assignee.id === editorId) return;
+    const {
+      taskId,
+      taskTitle,
+      oldText,
+      newText,
+      assignee,
+      editorId,
+      mentionedUsers,
+      notifyAssignee,
+      notifyMentioned,
+    } = params;
 
-    const text = buildTaskCommentUpdatedMessage(taskTitle, oldText, newText);
+    const mentionedMap = new Map<string, string>();
+    for (const user of mentionedUsers) {
+      if (!notifyMentioned) break;
+      if (!user.telegramId || user.id === editorId) continue;
+      if (!mentionedMap.has(user.id)) {
+        mentionedMap.set(user.id, user.telegramId);
+      }
+    }
 
-    try {
-      await this.telegramNotify.sendMessage(assignee.telegramId, text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to notify assignee about comment update for task ${taskId}: ${msg}`);
+    for (const [userId, telegramId] of mentionedMap) {
+      const mentionText = buildTaskMentionRequestedMessage(taskTitle, newText);
+      try {
+        await this.telegramNotify.sendMessage(telegramId, mentionText);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to notify mentioned user ${userId} for task ${taskId}: ${msg}`);
+      }
+    }
+
+    if (
+      notifyAssignee &&
+      assignee?.telegramId &&
+      assignee.id !== editorId &&
+      !mentionedMap.has(assignee.id)
+    ) {
+      const assigneeText = buildTaskCommentUpdatedMessage(taskTitle, oldText, newText);
+      try {
+        await this.telegramNotify.sendMessage(assignee.telegramId, assigneeText);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to notify assignee about comment update for task ${taskId}: ${msg}`);
+      }
     }
   }
 
@@ -386,38 +537,20 @@ export class TasksService {
       };
     });
 
-    if (dto.notifyMentioned) {
-      await this.notifyMentionedUser({
+    if (dto.notifyMentioned || dto.notifyAssignee) {
+      await this.notifyTaskCommentCreated({
         taskId,
         taskTitle: result.task.title,
         commentText: result.comment.text,
         authorId: result.author.id,
-        mentionedUser: result.mentionedUser,
+        assignee: result.task.assignee,
+        mentionedUsers: [result.mentionedUser],
+        notifyAssignee: dto.notifyAssignee === true,
+        notifyMentioned: dto.notifyMentioned === true,
       });
     }
 
     return result;
-  }
-
-  private async notifyMentionedUser(params: {
-    taskId: string;
-    taskTitle: string;
-    commentText: string;
-    authorId: string;
-    mentionedUser: { id: string; telegramId: string | null };
-  }): Promise<void> {
-    const { taskId, taskTitle, commentText, authorId, mentionedUser } = params;
-    if (!mentionedUser.telegramId) return;
-    if (mentionedUser.id === authorId) return;
-
-    const text = buildTaskMentionRequestedMessage(taskTitle, commentText);
-
-    try {
-      await this.telegramNotify.sendMessage(mentionedUser.telegramId, text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to notify mentioned user for task ${taskId}: ${msg}`);
-    }
   }
 
   async findAll(projectId?: string) {

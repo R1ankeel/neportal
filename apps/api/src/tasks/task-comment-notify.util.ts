@@ -7,13 +7,21 @@ function preview(value: string): string {
   return `${trimmed.slice(0, MAX_TEXT_LENGTH)}…`;
 }
 
+export function buildTaskCommentCreatedMessage(taskTitle: string, commentText: string): string {
+  return [
+    `💬 Новый комментарий к задаче «${taskTitle.trim() || "—"}»`,
+    "",
+    preview(commentText),
+  ].join("\n");
+}
+
 export function buildTaskCommentUpdatedMessage(
   taskTitle: string,
   oldText: string,
   newText: string,
 ): string {
   return [
-    `Комментарий к задаче «${taskTitle.trim() || "—"}» изменён.`,
+    `💬 Комментарий к задаче «${taskTitle.trim() || "—"}» изменён`,
     "",
     "Было:",
     preview(oldText),

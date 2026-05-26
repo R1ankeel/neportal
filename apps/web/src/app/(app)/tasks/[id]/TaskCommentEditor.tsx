@@ -71,6 +71,9 @@ export function TaskCommentEditor({
           <input type="hidden" name="commentId" value={comment.id} />
           <input type="hidden" name="editorId" value={editorId ?? ""} />
           {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
+          {comment.mentions?.map((m) => (
+            <input key={m.id} type="hidden" name="mentionedUserIds" value={m.mentionedUser.id} />
+          ))}
           <textarea
             name="text"
             rows={3}

@@ -27,8 +27,8 @@ export async function addTaskComment(
   const base = getApiBaseUrl();
   const path = mentionedUserId ? `/tasks/${taskId}/comments/mention` : `/tasks/${taskId}/comments`;
   const payload = mentionedUserId
-    ? { authorId, mentionedUserId, text, source: "WEB", notifyMentioned: true }
-    : { authorId, text, source: "WEB" };
+    ? { authorId, mentionedUserId, text, source: "WEB", notifyMentioned: true, notifyAssignee: true }
+    : { authorId, text, source: "WEB", notifyAssignee: true };
   const res = await fetch(`${base}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -58,6 +58,10 @@ export async function updateTaskComment(
   const editorId = String(formData.get("editorId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
   const projectId = String(formData.get("projectId") ?? "").trim();
+  const mentionedUserIds = formData
+    .getAll("mentionedUserIds")
+    .map((v) => String(v).trim())
+    .filter((v) => v.length > 0 && v !== editorId);
 
   if (!taskId) return { ok: false, message: "Не указана задача" };
   if (!commentId) return { ok: false, message: "Не указан комментарий" };
@@ -67,7 +71,13 @@ export async function updateTaskComment(
   const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/comments/${commentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ editorId, text }),
+    body: JSON.stringify({
+      editorId,
+      text,
+      mentionedUserIds,
+      notifyAssignee: true,
+      notifyMentioned: true,
+    }),
   });
 
   if (!res.ok) {

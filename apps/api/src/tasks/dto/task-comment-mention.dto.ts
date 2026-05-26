@@ -30,4 +30,12 @@ export class CreateTaskCommentMentionDto {
   @IsOptional()
   @IsBoolean()
   notifyMentioned?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Отправить исполнителю уведомление о новом комментарии (Web)",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyAssignee?: boolean;
 }

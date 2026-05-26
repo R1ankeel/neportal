@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { TaskCommentSource } from "@neportal/database";
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateTaskCommentDto {
   @ApiProperty({ description: "Автор комментария (пользователь org)" })
@@ -17,6 +17,14 @@ export class CreateTaskCommentDto {
   @IsOptional()
   @IsEnum(TaskCommentSource)
   source?: TaskCommentSource;
+
+  @ApiPropertyOptional({
+    description: "Отправить исполнителю уведомление о новом комментарии (Web)",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyAssignee?: boolean;
 }
 
 export class UpdateTaskCommentDto {
@@ -29,4 +37,29 @@ export class UpdateTaskCommentDto {
   @IsString()
   @IsNotEmpty()
   text!: string;
+
+  @ApiPropertyOptional({
+    description: "Список упомянутых пользователей для уведомления при редактировании (Web)",
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mentionedUserIds?: string[];
+
+  @ApiPropertyOptional({
+    description: "Отправить исполнителю уведомление об изменении комментария (Web)",
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyAssignee?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Отправить упомянутым пользователям уведомление при редактировании (Web)",
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyMentioned?: boolean;
 }
