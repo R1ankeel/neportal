@@ -90,10 +90,12 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 - произвольные AI-запросы и intent-классификация (create task/comment/mention/absence/task list и т.д.);
 - slash-команды (`/tasks`, `/comment`, `/mention`, `/deadline`, `/sick` и др.) и их аргументы;
-- текстовые детали, где пользователь должен сформулировать содержание (например, комментарий, пояснение, текст заметки);
-- `/start`-привязка по username: подтверждение `да` / `нет` только текстом (без inline-кнопок).
+- текстовые детали, где пользователь должен сформулировать содержание (например, комментарий, пояснение, текст заметки).
 
 **Закрыто кнопками (button-first; voice не должен специально ловить `да`, `1`, `отмена`):**
+
+- `/start`-привязка по username: подтверждение **Да** / **Нет** (текст `да` / `нет` — fallback);
+- главное меню после `/start` и успешной привязки — inline-кнопки действий;
 
 - все preview confirmation-сценарии: **Подтвердить / Изменить / Отменить**;
 - все choice-сценарии выбора из списка: пользователь, задача, бюджет, расход без чека, пункты edit-flow;
@@ -115,6 +117,7 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 - создание заметки / бюджета;
 - больничный / отпуск и отмена отсутствия;
 - распределение задач при отсутствии (`confirm_absence_delegation_distribution`);
+- привязка Telegram по username через `/start` (`confirm_link_by_username`);
 - другие confirmation-сценарии через общий preview flow.
 
 Модули: `telegram/keyboards/confirmation-keyboard.ts`, `confirmation-callback.ts`, `confirmation-decision.ts`, `confirmation-reply.ts`.
@@ -184,9 +187,45 @@ Telegram может вернуть ошибку на `answerCallbackQuery`, ес
 - глобальный `bot.catch` (`telegram-error-log.ts`) — необработанные ошибки middleware;
 - логи callback (`telegram/callback-log.ts`) — без секретов, токенов и полного контекста Telegram API.
 
-В `main.ts` обработчик `bot.on("callback_query:data")` вызывает `handleChoiceCallback`, затем `handleConfirmationCallback` — **параллельно** с `message:text` (plain text идёт в `handlePlainTextMessage`).
+В `main.ts` обработчик `bot.on("callback_query:data")` вызывает `handleStartLinkCallback`, `handleMainMenuCallback`, затем `handleChoiceCallback` и `handleConfirmationCallback` — **параллельно** с `message:text` (plain text идёт в `handlePlainTextMessage`).
 
-**Исключение:** привязка по username через `/start` — подтверждение «да» / «нет» **только текстом** (отдельный pending в `start-binding.ts`, без общего confirmation-keyboard).
+**Привязка по username через `/start`:** inline-кнопки **Да** / **Нет** (`start-link-keyboard.ts`, `start-link-callback.ts`); текст `да` / `нет` — fallback через `start-binding.ts`. Формат callback:
+
+```text
+start-link:yes:<telegramUserId>:<confirmationId>
+start-link:no:<telegramUserId>:<confirmationId>
+```
+
+### `/start` и главное меню
+
+**`/start` (button-first):**
+
+- уже привязанный пользователь → приветствие + **главное меню** (inline-кнопки);
+- не привязан, username найден в Web → вопрос о привязке + кнопки **Да** / **Нет**;
+- успешная привязка → onboarding-текст + главное меню;
+- slash-список команд из `/start` **убран**; полный список — в `/demo`.
+
+**Главное меню** (`main-menu-keyboard.ts`, `main-menu-reply.ts`, `main-menu-callback.ts`):
+
+| Кнопка | Действие |
+|--------|----------|
+| Мои задачи | тот же flow, что `/tasks` |
+| Создать задачу / Записать заметку / Отчитаться по расходам | инструкция для текста/голоса |
+| Мои неподтверждённые расходы | тот же flow, что `/pending-expenses` |
+| Больничный / Отпуск | инструкция для текста/голоса |
+| Информация | справка про голос + повторное меню |
+
+Формат callback главного меню:
+
+```text
+main-menu:<action>:<telegramUserId>
+```
+
+`<action>` — whitelist: `my-tasks`, `create-task`, `create-note`, `create-expense`, `unconfirmed-expenses`, `sick`, `vacation`, `info`.
+
+**Защита:** `telegramUserId` в callback сверяется с `ctx.from.id` (owner-guard); устаревший `confirmationId` для привязки — безопасный no-op + снятие inline-клавиатуры; ошибки `answerCallbackQuery` / `editMessageReplyMarkup` не валят бот (`safe-answer-callback.ts`, `safe-edit-message-reply-markup.ts`).
+
+**Slash-команды** (`/task`, `/note`, `/expense`, `/tasks`, …) остаются рабочим fallback — см. `/demo`.
 
 ### Принципы реализации
 
@@ -213,7 +252,7 @@ Telegram может вернуть ошибку на `answerCallbackQuery`, ес
 
 | Команда | Действие |
 |---------|----------|
-| `/start` | Привязка Telegram по username из Web + краткая справка |
+| `/start` | Привязка Telegram по username из Web + главное меню (кнопки) |
 | `/me` | Статус привязки (ФИО, роль, @username) |
 | `/link <ФИО>` | Привязка по имени (**dev**, без username в Web) |
 | `/demo` | Полный список команд |
@@ -510,14 +549,14 @@ Dev-лог (без секретов): `[bot] create_task assignee before require
 
 **Поток `/start`:**
 
-1. `GET /users/by-telegram/:telegramId` — если пользователь уже привязан → *«Здравствуйте, {fullName}. Вы уже привязаны.»*
+1. `GET /users/by-telegram/:telegramId` — если пользователь уже привязан → приветствие + **главное меню**
 2. Иначе, если у отправителя есть `ctx.from.username`:
    - `GET /users/by-telegram-username/:username` (без `@`, case-insensitive)
-   - Найден, `telegramId` пустой → pending `confirm_link_by_username`, вопрос *да / нет*
+   - Найден, `telegramId` пустой → pending `confirm_link_by_username`, вопрос с кнопками **Да** / **Нет**
    - Найден, `telegramId` уже задан → *«…уже привязан. Обратитесь к руководителю.»*
 3. Username не указан в Telegram или сотрудник не найден → *«Попросите руководителя добавить ваш username…»*
 
-**Подтверждение:** ответ `да` / `нет` **только текстом** (без общего confirmation-keyboard) → `PATCH /users/:id/telegram` с `telegramId = String(ctx.from.id)` → *«Готово. Telegram привязан…»*; `нет` → *«Привязка отменена.»*
+**Подтверждение:** кнопки **Да** / **Нет** или текст `да` / `нет` (fallback) → `PATCH /users/:id/telegram` с `telegramId = String(ctx.from.id)` → onboarding + главное меню; `нет` → *«Привязка отменена.»*
 
 Pending привязки и AI intent хранятся **в памяти** (`pending-intent.ts`), типы различаются полем `type`.
 
@@ -879,7 +918,12 @@ REST для scheduler (вызывает бот):
 | `handle-mention-intent.ts` | AI `mention_in_task` с selection |
 | `task-mention-flow.ts` | slash `/mention`, execute mention |
 | `pending-task-mention-details.ts` | ожидание текста призыва |
-| `start-binding.ts` | Логика `/start` и подтверждение привязки |
+| `start-binding.ts` | Логика привязки по username, text fallback `да`/`нет`, onboarding |
+| `start-link-callback.ts` | Callback **Да**/**Нет** для привязки |
+| `telegram/keyboards/start-link-keyboard.ts` | Inline-клавиатура привязки |
+| `main-menu-reply.ts` | `replyWithMainMenu` — приветствие + меню |
+| `main-menu-callback.ts` | Routing действий главного меню |
+| `telegram/keyboards/main-menu-keyboard.ts` | Inline-клавиатура главного меню |
 | `current-user.ts` | Linked user или fallback для slash/AI |
 | `parse-ru-date.ts` | DD.MM.YYYY ↔ ISO, ordinal/named-month дедлайны, `resolveDeadlineFromUserMessage`, `replaceIsoDatesInText` |
 | `ai/postprocess/create-task-normalize.ts` | Дедлайн create_task: deterministic → LLM fallback → cleanup title |

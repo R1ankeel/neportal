@@ -1,7 +1,6 @@
 import type { Context } from "grammy";
 import { isConfirmationNo, isConfirmationYes } from "./confirmation";
 import {
-  fetchUserByTelegramId,
   fetchUserByTelegramUsername,
   linkTelegramUser,
   normalizeTelegramUsername,
@@ -9,7 +8,46 @@ import {
 import {
   clearPendingConfirmation,
   setPendingConfirmation,
+  type PendingLinkByUsername,
 } from "./pending-intent";
+import { buildStartLinkKeyboard } from "./telegram/keyboards/start-link-keyboard";
+import { replyWithMainMenu } from "./main-menu-reply";
+import type { StartLinkAction } from "./telegram/keyboards/start-link-keyboard";
+
+export async function finalizeLinkSuccess(ctx: Context): Promise<void> {
+  await ctx.reply(
+    [
+      "Готово, Telegram привязан к Neportal.",
+      "",
+      "Теперь вы можете создавать задачи, записывать заметки,",
+      "отчитываться по расходам и управлять задачами текстом или голосом.",
+    ].join("\n"),
+  );
+  await replyWithMainMenu(ctx);
+}
+
+export async function applyLinkByUsernameDecision(
+  ctx: Context,
+  pending: PendingLinkByUsername,
+  decision: StartLinkAction,
+  telegramUserId: number,
+): Promise<void> {
+  clearPendingConfirmation(telegramUserId);
+
+  if (decision === "no") {
+    await ctx.reply("Привязка отменена.");
+    return;
+  }
+
+  try {
+    await linkTelegramUser(pending.userId, String(telegramUserId));
+    await finalizeLinkSuccess(ctx);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] link by username error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+}
 
 export async function handleStartBinding(ctx: Context): Promise<void> {
   const telegramId = ctx.from?.id;
@@ -18,17 +56,10 @@ export async function handleStartBinding(ctx: Context): Promise<void> {
     return;
   }
 
-  const telegramIdStr = String(telegramId);
   const rawUsername = ctx.from?.username;
   const username = rawUsername ? normalizeTelegramUsername(rawUsername) : null;
 
   try {
-    const linked = await fetchUserByTelegramId(telegramIdStr);
-    if (linked) {
-      await ctx.reply(`Здравствуйте, ${linked.fullName}. Вы уже привязаны.`);
-      return;
-    }
-
     if (username) {
       const user = await fetchUserByTelegramUsername(username);
       if (user) {
@@ -39,7 +70,7 @@ export async function handleStartBinding(ctx: Context): Promise<void> {
           return;
         }
 
-        setPendingConfirmation(telegramId, {
+        const confirmationId = setPendingConfirmation(telegramId, {
           type: "confirm_link_by_username",
           userId: user.id,
           fullName: user.fullName,
@@ -47,12 +78,13 @@ export async function handleStartBinding(ctx: Context): Promise<void> {
         });
 
         await ctx.reply(
-          [
-            `Здравствуйте, ${user.fullName}.`,
-            `Ваш Telegram @${username} указан в профиле Neportal.`,
-            `Привязать этот Telegram к сотруднику ${user.fullName}?`,
-            "Ответьте: да / нет",
-          ].join("\n"),
+          `Привязать этот Telegram к корпоративному аккаунту ${user.fullName}?`,
+          {
+            reply_markup: buildStartLinkKeyboard({
+              ownerTelegramUserId: telegramId,
+              confirmationId,
+            }),
+          },
         );
         return;
       }
@@ -70,39 +102,20 @@ export async function handleStartBinding(ctx: Context): Promise<void> {
 
 export async function handleLinkByUsernameConfirmation(
   ctx: Context,
-  pending: {
-    type: "confirm_link_by_username";
-    userId: string;
-    fullName: string;
-    username: string;
-  },
+  pending: PendingLinkByUsername,
   text: string,
   telegramUserId: number,
 ): Promise<boolean> {
   if (isConfirmationYes(text)) {
-    clearPendingConfirmation(telegramUserId);
-    try {
-      const linked = await linkTelegramUser(
-        pending.userId,
-        String(telegramUserId),
-      );
-      await ctx.reply(
-        `Готово. Telegram привязан к сотруднику: ${linked.fullName}.`,
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[bot] link by username error: ${msg}`);
-      await ctx.reply(`Ошибка API: ${msg}`);
-    }
+    await applyLinkByUsernameDecision(ctx, pending, "yes", telegramUserId);
     return true;
   }
 
   if (isConfirmationNo(text)) {
-    clearPendingConfirmation(telegramUserId);
-    await ctx.reply("Привязка отменена.");
+    await applyLinkByUsernameDecision(ctx, pending, "no", telegramUserId);
     return true;
   }
 
-  await ctx.reply("Ожидаю подтверждение привязки. Ответьте: да / нет");
+  await ctx.reply("Ожидаю подтверждение привязки. Нажмите «Да» или «Нет», либо ответьте: да / нет");
   return true;
 }

@@ -52,6 +52,9 @@ import {
 import { resolveUserByHint } from "./user-hint-resolution";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 import { handleStartBinding } from "./start-binding";
+import { handleStartLinkCallback } from "./start-link-callback";
+import { handleMainMenuCallback } from "./main-menu-callback";
+import { replyWithMainMenu } from "./main-menu-reply";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
@@ -93,35 +96,33 @@ const bot = new Bot(token);
 
 bot.catch(logBotMiddlewareError);
 
-bot.command("start", async (ctx) => {
-  await handleStartBinding(ctx);
+async function handleStartCommand(ctx: Context): Promise<void> {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) {
+    await ctx.reply("Не удалось определить Telegram ID.");
+    return;
+  }
 
-  await ctx.reply(
-    [
-      "",
-      "Команды Neportal:",
-      "/task <название> — задача",
-      "/note <текст> — заметка",
-      "/expense <сумма> <описание> — расход",
-      "/sick до 25.05.2026 номер 123456 — больничный",
-      "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
-      "/cancel-absence — отменить своё отсутствие",
-      "/cancel-absence Вася — отменить отсутствие сотрудника",
-      "/start-task <название> — взять задачу в работу",
-      "/work <название> — взять задачу в работу",
-      "/done <название> — закрыть задачу",
-      "/cancel <название> — отменить задачу",
-      "/comment <задача> — <комментарий> — комментарий к задаче",
-      "/mention <сотрудник> | <задача> | <комментарий> — призвать в задачу",
-      "/transfer <задача> | <исполнитель> | <комментарий> — передать задачу",
-      "/reassign <задача> | <старый?> | <новый> | <комментарий> — переназначить (OWNER/MANAGER)",
-      "/tasks — мои ближайшие задачи",
-      "/tasks <сотрудник> — задачи сотрудника (OWNER/MANAGER)",
-      "/pending-expenses — расходы без чеков",
-      "/me — статус привязки",
-      "/demo — справка",
-    ].join("\n"),
-  );
+  try {
+    const linked = await fetchUserByTelegramId(String(telegramId));
+    if (linked) {
+      await replyWithMainMenu(
+        ctx,
+        `Здравствуйте, ${linked.fullName}.\nВы можете создавать задачи, записывать заметки и управлять ими текстом или голосом.`,
+      );
+      return;
+    }
+
+    await handleStartBinding(ctx);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] start command error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
+}
+
+bot.command("start", async (ctx) => {
+  await handleStartCommand(ctx);
 });
 
 bot.command("demo", async (ctx) => {
@@ -907,6 +908,8 @@ bot.on("message:voice", async (ctx) => {
 });
 
 bot.on("callback_query:data", async (ctx) => {
+  if (await handleStartLinkCallback(ctx)) return;
+  if (await handleMainMenuCallback(ctx)) return;
   if (await handleTaskStatusDetailsCancelCallback(ctx)) return;
   await handleChoiceCallback(ctx);
   await handleConfirmationCallback(ctx);
