@@ -40,3 +40,43 @@ export async function addTaskComment(
 
   return { ok: true, saved: true };
 }
+
+export type UpdateDeadlineState =
+  | { ok: true; deadlineAt: string | null }
+  | { ok: false };
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function updateTaskDeadline(
+  _prev: UpdateDeadlineState | undefined,
+  formData: FormData,
+): Promise<UpdateDeadlineState> {
+  const taskId = String(formData.get("taskId") ?? "");
+  const deadlineAt = String(formData.get("deadlineAt") ?? "").trim();
+  const projectId = String(formData.get("projectId") ?? "").trim();
+
+  if (!taskId || !deadlineAt || !ISO_DATE_RE.test(deadlineAt)) {
+    return { ok: false };
+  }
+
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/deadline`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ deadlineAt }),
+  });
+
+  if (!res.ok) {
+    return { ok: false };
+  }
+
+  const task = (await res.json()) as { deadlineAt: string | null };
+
+  revalidatePath(`/tasks/${taskId}`);
+  revalidatePath("/tasks");
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}/tasks`);
+    revalidatePath(`/projects/${projectId}`);
+  }
+
+  return { ok: true, deadlineAt: task.deadlineAt };
+}

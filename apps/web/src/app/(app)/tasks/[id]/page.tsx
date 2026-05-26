@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddCommentForm } from "./AddCommentForm";
+import { TaskDeadlineEditor } from "./TaskDeadlineEditor";
 import { apiGet } from "@/lib/api";
 import {
-  formatDate,
   formatDateTime,
   noteSourceLabel,
   taskStatusLabel,
@@ -67,7 +67,13 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div>
             <dt className="text-sm font-medium text-zinc-500">Дедлайн</dt>
-            <dd className="mt-1 text-lg">{formatDate(task.deadlineAt)}</dd>
+            <dd className="mt-1">
+              <TaskDeadlineEditor
+                taskId={task.id}
+                initialDeadlineAt={task.deadlineAt}
+                projectId={task.project?.id}
+              />
+            </dd>
           </div>
           {task.status === "IN_PROGRESS" && task.startedAt ? (
             <div>
