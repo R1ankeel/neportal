@@ -64,6 +64,10 @@ export async function normalizeCreateTaskPayload(
     }
   }
 
+  if (!deadlineDate) {
+    deadlineDate = baseDate;
+  }
+
   return { ...rest, title, description, deadlineDate };
 }
 
@@ -88,6 +92,10 @@ export function normalizeCreateTaskPayloadSync(
     deadlineDate = existingDeadline;
   } else if (deadlineDate) {
     deadlineDate = coerceDeadlineDateLoose(deadlineDate, baseDate);
+  }
+
+  if (!deadlineDate) {
+    deadlineDate = baseDate;
   }
 
   return { ...rest, title, description, deadlineDate };
