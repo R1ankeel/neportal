@@ -57,7 +57,8 @@ export async function handlePendingTaskStatusDetailsMessage(
 
   if (isPendingDetailsCancel(text)) {
     clearPendingTaskStatusDetails(telegramUserId);
-    await ctx.reply("Ок, действие отменено.");
+    clearPendingConfirmation(telegramUserId);
+    await ctx.reply("Отменено.");
     return true;
   }
 

@@ -26,6 +26,7 @@ import type { CreateTaskAssigneeCandidate } from "./pending-create-task-assignee
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
 import { validateIntentForRouting } from "./validate-parsed-intent";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { devLog } from "./dev-log";
 
 const CONFIDENCE_THRESHOLD = 0.7;
 const CREATE_TASK_ASSIGNEE_LIST_LIMIT = 7;
@@ -51,6 +52,17 @@ export async function routeParsedAiIntent(
     intent.intent === "start_task" ||
     intent.intent === "set_task_deadline"
   ) {
+    if (process.env.BOT_DEV_LOG !== "0" && (intent.intent === "complete_task" || intent.intent === "cancel_task")) {
+      const value =
+        intent.intent === "complete_task"
+          ? intent.payload.completionResult ?? ""
+          : intent.payload.cancellationReason ?? "";
+      devLog("task-status intent parsed", {
+        intent: intent.intent,
+        hasResult: value.trim().length > 0,
+        resultChars: value.trim().length,
+      });
+    }
     await handleTaskActionIntent(ctx, linked, telegramUserId, intent);
     return;
   }

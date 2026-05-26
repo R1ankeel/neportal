@@ -280,6 +280,16 @@ function devCheckVoiceCleanupIntentPreservation(): void {
       mustContainAll: ["комментар", "нужны трубы диаметром 5 и 3"],
       mustNotContain: ["короче"],
     },
+    {
+      input: "ну короче закрой задачу по квартальному отчёту, я всё сделал, всё отправил",
+      mustContainAll: ["закрой задачу", "я всё сделал", "всё отправил"],
+      mustNotContain: ["короче"],
+    },
+    {
+      input: "короче отмени задачу по складу, потому что больше не актуально",
+      mustContainAll: ["отмени задачу", "потому что больше не актуально"],
+      mustNotContain: ["короче"],
+    },
   ];
 
   for (const testCase of cases) {

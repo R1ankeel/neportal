@@ -64,6 +64,7 @@ import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { getPendingTaskStatusDetails } from "./pending-task-status-details";
 import { buildTaskStatusDetailsCancelKeyboard, handleTaskStatusDetailsCancelCallback } from "./task-status-details-cancel";
 import { devLogVoicePendingGuardChecks } from "./speech/voice-pending-guard.dev";
+import { devLogTaskStatusFlowChecks } from "./task-status-flow.dev";
 import { replyWithTasksForHint } from "./my-tasks-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -935,6 +936,7 @@ async function main() {
     devLogConfirmationKeyboardChecks();
     devLogChoiceKeyboardChecks();
     devLogVoicePendingGuardChecks();
+    await devLogTaskStatusFlowChecks();
     await devLogSafeCallbackChecks();
     await devLogCreateTaskNormalizeChecks();
   }

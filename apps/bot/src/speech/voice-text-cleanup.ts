@@ -43,9 +43,44 @@ const SELF_ASSIGNEE_PATTERNS: RegExp[] = [
   /\bзапиш\w*\s+на\s+меня\b/iu,
 ];
 
+const TASK_STATUS_ACTION_PATTERNS: RegExp[] = [
+  /\bзакрой\s+задач\w*/iu,
+  /\bзакрыть\s+задач\w*/iu,
+  /\bотмени\s+задач\w*/iu,
+  /\bотменить\s+задач\w*/iu,
+  /\bзадача\s+сделан\w*/iu,
+  /\bвыполнил\s+задач\w*/iu,
+];
+
+const TASK_STATUS_DETAIL_PATTERNS: RegExp[] = [
+  /\bя\s+сделал\b/iu,
+  /\bя\s+вс[её]\s+сделал\b/iu,
+  /\bсделал\b/iu,
+  /\bотправил\b/iu,
+  /\bготово\b/iu,
+  /\bпричин\w*/iu,
+  /\bпотому\s+что\b/iu,
+  /\bтак\s+как\b/iu,
+];
+
 export function containsSelfAssigneeMarker(text: string): boolean {
   const normalized = normalizeWhitespace(text).toLowerCase();
   return SELF_ASSIGNEE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function containsTaskStatusActionMarker(text: string): boolean {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  return TASK_STATUS_ACTION_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function containsTaskStatusDetailMarker(text: string): boolean {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  return TASK_STATUS_DETAIL_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function hasInlineStatusSuffixSignal(text: string): boolean {
+  const normalized = normalizeWhitespace(text);
+  return /[,:;]\s*\S+/u.test(normalized);
 }
 
 function isShortText(text: string): boolean {
@@ -104,6 +139,16 @@ const INTENT_MARKERS: IntentMarker[] = [
     key: "edit_task",
     equivalentKeys: ["edit_task"],
     patterns: [/\bизмени\s+описан\w*/iu, /\bизмени\s+дедлайн\w*/iu, /\bизмени\s+исполнител\w*/iu],
+  },
+  {
+    key: "complete_task",
+    equivalentKeys: ["complete_task"],
+    patterns: [/\bзакрой\s+задач\w*/iu, /\bзакрыть\s+задач\w*/iu, /\bзадача\s+сделан\w*/iu, /\bвыполнил\s+задач\w*/iu],
+  },
+  {
+    key: "cancel_task",
+    equivalentKeys: ["cancel_task"],
+    patterns: [/\bотмени\s+задач\w*/iu, /\bотменить\s+задач\w*/iu],
   },
   {
     key: "sick_leave",
@@ -186,6 +231,8 @@ const SYSTEM_PROMPT =
   "Эти слова определяют исполнителя задачи и должны быть сохранены буквально по смыслу. " +
   "Сохрани смысл, имена, даты, суммы, числа, названия задач и тип команды. " +
   "Сохрани назначение задачи (кто исполнитель) без изменений. " +
+  "Если команда про закрытие/отмену задачи содержит результат или причину, не удаляй эту часть. " +
+  "Текст вида 'Закрой задачу, я всё сделал...' должен сохранить и команду, и результат. " +
   "Не добавляй новых фактов. Верни command-like текст, а не только контент. " +
   "Верни только JSON {\"text\":\"...\"}.";
 
@@ -210,6 +257,9 @@ export async function cleanupRecognizedVoiceText(
   const deterministic = cleanupFillerWords(original);
   const deterministicSafe = ensureIntentMarkerPreserved(original, deterministic);
   const originalHasSelfMarker = containsSelfAssigneeMarker(original);
+  const originalHasStatusAction = containsTaskStatusActionMarker(original);
+  const originalHasStatusDetail =
+    containsTaskStatusDetailMarker(original) || (originalHasStatusAction && hasInlineStatusSuffixSignal(original));
 
   if (!shouldUseAiCleanup(original, options)) {
     return {
@@ -254,6 +304,26 @@ export async function cleanupRecognizedVoiceText(
         source: "voice-cleanup-self-marker-fallback",
         originalHasSelfMarker: true,
         cleanedHasSelfMarker: false,
+        originalChars: original.length,
+        cleanedChars: cleaned.length,
+      });
+      return {
+        text: original,
+        source: "fallback",
+        changed: false,
+      };
+    }
+
+    const cleanedHasStatusAction = containsTaskStatusActionMarker(cleaned);
+    const cleanedHasStatusDetail =
+      containsTaskStatusDetailMarker(cleaned) || (cleanedHasStatusAction && hasInlineStatusSuffixSignal(cleaned));
+    if (originalHasStatusAction && originalHasStatusDetail && (!cleanedHasStatusAction || !cleanedHasStatusDetail)) {
+      console.info("[voice] voice-cleanup-task-status-detail-fallback", {
+        source: "voice-cleanup-task-status-detail-fallback",
+        originalHasStatusAction,
+        originalHasStatusDetail,
+        cleanedHasStatusAction,
+        cleanedHasStatusDetail,
         originalChars: original.length,
         cleanedChars: cleaned.length,
       });
