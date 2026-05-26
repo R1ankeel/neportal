@@ -22,6 +22,7 @@ import {
   stripDateFromTitle,
   stripMatchedDateExpression,
 } from "./create-task-text-cleanup";
+import { normalizeStructuredCreateTaskDescription } from "./create-task-structured-description";
 
 export type PostProcessCreateTaskOpts = {
   userText: string;
@@ -260,6 +261,23 @@ export async function postProcessCreateTaskPayloadAsync(
   }
 
   applyCreateTaskTitleDescriptionCleanup(payload, opts, deadline);
+
+  const title = typeof payload.title === "string" ? payload.title.trim() : "";
+  if (title) {
+    const description = typeof payload.description === "string" ? payload.description : undefined;
+    const structured = await normalizeStructuredCreateTaskDescription({
+      originalText: opts.userText,
+      title,
+      description,
+      deadlineDate: typeof payload.deadlineDate === "string" ? payload.deadlineDate : undefined,
+    });
+    payload.title = structured.title;
+    if (structured.description && structured.description.trim()) {
+      payload.description = structured.description;
+    } else {
+      delete payload.description;
+    }
+  }
 }
 
 /**
@@ -280,4 +298,21 @@ export async function postProcessCreateTaskPayload(
     payload.deadlineDate = deadline.deadlineDate;
   }
   applyCreateTaskTitleDescriptionCleanup(payload, opts, deadline);
+
+  const title = typeof payload.title === "string" ? payload.title.trim() : "";
+  if (title) {
+    const description = typeof payload.description === "string" ? payload.description : undefined;
+    const structured = await normalizeStructuredCreateTaskDescription({
+      originalText: opts.userText,
+      title,
+      description,
+      deadlineDate: typeof payload.deadlineDate === "string" ? payload.deadlineDate : undefined,
+    });
+    payload.title = structured.title;
+    if (structured.description && structured.description.trim()) {
+      payload.description = structured.description;
+    } else {
+      delete payload.description;
+    }
+  }
 }
