@@ -1,14 +1,14 @@
 # AI intent (LLM + `@neportal/ai-contracts`)
 
-Локальный MVP: Yandex Cloud используется **только как внешний API** (YandexGPT Foundation Models и/или Qwen в AI Studio; SpeechKit — позже). Бот и API работают на `localhost`, без деплоя приложения в Yandex.
+Локальный MVP: Yandex Cloud используется **только как внешний API** (YandexGPT Foundation Models, Qwen в AI Studio, SpeechKit STT). Бот и API работают на `localhost`, без деплоя приложения в Yandex.
 
 ## Архитектура разбора текста
 
-Обычный текст в боте проходит **три слоя** (см. также [bot.md](bot.md#детерминированный-разбор-без-yandexgpt)):
+Обычный текст и **распознанный голос** в боте проходят **три слоя** (см. также [bot.md](bot.md#детерминированный-разбор-без-yandexgpt), [bot.md - голос](bot.md#голосовые-сообщения-speechkit)):
 
-1. **Pending-состояния** — подтверждение и выбор: inline-кнопки (`callback_query`) или текст («да»/«нет», номер пункта, уточнение комментария и т.д.) — без GPT. См. [bot.md — Telegram UX](bot.md#telegram-ux-inline-кнопки).
-2. **Детерминированные парсеры** — регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) — **без** LLM.
-3. **LLM** (`parseTextIntent` → `AiProvider.complete`) — двухэтапный разбор для остальных фраз, если env настроен.
+1. **Pending-состояния** - подтверждение и выбор: inline-кнопки (`callback_query`) или текст («да»/«нет», номер пункта, уточнение комментария и т.д.) - без GPT. См. [bot.md - Telegram UX](bot.md#telegram-ux-inline-кнопки).
+2. **Детерминированные парсеры** - регулярные шаблоны и эвристики в `ai-message.ts` (списки задач, расходы, простое «создай задачу…», transfer/reassign) - **без** LLM.
+3. **LLM** (`parseTextIntent` → `AiProvider.complete`) - двухэтапный разбор для остальных фраз, если env настроен.
 
 ```mermaid
 sequenceDiagram
@@ -40,7 +40,7 @@ sequenceDiagram
   B-->>U: результат
 ```
 
-Slash-команды (`/task`, `/note`, …) **не** проходят через LLM.
+Slash-команды (`/task`, `/note`, …) и голос **не** проходят через LLM напрямую: голос сначала превращается в текст через SpeechKit, затем идёт в `handleTextSemanticMessage`.
 
 ### AiProvider (`apps/bot/src/ai/provider/`)
 
@@ -63,7 +63,7 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 Файл: `apps/bot/src/ai/prompt-group-router.ts`.
 
-По тексту пользователя бот выбирает **группу промпта** (`expense`, `absence`, `task-status`, `collaboration`, `task-list`, `create-task-rich`, `create-note` или `classifier`). Если группа **не** `classifier`, шаг classifier **пропускается** — сразу extractor этой группы.
+По тексту пользователя бот выбирает **группу промпта** (`expense`, `absence`, `task-status`, `collaboration`, `task-list`, `create-task-rich`, `create-note` или `classifier`). Если группа **не** `classifier`, шаг classifier **пропускается** - сразу extractor этой группы.
 
 Примеры маршрутизации без classifier: «мои задачи», «расходы без чеков», «потратил …», «создай задачу …», «закрыл задачу по складу …», transfer/reassign.
 
@@ -85,14 +85,14 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ### Логирование токенов и отладка
 
-- `[yandex-gpt] tokens provider=yandex|qwen promptGroup=… input=… output=… latencyMs=…` (`yandex-gpt-usage.ts`) — **один** лог на успешный completion (без дублей при retry).
+- `[yandex-gpt] tokens provider=yandex|qwen promptGroup=… input=… output=… latencyMs=…` (`yandex-gpt-usage.ts`) - **один** лог на успешный completion (без дублей при retry).
 - Итог за один `parseTextIntent`: `tokens parseTextIntent total`.
 - При HTTP/transient ошибках: `ai-provider error` / `retry` с `code`, `status`, `retryable`, `attempts`, `requestId` (без API key и Authorization).
-- Timeout/retry: `AI_PROVIDER_TIMEOUT_MS`, `AI_PROVIDER_MAX_RETRIES`, `AI_PROVIDER_RETRY_BASE_DELAY_MS` — см. [env.md](env.md).
+- Timeout/retry: `AI_PROVIDER_TIMEOUT_MS`, `AI_PROVIDER_MAX_RETRIES`, `AI_PROVIDER_RETRY_BASE_DELAY_MS` - см. [env.md](env.md).
 - Диагностика: `getAiProviderState().diagnostics` (configured, model, endpoint, timeoutMs, maxRetries).
-- При отказе модели / невалидной схеме — `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt`).
-- `BOT_DEV_SELF_CHECKS=true` — self-checks (registry, hardening, assignee `__self__`, парсеры).
-- `BOT_AI_CLEANUP_BASIC_TASKS` — LLM-очистка title (`cleanup-task-title.ts` → `requestAiJson`).
+- При отказе модели / невалидной схеме - `BOT_YANDEX_PROMPT_LOG_DIR` (по умолчанию `logs/yandex-gpt`).
+- `BOT_DEV_SELF_CHECKS=true` - self-checks (registry, hardening, assignee `__self__`, парсеры).
+- `BOT_AI_CLEANUP_BASIC_TASKS` - LLM-очистка title (`cleanup-task-title.ts` → `requestAiJson`).
 
 ### Местоимения и `__self__`
 
@@ -100,8 +100,8 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ### create_task: исполнитель vs имена в задаче
 
-- **assigneeHint** / **assigneeUserId** — кому назначают задачу; «мне» → `__self__` (модель может отдать только `assigneeUserId`, без hint).
-- Имена **внутри действия** («уволить Васю», «позвонить Ивану») — часть `title`, не исполнитель.
+- **assigneeHint** / **assigneeUserId** - кому назначают задачу; «мне» → `__self__` (модель может отдать только `assigneeUserId`, без hint).
+- Имена **внутри действия** («уволить Васю», «позвонить Ивану») - часть `title`, не исполнитель.
 - Post-processing (`fix-ai-intent-assignee.ts`): «поставь/создай/добавь мне задачу», «запиши мне в задачи» → `assigneeHint: "__self__"`.
 - После parse, в `route-parsed-intent.ts`: `resolveCreateTaskAssigneeInIntent` заменяет `__self__` на `currentUser.id` **до** вопроса «Кому назначить задачу?»; уточнение только если исполнитель полностью отсутствует.
 
@@ -126,19 +126,19 @@ Slash-команды (`/task`, `/note`, …) **не** проходят чере�
 
 ### create_task: дедлайн
 
-Разбор даты в сообщении пользователя **сначала детерминированный** (`apps/bot/src/parse-ru-date.ts`), LLM для дедлайна — только fallback (`ai/postprocess/create-task-deadline-llm.ts`, prompt group `create-task-deadline`).
+Разбор даты в сообщении пользователя **сначала детерминированный** (`apps/bot/src/parse-ru-date.ts`), LLM для дедлайна - только fallback (`ai/postprocess/create-task-deadline-llm.ts`, prompt group `create-task-deadline`).
 
 | Шаг | Источник | Когда |
 |-----|----------|--------|
 | 1 | `deterministic-deadline-resolver` | ISO, `DD.MM`, ordinal+weekday+след. месяц / named month, завтра/сегодня, «до пятницы», … |
-| 2 | `llm-deadline-resolver` | `needsLlmDeadlineResolution` — сложная фраза без покрытия парсером |
+| 2 | `llm-deadline-resolver` | `needsLlmDeadlineResolution` - сложная фраза без покрытия парсером |
 | 3 | `ai-deadline-fallback` | Поле `deadlineDate` из extractor + коррекции в `fix-ai-intent-deadline.ts` |
 
-Примеры (baseDate `2026-05-25`): «первая пятница следующего месяца» → `2026-06-05`; «первая пятница июля» → `2026-07-03`. После resolve — удаление временной фразы из title/description (`create-task-text-cleanup.ts`). Provider layer (Yandex/Qwen) **не менялся**.
+Примеры (baseDate `2026-05-25`): «первая пятница следующего месяца» → `2026-06-05`; «первая пятница июля» → `2026-07-03`. После resolve - удаление временной фразы из title/description (`create-task-text-cleanup.ts`). Provider layer (Yandex/Qwen) **не менялся**.
 
 ### Подтверждение и выбор (UX)
 
-Intents с `requiresConfirmation: true` → preview в Telegram с кнопками **Подтвердить / Изменить / Отменить**. Callback `confirmation:*` ссылается на pending по `confirmationId` — **без** payload intent в callback data. Списки (сотрудник, задача, бюджет, поля edit) — choice-layer (`choice:select:…`). Текстовый fallback сохранён. Подробно: [bot.md — Telegram UX](bot.md#telegram-ux-inline-кнопки).
+Intents с `requiresConfirmation: true` → preview в Telegram с кнопками **Подтвердить / Изменить / Отменить**. Callback `confirmation:*` ссылается на pending по `confirmationId` - **без** payload intent в callback data. Списки (сотрудник, задача, бюджет, поля edit) - choice-layer (`choice:select:…`). Текстовый fallback сохранён. Подробно: [bot.md - Telegram UX](bot.md#telegram-ux-inline-кнопки).
 
 > Поставь мне задачу проверить склад завтра
 
@@ -157,7 +157,7 @@ Intents с `requiresConfirmation: true` → preview в Telegram с кнопка�
 
 ### Неоднозначный сотрудник
 
-Если по hint найдено несколько сотрудников (например «Ване» и два Ивана), бот **не** выбирает автоматически — показывает нумерованный список с inline-кнопками или ждёт номер (см. [bot.md](bot.md#поиск-сотрудника-user-resolution-flow-v1)).
+Если по hint найдено несколько сотрудников (например «Ване» и два Ивана), бот **не** выбирает автоматически - показывает нумерованный список с inline-кнопками или ждёт номер (см. [bot.md](bot.md#поиск-сотрудника-user-resolution-flow-v1)).
 
 ## Контракт JSON
 
@@ -179,7 +179,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | intent | payload |
 |--------|---------|
 | `create_task` | `projectHint?`, `assigneeHint?`, `assigneeUserId?` (в т.ч. `__self__`), `title`, `description?`, `deadlineDate?` (ISO) |
-| `create_note` | `projectHint?`, `text` (в тексте даты — **DD.MM.YYYY**) |
+| `create_note` | `projectHint?`, `text` (в тексте даты - **DD.MM.YYYY**) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_budget` | `projectHint?`, `name`, `amount`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
@@ -308,9 +308,9 @@ Confirmation: *«Взять задачу «Проверить склад» в р
 YandexGPT может вернуть формально валидный JSON, где `comment` совпадает с целой фразой пользователя. Перед routing бот вызывает `validateIntentForRouting` → `validateAddTaskCommentPayload`:
 
 - нормализация строк (trim, схлопывание пробелов);
-- если `comment` пустой или почти равен `userText` при известной задаче — recovery: явные разделители (`:`, «, что», « что », « с текстом ») или хвост `userText` после fuzzy-вхождения `taskQuery`/`taskTitle` (stem из `task-search-text.ts`);
-- если recovery не удался — `needsComment` → бот спрашивает: *«Какой комментарий добавить?»*;
-- если нет `taskQuery` / `taskTitle` / `taskId` — `needsTaskQuery` → *«К какой задаче добавить комментарий?»*;
+- если `comment` пустой или почти равен `userText` при известной задаче - recovery: явные разделители (`:`, «, что», « что », « с текстом ») или хвост `userText` после fuzzy-вхождения `taskQuery`/`taskTitle` (stem из `task-search-text.ts`);
+- если recovery не удался - `needsComment` → бот спрашивает: *«Какой комментарий добавить?»*;
+- если нет `taskQuery` / `taskTitle` / `taskId` - `needsTaskQuery` → *«К какой задаче добавить комментарий?»*;
 - в preview и в БД сохраняется очищенный `comment`, не исходная команда.
 
 Edit-flow (`pendingConfirmationEdit`) для поля «Комментарий» не прогоняет текст через recovery (пустой `userText`).
@@ -385,7 +385,7 @@ OWNER/MANAGER: задача передаётся сразу после «да».
 }
 ```
 
-Только OWNER/MANAGER. Отличие от `transfer_task`: формулировка «с X на Y» / «перекинь» / «переназначь». После «да» — сразу смена исполнителя и уведомления старому, новому и постановщику.
+Только OWNER/MANAGER. Отличие от `transfer_task`: формулировка «с X на Y» / «перекинь» / «переназначь». После «да» - сразу смена исполнителя и уведомления старому, новому и постановщику.
 
 ### Пример: мои задачи (без confirmation)
 
@@ -415,7 +415,7 @@ OWNER/MANAGER: задача передаётся сразу после «да».
 }
 ```
 
-Бот проверяет роль (OWNER/MANAGER), разрешает `userHint` через User Resolution; при нескольких совпадениях — `select_user_for_task_list`, затем `GET /tasks/my?userId=<выбранный>&limit=5`. EMPLOYEE при запросе чужих задач получает отказ.
+Бот проверяет роль (OWNER/MANAGER), разрешает `userHint` через User Resolution; при нескольких совпадениях - `select_user_for_task_list`, затем `GET /tasks/my?userId=<выбранный>&limit=5`. EMPLOYEE при запросе чужих задач получает отказ.
 
 ### Пример: заметка
 
@@ -458,7 +458,7 @@ OWNER/MANAGER: задача передаётся сразу после «да».
 
 ### Контекст в prompt
 
-Текущая дата (UTC ISO), проекты, пользователи (компактные alias), бюджеты, задачи — из REST API (`intent-context.ts`) для сопоставления имён и hints.
+Текущая дата (UTC ISO), проекты, пользователи (компактные alias), бюджеты, задачи - из REST API (`intent-context.ts`) для сопоставления имён и hints.
 
 ## Загрузка схемы в боте
 
@@ -486,9 +486,9 @@ pnpm --filter @neportal/web dev
 pnpm --filter @neportal/bot dev
 ```
 
-1. Slash: `/note Тест` — без Yandex.
+1. Slash: `/note Тест` - без Yandex.
 2. Текст с настроенным Yandex → preview → Подтвердить (кнопка) или `да` → запись в Web (проект «Реклама VK»).
-3. `BOT_DEV_SELF_CHECKS=true` — self-checks при старте бота (в т.ч. deadline normalize, confirmation/choice keyboard).
-4. `BOT_DEV_MOCK_DEADLINE_LLM=true` — dev-checks дедлайна без реального LLM (см. [env.md](env.md)).
+3. `BOT_DEV_SELF_CHECKS=true` - self-checks при старте бота (в т.ч. deadline normalize, confirmation/choice keyboard).
+4. `BOT_DEV_MOCK_DEADLINE_LLM=true` - dev-checks дедлайна без реального LLM (см. [env.md](env.md)).
 
 См. также: [bot.md](bot.md), [packages.md](packages.md).

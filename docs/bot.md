@@ -50,7 +50,7 @@ YANDEX_GPT_MODEL_URI=gpt://<folder-id>/yandexgpt/latest
 | `YANDEX_CLOUD_FOLDER_ID` | Каталог Yandex Cloud, заголовок `x-folder-id` |
 | `YANDEX_GPT_API_KEY` | `Authorization: Api-Key` (**приоритет**) |
 | `YANDEX_CLOUD_IAM_TOKEN` | `Authorization: Bearer`, если API key пуст |
-| `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` — `gpt://{folder}/yandexgpt/latest` |
+| `YANDEX_GPT_MODEL_URI` | URI модели; если `change_me` - `gpt://{folder}/yandexgpt/latest` |
 
 При старте (без секретов): `[yandex-gpt] auth mode: api-key` или `iam-token`.
 
@@ -70,7 +70,7 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 #### Общее
 
-Значения `change_me` и пустые строки считаются «не задано». Если выбранный provider не настроен — slash-команды работают; на произвольный текст: *«AI-парсер пока не настроен. Используйте команды /demo.»*
+Значения `change_me` и пустые строки считаются «не задано». Если выбранный provider не настроен - slash-команды работают; на произвольный текст: *«AI-парсер пока не настроен. Используйте команды /demo.»*
 
 В логах completion (префикс `[yandex-gpt]` сохранён для совместимости): `provider=yandex|qwen`, `promptGroup`, `maxTokens`, `latencyMs`, токены.
 
@@ -78,7 +78,7 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 ## Telegram UX: inline-кнопки
 
-Текстовые сценарии подтверждения и выбора из списка дополнены **inline-кнопками**: меньше ошибок при вводе, быстрее взаимодействие, подготовка к голосовому вводу (SpeechKit). **Текстовый ввод сохранён** как fallback — пользователь по-прежнему может писать `да`, `нет`, `изменить`, `1`, `2`, `отмена` и другие поддерживаемые варианты.
+Текстовые сценарии подтверждения и выбора из списка дополнены **inline-кнопками**: меньше ошибок при вводе, быстрее взаимодействие, подготовка к голосовому вводу (SpeechKit). **Текстовый ввод сохранён** как fallback - пользователь по-прежнему может писать `да`, `нет`, `изменить`, `1`, `2`, `отмена` и другие поддерживаемые варианты.
 
 Подробнее о AI-контракте и postprocess дедлайнов: [ai-intent.md](ai-intent.md).
 
@@ -94,8 +94,8 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 **Закрыто кнопками (button-first; voice не должен специально ловить `да`, `1`, `отмена`):**
 
-- `/start`-привязка по username: подтверждение **Да** / **Нет** (текст `да` / `нет` — fallback);
-- главное меню после `/start` и успешной привязки — inline-кнопки действий;
+- `/start`-привязка по username: подтверждение **Да** / **Нет** (текст `да` / `нет` - fallback);
+- главное меню после `/start` и успешной привязки - inline-кнопки действий;
 
 - все preview confirmation-сценарии: **Подтвердить / Изменить / Отменить**;
 - все choice-сценарии выбора из списка: пользователь, задача, бюджет, расход без чека, пункты edit-flow;
@@ -105,7 +105,7 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 ### Confirmation flow
 
-Для preview-сценариев (бот показывает предварительный результат и ждёт решения) под сообщением — кнопки **Подтвердить**, **Изменить**, **Отменить**:
+Для preview-сценариев (бот показывает предварительный результат и ждёт решения) под сообщением - кнопки **Подтвердить**, **Изменить**, **Отменить**:
 
 - создание задачи;
 - добавление расхода;
@@ -122,7 +122,7 @@ QWEN_MODEL=gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest
 
 Модули: `telegram/keyboards/confirmation-keyboard.ts`, `confirmation-callback.ts`, `confirmation-decision.ts`, `confirmation-reply.ts`.
 
-**Callback не содержит business payload** — только ссылка на pending confirmation в состоянии бота:
+**Callback не содержит business payload** - только ссылка на pending confirmation в состоянии бота:
 
 ```text
 confirmation:confirm:<telegramUserId>:<confirmationId>
@@ -142,11 +142,11 @@ confirmation:cancel:<telegramUserId>:<confirmationId>
 
 Для `create_expense` ответ **нет** по-прежнему означает **выбор другого бюджета**, не отмену (см. [Подтверждение расхода](#подтверждение-расхода-create_expense)).
 
-Preview отправляется через `replyWithConfirmationPreview` — текст + `InlineKeyboard` с актуальным `confirmationId` из `pending-intent.ts`.
+Preview отправляется через `replyWithConfirmationPreview` - текст + `InlineKeyboard` с актуальным `confirmationId` из `pending-intent.ts`.
 
 ### Choice flow
 
-Сценарии выбора из списка (раньше — «напишите номер 1, 2, 3…») показывают **нумерованные inline-кнопки** и **Отменить**:
+Сценарии выбора из списка (раньше - «напишите номер 1, 2, 3…») показывают **нумерованные inline-кнопки** и **Отменить**:
 
 - сотрудник (User Resolution);
 - задача (task selection);
@@ -164,13 +164,13 @@ choice:select:<telegramUserId>:<choiceId>:<optionIndex>
 choice:cancel:<telegramUserId>:<choiceId>
 ```
 
-Список вариантов хранится в pending state; в callback передаются только индекс и guard-поля. Защита аналогична confirmation: чужой пользователь, устаревший `choiceId`, повторный callback, некорректный индекс — безопасный no-op без падения бизнес-логики.
+Список вариантов хранится в pending state; в callback передаются только индекс и guard-поля. Защита аналогична confirmation: чужой пользователь, устаревший `choiceId`, повторный callback, некорректный индекс - безопасный no-op без падения бизнес-логики.
 
 **Текстовый fallback:** `1`, `2`, `3`, …; `отмена`, `отменить`, `cancel`, `стоп`.
 
 ### Edit-flow (confirmation)
 
-Меню «Что редактируем?» (поля intent + «Сохранить без изменений» + «Отменить») — через **choice-layer** с теми же кнопками, что и нумерованный список. При выборе кнопкой вызывается тот же обработчик, что при вводе номера текстом; логика редактирования не дублируется.
+Меню «Что редактируем?» (поля intent + «Сохранить без изменений» + «Отменить») - через **choice-layer** с теми же кнопками, что и нумерованный список. При выборе кнопкой вызывается тот же обработчик, что при вводе номера текстом; логика редактирования не дублируется.
 
 Для `create_task` доступны поля: название, описание, исполнитель, дедлайн, проект, сохранить без изменений, отменить (`confirmation/editable-fields.ts`).
 
@@ -182,14 +182,14 @@ Telegram может вернуть ошибку на `answerCallbackQuery`, ес
 
 Обработка:
 
-- `safeAnswerCallbackQuery` — истёкший/невалидный callback не валит процесс;
+- `safeAnswerCallbackQuery` - истёкший/невалидный callback не валит процесс;
 - ошибки снятия inline-кнопок (`safe-edit-message-reply-markup.ts`) не останавливают middleware;
-- глобальный `bot.catch` (`telegram-error-log.ts`) — необработанные ошибки middleware;
-- логи callback (`telegram/callback-log.ts`) — без секретов, токенов и полного контекста Telegram API.
+- глобальный `bot.catch` (`telegram-error-log.ts`) - необработанные ошибки middleware;
+- логи callback (`telegram/callback-log.ts`) - без секретов, токенов и полного контекста Telegram API.
 
-В `main.ts` обработчик `bot.on("callback_query:data")` вызывает `handleStartLinkCallback`, `handleMainMenuCallback`, затем `handleChoiceCallback` и `handleConfirmationCallback` — **параллельно** с `message:text` (plain text идёт в `handlePlainTextMessage`).
+В `main.ts` обработчик `bot.on("callback_query:data")` вызывает `handleStartLinkCallback`, `handleMainMenuCallback`, `handleTaskStatusDetailsCancelCallback`, затем `handleChoiceCallback` и `handleConfirmationCallback` - **параллельно** с `message:text` / `message:voice` (plain text идёт в `handlePlainTextMessage`, голос - в `handleTelegramVoiceMessage`).
 
-**Привязка по username через `/start`:** inline-кнопки **Да** / **Нет** (`start-link-keyboard.ts`, `start-link-callback.ts`); текст `да` / `нет` — fallback через `start-binding.ts`. Формат callback:
+**Привязка по username через `/start`:** inline-кнопки **Да** / **Нет** (`start-link-keyboard.ts`, `start-link-callback.ts`); текст `да` / `нет` - fallback через `start-binding.ts`. Формат callback:
 
 ```text
 start-link:yes:<telegramUserId>:<confirmationId>
@@ -203,7 +203,7 @@ start-link:no:<telegramUserId>:<confirmationId>
 - уже привязанный пользователь → приветствие + **главное меню** (inline-кнопки);
 - не привязан, username найден в Web → вопрос о привязке + кнопки **Да** / **Нет**;
 - успешная привязка → onboarding-текст + главное меню;
-- slash-список команд из `/start` **убран**; полный список — в `/demo`.
+- slash-список команд из `/start` **убран**; полный список - в `/demo`.
 
 **Главное меню** (`main-menu-keyboard.ts`, `main-menu-reply.ts`, `main-menu-callback.ts`):
 
@@ -221,20 +221,20 @@ start-link:no:<telegramUserId>:<confirmationId>
 main-menu:<action>:<telegramUserId>
 ```
 
-`<action>` — whitelist: `my-tasks`, `create-task`, `create-note`, `create-expense`, `unconfirmed-expenses`, `sick`, `vacation`, `info`.
+`<action>` - whitelist: `my-tasks`, `create-task`, `create-note`, `create-expense`, `unconfirmed-expenses`, `sick`, `vacation`, `info`.
 
-**Защита:** `telegramUserId` в callback сверяется с `ctx.from.id` (owner-guard); устаревший `confirmationId` для привязки — безопасный no-op + снятие inline-клавиатуры; ошибки `answerCallbackQuery` / `editMessageReplyMarkup` не валят бот (`safe-answer-callback.ts`, `safe-edit-message-reply-markup.ts`).
+**Защита:** `telegramUserId` в callback сверяется с `ctx.from.id` (owner-guard); устаревший `confirmationId` для привязки - безопасный no-op + снятие inline-клавиатуры; ошибки `answerCallbackQuery` / `editMessageReplyMarkup` не валят бот (`safe-answer-callback.ts`, `safe-edit-message-reply-markup.ts`).
 
-**Slash-команды** (`/task`, `/note`, `/expense`, `/tasks`, …) остаются рабочим fallback — см. `/demo`.
+**Slash-команды** (`/task`, `/note`, `/expense`, `/tasks`, …) остаются рабочим fallback - см. `/demo`.
 
 ### Принципы реализации
 
-1. Кнопки **не заменяют** текстовый ввод полностью — fallback для всех ключевых действий.
-2. Callback **не содержит** business payload — только тип действия, `telegramUserId`, id pending-состояния и (для choice) индекс.
-3. Бизнес-логика **не дублируется** — кнопки сводятся к `applyConfirmationDecision` / choice handlers.
+1. Кнопки **не заменяют** текстовый ввод полностью - fallback для всех ключевых действий.
+2. Callback **не содержит** business payload - только тип действия, `telegramUserId`, id pending-состояния и (для choice) индекс.
+3. Бизнес-логика **не дублируется** - кнопки сводятся к `applyConfirmationDecision` / choice handlers.
 4. `confirmationId` / `choiceId` защищают от старых кнопок в истории чата.
 5. `telegramUserId` в callback защищает от чужих нажатий.
-6. Ошибки Telegram callback **не валят** бот — просроченный query нормален в production.
+6. Ошибки Telegram callback **не валят** бот - просроченный query нормален в production.
 7. Provider layer (YandexGPT / Qwen / `requestAiJson`) **не менялся** из-за UX-кнопок.
 
 ### Ручная проверка (чеклист)
@@ -246,7 +246,7 @@ main-menu:<action>:<telegramUserId>
 - изменение исполнителя через UI;
 - выбор из списка кнопками;
 - текстовый fallback: `да`, `отмена`, номер пункта;
-- повторное / устаревшее нажатие — без дубля и без падения бота.
+- повторное / устаревшее нажатие - без дубля и без падения бота.
 
 ## Команды
 
@@ -254,14 +254,14 @@ main-menu:<action>:<telegramUserId>
 |---------|----------|
 | `/start` | Привязка Telegram по username из Web + главное меню (кнопки) |
 | `/me` | Статус привязки (ФИО, роль, @username) |
-| `/link <ФИО>` | Привязка по имени (**dev**, без username в Web) |
+| `/link <ФИО>` | Привязка по имени (**dev**, без username в Web); при нескольких совпадениях - choice-список |
 | `/demo` | Полный список команд |
 | `/task <текст>` | `POST /tasks` в проекте по умолчанию |
 | `/note <текст>` | `POST /notes`, source `TELEGRAM_TEXT` |
 | `/expense <сумма> <описание>` | `POST /budgets/:id/expenses` |
 | `/sick до <дата> [номер <№>]` | `POST /absences` (`SICK_LEAVE`) |
 | `/vacation с <дата> по <дата>` | `POST /absences` (`VACATION`) |
-| `/cancel-absence` | `POST /absences/:id/cancel` — своё отсутствие |
+| `/cancel-absence` | `POST /absences/:id/cancel` - своё отсутствие |
 | `/cancel-absence <сотрудник>` | то же для сотрудника (OWNER/MANAGER или своё) |
 | `/delete-absence` | алиас `/cancel-absence` |
 | `/deadline <название> <дата>` | `PATCH /tasks/:id/deadline` |
@@ -269,16 +269,16 @@ main-menu:<action>:<telegramUserId>
 | `/work <название>` | то же, что `/start-task` |
 | `/done <название>` | `PATCH /tasks/:id/status` → `DONE` |
 | `/cancel <название>` | `PATCH /tasks/:id/status` → `CANCELLED` |
-| `/comment <задача> — <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
+| `/comment <задача> - <текст>` | `POST /tasks/:id/comments`, source `TELEGRAM_TEXT` |
 | `/mention <сотрудник> \| <задача> \| <текст>` | `POST /tasks/:id/comments/mention`, source `TELEGRAM_TEXT` |
 | `/transfer <задача> \| <исполнитель> \| <комментарий>` | `POST /tasks/:id/transfers` |
 | `/reassign <задача> \| <старый?> \| <новый> \| <комментарий>` | `POST /tasks/:id/transfers` (только OWNER/MANAGER) |
-| `/tasks` | `GET /tasks/my?userId=…&limit=5` — мои задачи |
+| `/tasks` | `GET /tasks/my?userId=…&limit=5` - мои задачи |
 | `/tasks <сотрудник>` | то же API; только **OWNER** / **MANAGER** |
 
 ### Список задач
 
-**Права:** `canViewOtherUsersTasks` — `true` для OWNER и MANAGER. Остальные видят только свои задачи; при запросе чужих: *«Вы можете смотреть только свои задачи.»*
+**Права:** `canViewOtherUsersTasks` - `true` для OWNER и MANAGER. Остальные видят только свои задачи; при запросе чужих: *«Вы можете смотреть только свои задачи.»*
 
 **Slash:**
 
@@ -314,7 +314,7 @@ main-menu:<action>:<telegramUserId>
 
 | Команда | Пример |
 |---------|--------|
-| `/comment` с текстом | `/comment Проверить склад — склад закрыт до завтра` (разделитель `—`, `-` или `:`) → preview с кнопками (или `да`) |
+| `/comment` с текстом | `/comment Проверить склад - склад закрыт до завтра` (разделитель `-`, `-` или `:`) → preview с кнопками (или `да`) |
 | `/comment` без текста | `/comment Проверить склад` → *«Что написать в комментарии к задаче «…»?»* → preview с кнопками (или `да`) |
 
 **AI:**
@@ -326,9 +326,9 @@ main-menu:<action>:<telegramUserId>
 
 **Pending comment details** (TTL 30 мин): `pending-task-comment-details.ts`. Отмена: *отмена*, *отмени*, *нет*, *стоп*.
 
-**Selection:** тип `select_task_for_comment`; если `commentText` уже в payload — после выбора (кнопка или номер) сразу preview, иначе — уточняющий вопрос.
+**Selection:** тип `select_task_for_comment`; если `commentText` уже в payload - после выбора (кнопка или номер) сразу preview, иначе - уточняющий вопрос.
 
-**Права (MVP):** постановщик, исполнитель, `OWNER`, `MANAGER` — те же, что для изменения задачи.
+**Права (MVP):** постановщик, исполнитель, `OWNER`, `MANAGER` - те же, что для изменения задачи.
 
 **Уведомления (без TaskNotificationLog):**
 
@@ -341,7 +341,7 @@ main-menu:<action>:<telegramUserId>
 
 ### Призыв в задачу (mention)
 
-**Slash** (разделители `|`, `—`, `-`):
+**Slash** (разделители `|`, `-`, `-`):
 
 | Команда | Пример |
 |---------|--------|
@@ -357,7 +357,7 @@ main-menu:<action>:<telegramUserId>
 
 **Pending mention details** (TTL 30 мин): `pending-task-mention-details.ts`, тип `awaiting_task_mention_text`. Отмена: *отмена*, *отмени*, *нет*, *стоп*.
 
-**Selection:** тип `select_task_for_mention`; payload: `mentionedUserId`, `mentionedUserName`, `mentionText?`. После выбора (кнопка или номер) — preview или вопрос о тексте.
+**Selection:** тип `select_task_for_mention`; payload: `mentionedUserId`, `mentionedUserName`, `mentionText?`. После выбора (кнопка или номер) - preview или вопрос о тексте.
 
 **Права:** те же, что для комментариев (постановщик, исполнитель, OWNER, MANAGER).
 
@@ -370,13 +370,13 @@ main-menu:<action>:<telegramUserId>
 Комментарий: {text}
 ```
 
-Если у сотрудника нет `telegramId` — комментарий и mention всё равно создаются; автору: *«… приглашён …, но Telegram у сотрудника не привязан.»*
+Если у сотрудника нет `telegramId` - комментарий и mention всё равно создаются; автору: *«… приглашён …, но Telegram у сотрудника не привязан.»*
 
-**Порядок обработки текста** (дополнение): после pending comment details — **pending mention details**, затем task selection.
+**Порядок обработки текста** (дополнение): после pending comment details - **pending mention details**, затем task selection.
 
 ### Передача задачи (transfer)
 
-**Slash:** `/transfer Проверить склад | Вася | потому что он отвечает за склад` (разделители `|`, `—`, `-`). Без комментария в slash — уточняющий вопрос *«Почему передаём задачу «…»?»*.
+**Slash:** `/transfer Проверить склад | Вася | потому что он отвечает за склад` (разделители `|`, `-`, `-`). Без комментария в slash - уточняющий вопрос *«Почему передаём задачу «…»?»*.
 
 **AI:** «Передай задачу Проверить склад Васе, потому что …» → preview с кнопками (или `да`).
 
@@ -385,7 +385,7 @@ main-menu:<action>:<telegramUserId>
 | Инициатор | После «да» |
 |-----------|------------|
 | OWNER / MANAGER | `assigneeId` сразу, уведомление новому исполнителю |
-| EMPLOYEE / ACCOUNTANT | `PENDING`, новому исполнителю «Принять? да/нет»; без Telegram у получателя — передача не создаётся |
+| EMPLOYEE / ACCOUNTANT | `PENDING`, новому исполнителю «Принять? да/нет»; без Telegram у получателя - передача не создаётся |
 
 **Принятие / отказ:** pending `pending_task_transfer_decision` у получателя. «да» → `POST /task-transfers/:id/accept`. «нет» → вопрос о причине → `POST .../reject`.
 
@@ -393,17 +393,17 @@ main-menu:<action>:<telegramUserId>
 
 **Selection:** `select_task_for_transfer`, payload `toUserId`, `toUserName`, `transferComment?`.
 
-**Порядок текста:** после mention details — transfer comment → transfer rejection reason → transfer decision → selection.
+**Порядок текста:** после mention details - transfer comment → transfer rejection reason → transfer decision → selection.
 
 ### Переназначение задачи (reassign, OWNER/MANAGER)
 
-**Slash:** `/reassign Проверить склад | Вася | Маша | из-за больничного` (2 части: задача и новый исполнитель; 3+: старый и новый). Разделители `|`, `—`, `-`.
+**Slash:** `/reassign Проверить склад | Вася | Маша | из-за больничного` (2 части: задача и новый исполнитель; 3+: старый и новый). Разделители `|`, `-`, `-`.
 
 **AI:** «Перекинь задачу Проверить склад с Васи на Машу» → preview с полями *Было / Стало* (кнопки или `да`) → `POST /tasks/:id/transfers` (сразу `ACCEPTED`, без согласия нового исполнителя).
 
 **Права:** только **OWNER** / **MANAGER**. Иначе: *«Только руководитель или менеджер может менять задачи сотрудников.»*
 
-**fromUserHint:** если указан («с Васи»), задачи фильтруются по `assigneeId`; при несовпадении с фактическим исполнителем — ошибка без confirmation.
+**fromUserHint:** если указан («с Васи»), задачи фильтруются по `assigneeId`; при несовпадении с фактическим исполнителем - ошибка без confirmation.
 
 **Уведомления:** новому исполнителю, старому (если другой), постановщику (если не инициатор); без дубля на один `telegramId`.
 
@@ -417,7 +417,7 @@ main-menu:<action>:<telegramUserId>
 
 **AI:** «Взял задачу Проверить склад в работу», … → intent `start_task` → тот же preview с кнопками.
 
-**Статусы:** уже `IN_PROGRESS` → *«Задача уже в работе: …»*; `DONE` / `CANCELLED` — соответствующие сообщения; повтор без дубля уведомления постановщику (лог `TASK_STARTED_CREATOR`).
+**Статусы:** уже `IN_PROGRESS` → *«Задача уже в работе: …»*; `DONE` / `CANCELLED` - соответствующие сообщения; повтор без дубля уведомления постановщику (лог `TASK_STARTED_CREATOR`).
 
 **Права:** исполнитель, постановщик, `OWNER`, `MANAGER`. Иначе: *«Вы не можете изменить эту задачу.»*
 
@@ -436,9 +436,9 @@ main-menu:<action>:<telegramUserId>
 | Команда | Пример |
 |---------|--------|
 | `/done` | `/done Проверить склад` → *«Что сделано по задаче…?»* |
-| `/done` с результатом | `/done Проверить склад — всё проверил` (разделитель `—`, `-` или `:`) → preview |
+| `/done` с результатом | `/done Проверить склад - всё проверил` (разделитель `-`, `-` или `:`) → preview |
 | `/cancel` | `/cancel Проверить склад` → *«Почему отменяем…?»* |
-| `/cancel` с причиной | `/cancel Проверить склад — склад закрыт` → preview |
+| `/cancel` с причиной | `/cancel Проверить склад - склад закрыт` → preview |
 
 **AI:**
 
@@ -449,14 +449,15 @@ main-menu:<action>:<telegramUserId>
 | Отмени задачу Проверить склад | вопрос о причине → preview → `CANCELLED` |
 | Отмени задачу Проверить склад, склад закрыт | сразу preview с `cancellationReason` |
 
-**Pending details** (в памяти, TTL 30 мин): `pending-task-status-details.ts`. Отмена уточнения: *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
+**Pending details** (в памяти, TTL 30 мин): `pending-task-status-details.ts`. Отмена уточнения: кнопка **Отменить** (`task-status-details-cancel.ts`) или *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
 **Порядок обработки** (`main.ts`):
 
-- **`callback_query:data`** — `handleChoiceCallback` → `handleConfirmationCallback` (inline-кнопки; не вызывает LLM).
-- **`message:text`** (без `/`) — `handlePlainTextMessage` → `ai-message.ts`:
+- **`callback_query:data`** - `handleStartLinkCallback` → `handleMainMenuCallback` → `handleTaskStatusDetailsCancelCallback` → `handleChoiceCallback` → `handleConfirmationCallback` (inline-кнопки; не вызывает LLM).
+- **`message:voice`** - `handleTelegramVoiceMessage` → SpeechKit STT → `handleTextSemanticMessage` (см. [Голосовые сообщения](#голосовые-сообщения-speechkit)).
+- **`message:text`** (без `/`) - `handlePlainTextMessage` → `handleTextSemanticMessage` (`ai-message.ts`):
 
-1. Pending confirmation edit — **не** в YandexGPT
+1. Pending confirmation edit - **не** в YandexGPT
 2. Pending expense receipt upload / selection (чек к выбранному расходу)
 3. Pending confirmation (кнопки или текст: да / нет / изменить; для `create_expense` «нет» → выбор бюджета)
 4. Pending budget selection
@@ -464,8 +465,8 @@ main-menu:<action>:<telegramUserId>
 6. Pending absence delegation / absence selection
 7. Pending task selection, create-task assignee, user selection
 8. Проверка привязки (`requireLinkedUser`)
-9. **Детерминированный блок** (см. ниже) — **не** в YandexGPT
-10. **LLM** (`parseTextIntent` → `AiProvider`) — classifier (опционально) + extractor
+9. **Детерминированный блок** (см. ниже) - **не** в YandexGPT
+10. **LLM** (`parseTextIntent` → `AiProvider`) - classifier (опционально) + extractor
 11. `routeParsedAiIntent` → resolver → preview (кнопки) → API
 
 Подробнее про AI: [ai-intent.md](ai-intent.md#архитектура-разбора-текста).
@@ -495,11 +496,11 @@ main-menu:<action>:<telegramUserId>
 
 **Где используется:** `create_task` (assignee после уточнения или из `assigneeHint`), `transfer_task`, `reassign_task`, `mention_in_task`, `create_absence`, slash `/transfer`, `/reassign`, `/mention`, `/link` (dev).
 
-**create_task — исполнитель в AI** (`route-parsed-intent.ts`, `create-task-assignee-resolve.ts`):
+**create_task - исполнитель в AI** (`route-parsed-intent.ts`, `create-task-assignee-resolve.ts`):
 
 - Модель может вернуть `assigneeHint` и/или `assigneeUserId` (в т.ч. `"__self__"` для «мне / себе / создай мне задачу»).
 - Перед проверкой обязательных полей `__self__` в hint или `assigneeUserId` **резолвится** в `id` привязанного пользователя; уточняющий вопрос **не** задаётся.
-- Вопрос «Кому назначить задачу?» — только если **нет** ни hint, ни `assigneeUserId`, ни `__self__` (TTL 30 мин, `pending-create-task-assignee.ts`):
+- Вопрос «Кому назначить задачу?» - только если **нет** ни hint, ни `assigneeUserId`, ни `__self__` (TTL 30 мин, `pending-create-task-assignee.ts`):
 
 ```
 Кому назначить задачу «Уволить Машу»?
@@ -523,14 +524,14 @@ Dev-лог (без секретов): `[bot] create_task assignee before require
 
 Отмена выбора: кнопка **Отменить** или *отмена*, *отмени*, *нет*, *стоп* → *«Ок, действие отменено.»*
 
-**Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` — любая задача.
+**Права (MVP):** исполнитель или постановщик; `OWNER` / `MANAGER` - любая задача.
 
 **Уведомление постановщику** (если есть `telegramId` и он не исполнитель действия):
 
 - DONE: *«{ФИО} закрыл задачу «{title}».»* + строка *Результат: …* при наличии
 - CANCELLED: *«{ФИО} отменил задачу «{title}».»* + *Причина отмены: …*
 
-`PATCH /tasks/:id/status` принимает `completionResult` / `cancellationReason`. Повторный `/done` на закрытой задаче — без дубля уведомления.
+`PATCH /tasks/:id/status` принимает `completionResult` / `cancellationReason`. Повторный `/done` на закрытой задаче - без дубля уведомления.
 
 ### Привязка Telegram (username flow)
 
@@ -543,13 +544,13 @@ Dev-лог (без секретов): `[bot] create_task assignee before require
 | `telegramUsername` | Только **первичная привязка** через `/start` (пока `telegramId` пустой) |
 | `telegramId` | **Постоянная** идентификация для slash-команд, AI и расходов после подтверждения |
 
-Смена `@username` в Telegram **не отвязывает** сотрудника — связь держится на `telegramId`.
+Смена `@username` в Telegram **не отвязывает** сотрудника - связь держится на `telegramId`.
 
-**Отвязка в Web:** `DELETE /users/:id/telegram` — очищает `telegramId` и `telegramUsername`; в Telegram уходит *«Вас открепили от проекта «…»»*. После этого рабочие команды бота недоступны до повторной привязки.
+**Отвязка в Web:** `DELETE /users/:id/telegram` - очищает `telegramId` и `telegramUsername`; в Telegram уходит *«Вас открепили от проекта «…»»*. После этого рабочие команды бота недоступны до повторной привязки.
 
 **Поток `/start`:**
 
-1. `GET /users/by-telegram/:telegramId` — если пользователь уже привязан → приветствие + **главное меню**
+1. `GET /users/by-telegram/:telegramId` - если пользователь уже привязан → приветствие + **главное меню**
 2. Иначе, если у отправителя есть `ctx.from.username`:
    - `GET /users/by-telegram-username/:username` (без `@`, case-insensitive)
    - Найден, `telegramId` пустой → pending `confirm_link_by_username`, вопрос с кнопками **Да** / **Нет**
@@ -558,13 +559,13 @@ Dev-лог (без секретов): `[bot] create_task assignee before require
 
 **Подтверждение:** кнопки **Да** / **Нет** или текст `да` / `нет` (fallback) → `PATCH /users/:id/telegram` с `telegramId = String(ctx.from.id)` → onboarding + главное меню; `нет` → *«Привязка отменена.»*
 
-Pending привязки и AI intent хранятся **в памяти** (`pending-intent.ts`), типы различаются полем `type`.
+Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`): типы `ai_intent`, `confirm_link_by_username`, `confirm_absence_delegation_distribution` (поле `type` + `confirmationId`).
 
-После привязки рабочие действия требуют **linked user** по `telegramId` (`requireLinkedUser`). Без привязки: *«Вы не привязаны ни к какому проекту.»* — fallback на демо-пользователя **отключён**.
+После привязки рабочие действия требуют **linked user** по `telegramId` (`requireLinkedUser`). Без привязки: *«Вы не привязаны ни к какому проекту.»* - fallback на демо-пользователя **отключён**.
 
 ### Dev fallback: `/link <ФИО>`
 
-Для локальной отладки без username в Web: поиск сотрудника по подстроке `fullName` (case-insensitive), затем `PATCH /users/:id/telegram`. Не использовать в проде — позже заменится на invite-code.
+Для локальной отладки без username в Web: поиск сотрудника по подстроке `fullName` (case-insensitive), затем `PATCH /users/:id/telegram`. Не использовать в проде - позже заменится на invite-code.
 
 ### Детерминированный разбор (без YandexGPT)
 
@@ -587,17 +588,17 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 
 ### Обычный текст (LLM)
 
-Сообщения **без** `/`, которые **не** разобрал детерминированный слой, обрабатываются `parseTextIntent` (если настроен `AI_PROVIDER`). Двухэтапный поток: classifier → extractor — см. [ai-intent.md](ai-intent.md#двухэтапный-разбор-classifier--extractor).
+Сообщения **без** `/`, которые **не** разобрал детерминированный слой, обрабатываются `parseTextIntent` (если настроен `AI_PROVIDER`). Двухэтапный поток: classifier → extractor - см. [ai-intent.md](ai-intent.md#двухэтапный-разбор-classifier--extractor).
 
 **Поток после GPT:**
 
 1. `fixAiIntentBeforeValidation` + Zod; `confidence < 0.7` или `intent: unknown` → «Не понял команду…».
-2. `validateIntentForRouting` (для `add_task_comment` — recovery текста комментария).
+2. `validateIntentForRouting` (для `add_task_comment` - recovery текста комментария).
 3. Сопоставление hints (`intent-resolver.ts`, `budget-resolver.ts`).
 4. Preview с inline-кнопками **Подтвердить / Изменить / Отменить** (или текст: *«Выберите действие кнопками ниже или ответьте текстом: да / изменить / отмена»*).
 5. Подтверждение (кнопка или `да`) → `intent-executor.ts` (те же REST-обёртки, что slash).
-6. «Нет» / **Отменить** → для `create_expense` выбор другого бюджета; для остальных intent — отмена.
-7. **Изменить** (кнопка или текст) → `pending-confirmation-edit.ts` (TTL 30 мин): меню полей кнопками или `поле: значение`. Для `create_budget` — в т.ч. «чек да/нет».
+6. «Нет» / **Отменить** → для `create_expense` выбор другого бюджета; для остальных intent - отмена.
+7. **Изменить** (кнопка или текст) → `pending-confirmation-edit.ts` (TTL 30 мин): меню полей кнопками или `поле: значение`. Для `create_budget` - в т.ч. «чек да/нет».
 
 **Пример правки (create_task):**
 
@@ -634,10 +635,10 @@ Pending привязки и AI intent хранятся **в памяти** (`pen
 
 - `projectHint` → проект по подстроке имени (без учёта регистра), иначе проект по умолчанию.
 - `assigneeHint` / `userHint` → пользователь по `fullName`, `systemAliases`, уменьшительным формам (`resolve-users-by-hint.ts`).
-- `budgetHint` → сопоставление с названием бюджета и полем `matchingKeywords` (Web); при неуверенном совпадении — выбор из списка, без угадывания по товару.
+- `budgetHint` → сопоставление с названием бюджета и полем `matchingKeywords` (Web); при неуверенном совпадении - выбор из списка, без угадывания по товару.
 - `taskTitle` → точное совпадение `title` (без учёта регистра), иначе `includes`; несколько совпадений → просьба уточнить.
 
-Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход».
+Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход» и pending choice states в других модулях.
 
 ### Проект и бюджет по умолчанию
 
@@ -646,9 +647,9 @@ Pending confirmation хранится **в памяти** процесса (`pen
 1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
 2. **Бюджет:** из `GET /budgets?projectId=…&status=ACTIVE&userId=…` (фильтр доступа) предпочитается заголовок с «Реклама VK», иначе первый.
 3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
-4. **Исполнитель задачи (AI):** `assigneeHint` / `assigneeUserId` / `__self__` → резолв в `create-task-assignee-resolve.ts`; уточнение только при полном отсутствии исполнителя (см. выше). Slash `/task` — `pickAssigneeId` (Вася или первый `EMPLOYEE`).
+4. **Исполнитель задачи (AI):** `assigneeHint` / `assigneeUserId` / `__self__` → резолв в `create-task-assignee-resolve.ts`; уточнение только при полном отсутствии исполнителя (см. выше). Slash `/task` - `pickAssigneeId` (Вася или первый `EMPLOYEE`).
 
-Если проектов или бюджетов нет — бот просит создать их в Web.
+Если проектов или бюджетов нет - бот просит создать их в Web.
 
 ### Подтверждение расхода (`create_expense`)
 
@@ -669,13 +670,13 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 1. Пользователь отправляет `/expense 1500 реклама VK` (или AI `create_expense`).
 2. API проверяет: бюджет `ACTIVE`, доступ (OWNER/MANAGER или `BudgetAccess`).
-3. Если `requiresReceipt` и чека нет — расход `PENDING_RECEIPT`, ответ: «Расход добавлен как неподтверждённый…».
-4. Иначе — `APPROVED` как раньше; чек можно прикрепить опционально.
+3. Если `requiresReceipt` и чека нет - расход `PENDING_RECEIPT`, ответ: «Расход добавлен как неподтверждённый…».
+4. Иначе - `APPROVED` как раньше; чек можно прикрепить опционально.
 5. Следующее **фото** или **документ** → `POST /budget-expenses/:expenseId/attachments`; для `PENDING_RECEIPT` статус → `APPROVED`, ответ: «Чек прикреплён. Расход подтверждён.»
 
 ### Неподтверждённые расходы (чеки позже)
 
-**Slash:** `/pending-expenses` — список своих расходов `PENDING_RECEIPT` (`GET /budget-expenses/pending`).
+**Slash:** `/pending-expenses` - список своих расходов `PENDING_RECEIPT` (`GET /budget-expenses/pending`).
 
 **Детерминированный текст** (до YandexGPT): «мои неподтвержденные расходы», «покажи расходы без чеков», «какие чеки я должен загрузить», «что у меня без чеков», «чеки к расходам» и др. (`parse-pending-expenses-query.ts`).
 
@@ -686,11 +687,11 @@ Pending confirmation хранится **в памяти** процесса (`pen
 1. Бот показывает нумерованный список (сумма, описание, бюджет, проект, дата) с inline-кнопками.
 2. Пользователь выбирает кнопкой, пишет номер или «отмена».
 3. Бот просит фото/документ чека.
-4. После файла — `attachTelegramReceiptToExpense` → «Чек прикреплён. Расход подтверждён.»
+4. После файла - `attachTelegramReceiptToExpense` → «Чек прикреплён. Расход подтверждён.»
 
 Pending-состояния (TTL 30 мин): выбор расхода → ожидание файла. Приоритет обработки фото: чек к только что созданному расходу → чек к выбранному из списка → чек к последнему расходу.
 
-Архивный бюджет / нет доступа — сообщения из API на русском.
+Архивный бюджет / нет доступа - сообщения из API на русском.
 
 Открытие чека в браузере: через API `GET /budget-expense-attachments/:id/preview`.
 
@@ -702,9 +703,9 @@ Pending-состояния (TTL 30 мин): выбор расхода → ожи
 
 После `POST /absences` вызывается **`handleAbsenceImpact`** (`apps/bot/src/absence-impact-flow.ts`): уведомления сотруднику и постановщикам, опциональная передача задач через Task Transfer Flow.
 
-`createAbsenceWithImpact()` → `POST /absences` → при непустых `affectedTasks` — Telegram + `POST /absences/:id/notifications`.
+`createAbsenceWithImpact()` → `POST /absences` → при непустых `affectedTasks` - Telegram + `POST /absences/:id/notifications`.
 
-**Dev-логи** (консоль бота, без токенов): payload команды, выбранный пользователь, тело POST, при ошибке — `status` и body. Отключить: `BOT_DEV_LOG=0`.
+**Dev-логи** (консоль бота, без токенов): payload команды, выбранный пользователь, тело POST, при ошибке - `status` и body. Отключить: `BOT_DEV_LOG=0`.
 
 | Команда | Примеры | Логика |
 |---------|---------|--------|
@@ -716,7 +717,7 @@ Pending-состояния (TTL 30 мин): выбор расхода → ожи
 - больничный: «Больничный добавлен: с … по …. Номер: …»
 - отпуск: «Отпуск добавлен: с … по ….»
 
-При неверной дате — подсказка по использованию команды.
+При неверной дате - подсказка по использованию команды.
 
 Отображение в Web: вкладка **Отсутствия** проекта (`GET /absences?projectId=…`).
 
@@ -726,11 +727,11 @@ AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence
 
 1. Поиск отсутствия: `GET /absences?userId=…` (без `CANCELLED`), опционально фильтр `type` из AI.
 2. Сортировка: текущее (сегодня в периоде) → ближайшее будущее → прошлые по `startDate` desc.
-3. 0 записей — «Не нашёл активный больничный или отпуск…»; несколько — **Absence Selection Flow** (`select_absence_for_cancel`, номер из списка).
+3. 0 записей - «Не нашёл активный больничный или отпуск…»; несколько - **Absence Selection Flow** (`select_absence_for_cancel`, номер из списка).
 4. Preview: «Удалить больничный/отпуск … с … по …?» → кнопки или `да` / `нет`.
 5. `POST /absences/:id/cancel` с `cancelledById` = привязанный пользователь, `cancellationReason` из AI (опционально).
 
-**Права:** OWNER/MANAGER — любое отсутствие; сотрудник — только своё. Иначе: «Вы не можете удалить это отсутствие.»
+**Права:** OWNER/MANAGER - любое отсутствие; сотрудник - только своё. Иначе: «Вы не можете удалить это отсутствие.»
 
 **Pending order** (текстовые сообщения): confirmation edit → confirmation → absence selection → absence delegation → task selection → …
 
@@ -740,7 +741,7 @@ AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence
 
 #### Slash `/deadline`
 
-`bot.command("deadline")` — последняя дата **DD.MM.YYYY** в аргументе, всё до неё — точное название задачи.
+`bot.command("deadline")` - последняя дата **DD.MM.YYYY** в аргументе, всё до неё - точное название задачи.
 
 | Пример | Действие |
 |--------|----------|
@@ -767,11 +768,11 @@ AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence
 
 **Postprocess** (`ai/postprocess/create-task-normalize.ts`, `fix-ai-intent-deadline.ts`):
 
-1. `deterministic-deadline-resolver` — `resolveDeadlineFromUserMessage` / `extractDeadlineFromRussianText`
-2. `llm-deadline-resolver` — только если `needsLlmDeadlineResolution` (отдельный prompt `create-task-deadline`)
-3. `ai-deadline-fallback` — coerce `deadlineDate` из ответа модели, коррекция «следующий месяц», сканирование title+description
+1. `deterministic-deadline-resolver` - `resolveDeadlineFromUserMessage` / `extractDeadlineFromRussianText`
+2. `llm-deadline-resolver` - только если `needsLlmDeadlineResolution` (отдельный prompt `create-task-deadline`)
+3. `ai-deadline-fallback` - coerce `deadlineDate` из ответа модели, коррекция «следующий месяц», сканирование title+description
 
-После resolve — **cleanup** title/description: удаление использованной временной фразы (named month, «до пятницы» и т.д.) в `create-task-text-cleanup.ts`. Dev-лог (без секретов): `source`, `matchedText`, `aiDeadlineDate`, `resolvedDeadlineDate`, `baseDate`.
+После resolve - **cleanup** title/description: удаление использованной временной фразы (named month, «до пятницы» и т.д.) в `create-task-text-cleanup.ts`. Dev-лог (без секретов): `source`, `matchedText`, `aiDeadlineDate`, `resolvedDeadlineDate`, `baseDate`.
 
 Сценарии self-assignee (`__self__`) и missing assignee **не менялись**. Provider layer (YandexGPT / Qwen / registry / `requestAiJson`) **не менялся**.
 
@@ -779,22 +780,21 @@ AI intent `cancel_absence`, slash `/cancel-absence` (алиас `/delete-absence
 
 ```bash
 pnpm --filter @neportal/bot build
-pnpm --filter @neportal/bot test
 ```
 
-`BOT_DEV_SELF_CHECKS=true` — ordinal/named-month/create_task cases при старте; для normalize без API: `BOT_DEV_MOCK_DEADLINE_LLM=true` (см. [env.md](env.md)).
+`BOT_DEV_SELF_CHECKS=true` - ordinal/named-month/create_task cases при старте; для normalize без API: `BOT_DEV_MOCK_DEADLINE_LLM=true` (см. [env.md](env.md)).
 
 ### Absence Impact Flow v1
 
 После `/sick`, `/vacation` или AI `create_absence` (после «да»), если есть affected tasks:
 
-1. Отсутствующему — список задач (title, проект, дедлайн, статус): «оставить / распределить».
-2. Постановщикам с `telegramId` — предупреждение по каждой задаче.
-3. **Распределить** — по каждой задаче: «мне» / «оставить» или имя сотрудника (User Resolution, `select_user_for_absence_delegation_item` при неоднозначности). Разные задачи можно отдать разным людям.
+1. Отсутствующему - список задач (title, проект, дедлайн, статус): «оставить / распределить».
+2. Постановщикам с `telegramId` - предупреждение по каждой задаче.
+3. **Распределить** - по каждой задаче: «мне» / «оставить» или имя сотрудника (User Resolution, `select_user_for_absence_delegation_item` при неоднозначности). Разные задачи можно отдать разным людям.
 4. Summary confirmation (`confirm_absence_delegation_distribution`) → `POST /tasks/:id/transfers` только для `TRANSFER`, `requestedById` = **absence.userId**, `absenceId` в теле.
-5. Передача на себя или «мне» = KEEP (transfer не создаётся). Без `telegramId` у получателя — остаёмся на текущей задаче.
+5. Передача на себя или «мне» = KEEP (transfer не создаётся). Без `telegramId` у получателя - остаёмся на текущей задаче.
 6. Итог: «запросы отправлены» / «переданы» / смешанный вариант по фактическим статусам transfer.
-7. После accept — постановщик получает уведомление о новом исполнителе.
+7. После accept - постановщик получает уведомление о новом исполнителе.
 
 Pending (plain text, до AI): `awaiting_absence_delegation_mode` → `awaiting_absence_delegation_item_assignee`.
 
@@ -810,7 +810,7 @@ Pending (plain text, до AI): `awaiting_absence_delegation_mode` → `awaiting_
 | Дедлайн завтра | Scheduler в процессе бота | Исполнитель с привязанным Telegram |
 | Просрочка | Scheduler: `deadlineAt` в прошлом, статус не DONE/CANCELLED | Исполнитель и постановщик (если у каждого есть `telegramId`) |
 
-**Scheduler** (без отдельного worker): `startTaskNotificationScheduler` в `main.ts` — `setInterval` по умолчанию 60 с.
+**Scheduler** (без отдельного worker): `startTaskNotificationScheduler` в `main.ts` - `setInterval` по умолчанию 60 с.
 
 В **корневом** `.env`:
 
@@ -823,7 +823,7 @@ TASK_NOTIFICATION_INTERVAL_MS=60000
 
 Граница «завтра» считается в **локальном времени сервера** (API: `GET /tasks/notifications/deadline-tomorrow`).
 
-**Проверка новой задачи:** от Ивана (привязан Telegram) — фраза *«Создай задачу Васе проверить склад завтра»* → Подтвердить (кнопка) или «да» → Васе приходит *«Вам назначена новая задача…»*.
+**Проверка новой задачи:** от Ивана (привязан Telegram) - фраза *«Создай задачу Васе проверить склад завтра»* → Подтвердить (кнопка) или «да» → Васе приходит *«Вам назначена новая задача…»*.
 
 **Проверка дедлайна завтра:** задача с `deadlineAt` на завтра, у исполнителя есть `telegramId` → одно сообщение *«Завтра дедлайн по задаче…»*; повторно scheduler не шлёт.
 
@@ -833,11 +833,11 @@ REST для scheduler (вызывает бот):
 
 - `GET /tasks/notifications/deadline-tomorrow`
 - `GET /tasks/notifications/overdue`
-- `POST /tasks/:id/notifications` — body `{ userId, type }`, идемпотентный upsert по `(taskId, userId, type)`
+- `POST /tasks/:id/notifications` - body `{ userId, type }`, идемпотентный upsert по `(taskId, userId, type)`
 
 ## HTTP-клиент бота
 
-Файл `apps/bot/src/api.ts` — обёртки над REST:
+Файл `apps/bot/src/api.ts` - обёртки над REST:
 
 - `fetchUsers`, `fetchUserByTelegramId`, `fetchUserByTelegramUsername`, `linkTelegramUser`
 - `fetchProjects`, `fetchBudgets`, `fetchTasks`
@@ -853,7 +853,7 @@ REST для scheduler (вызывает бот):
 
 | Файл | Назначение |
 |------|------------|
-| `main.ts` | Команды, `callback_query:data`, фото/документов, `message:text` → handlers, `bot.catch` |
+| `main.ts` | Команды, `callback_query:data`, `message:voice`, фото/документов, `message:text` → handlers, `bot.catch` |
 | `yandex-gpt.ts` | Оркестрация `parseTextIntent`, `requestAiJson`, classifier/extractor, валидация |
 | `ai/provider/types.ts` | Интерфейс `AiProvider`, `AiCompletionParams/Result` |
 | `ai/provider/yandex-provider.ts` | HTTP YandexGPT Foundation Models |
@@ -879,7 +879,7 @@ REST для scheduler (вызывает бот):
 | `intent-preview.ts` | Текст preview + footer с подсказкой кнопок/текста |
 | `intent-executor.ts` | Вызов API после подтверждения |
 | `confirmation.ts` | Текстовый fallback: да / нет / изменить / отмена |
-| `confirmation-reply.ts` | `replyWithConfirmationPreview` — сообщение + confirmation keyboard |
+| `confirmation-reply.ts` | `replyWithConfirmationPreview` - сообщение + confirmation keyboard |
 | `confirmation-callback.ts` | `callback_query` → `applyConfirmationDecision` |
 | `confirmation-decision.ts` | Общая логика confirm / edit / cancel |
 | `confirmation-edit.ts` | Подсказки и парсинг правок; меню полей через choice |
@@ -893,9 +893,15 @@ REST для scheduler (вызывает бот):
 | `telegram/safe-answer-callback.ts` | Безопасный `answerCallbackQuery` |
 | `telegram/safe-edit-message-reply-markup.ts` | Снятие клавиатуры без падения middleware |
 | `telegram/callback-log.ts` | Контекст логов callback без секретов |
-| `telegram-error-log.ts` | `bot.catch` — глобальные ошибки middleware |
-| `pending-intent.ts` | In-memory pending: AI intent или привязка по username |
-| `send-telegram.ts` | `sendTelegramMessage` — обёртка над `bot.api.sendMessage` |
+| `telegram-error-log.ts` | `bot.catch` - глобальные ошибки middleware |
+| `pending-intent.ts` | In-memory pending confirmation: `ai_intent`, `confirm_link_by_username`, `confirm_absence_delegation_distribution` |
+| `speech/telegram-voice-handler.ts` | Sync/async SpeechKit STT → `handleTextSemanticMessage` |
+| `speech/speechkit-config.ts` | `YANDEX_SPEECHKIT_*`, `getSpeechKitState()` |
+| `speech/speechkit-client.ts` | Sync STT (`stt/v1/stt:recognize`) |
+| `speech/speechkit-async-client.ts` | Async STT v2 через Object Storage |
+| `storage/yandex-object-storage.ts` | Временная загрузка voice для async STT |
+| `task-status-details-cancel.ts` | Inline **Отменить** при уточнении результата/причины задачи |
+| `send-telegram.ts` | `sendTelegramMessage` - обёртка над `bot.api.sendMessage` |
 | `task-notifications.ts` | Тексты и `notifyTaskAssigned` после создания задачи |
 | `task-notification-scheduler.ts` | Периодический опрос API: дедлайн завтра, просрочка |
 | `task-start-flow.ts` | `/start-task`, `/work`, AI `start_task`: поиск, права, confirmation, PATCH `IN_PROGRESS` |
@@ -921,7 +927,7 @@ REST для scheduler (вызывает бот):
 | `start-binding.ts` | Логика привязки по username, text fallback `да`/`нет`, onboarding |
 | `start-link-callback.ts` | Callback **Да**/**Нет** для привязки |
 | `telegram/keyboards/start-link-keyboard.ts` | Inline-клавиатура привязки |
-| `main-menu-reply.ts` | `replyWithMainMenu` — приветствие + меню |
+| `main-menu-reply.ts` | `replyWithMainMenu` - приветствие + меню |
 | `main-menu-callback.ts` | Routing действий главного меню |
 | `telegram/keyboards/main-menu-keyboard.ts` | Inline-клавиатура главного меню |
 | `current-user.ts` | Linked user или fallback для slash/AI |
@@ -936,8 +942,8 @@ REST для scheduler (вызывает бот):
 - `[yandex-gpt] tokens provider=… promptGroup=… latencyMs=…`
 - `raw AI JSON before validation`, `validation error`, `parsed intent`
 - `create_task assignee before required-fields` (резолв `__self__`)
-- `BOT_DEV_SELF_CHECKS=true` — self-checks при старте (registry, assignee, парсеры, confirmation/choice keyboard, create_task deadline)
-- `BOT_DEV_MOCK_DEADLINE_LLM=true` — mock LLM дедлайна в dev-checks normalize (см. [env.md](env.md))
+- `BOT_DEV_SELF_CHECKS=true` - self-checks при старте (registry, assignee, парсеры, confirmation/choice keyboard, create_task deadline)
+- `BOT_DEV_MOCK_DEADLINE_LLM=true` - mock LLM дедлайна в dev-checks normalize (см. [env.md](env.md))
 
 ## Troubleshooting
 
@@ -953,53 +959,48 @@ REST для scheduler (вызывает бот):
 
 ## Ограничения
 
-- Состояние «последний расход» и **pending AI intent** — **в памяти процесса**; сбрасывается при перезапуске бота.
-- LLM **не выполняет** действия — только парсит текст; API вызывает бот после «да».
+- Состояние «последний расход» и **pending AI intent** - **в памяти процесса**; сбрасывается при перезапуске бота.
+- LLM **не выполняет** действия - только парсит текст; API вызывает бот после «да».
 - Без привязки `telegramId` рабочие команды и AI **не выполняются** (`NOT_LINKED_MESSAGE`). Доступны: `/start`, `/demo`, `/me`, `/link` (dev).
-- `/link` — только для dev; в продукте — username в Web + `/start`.
-- Stage 5.3: voice используется как semantic input. После STT бот показывает распознанный текст и запускает тот же text intent pipeline, что и для обычного `message:text`.
-- Голос используется только для смыслового ввода. Подтверждения, выбор пунктов, редактирование и отмена выполняются через inline-кнопки или текстовый fallback.
-- Если у пользователя открыт blocking pending flow, голосовое сообщение блокируется **до STT**: не скачивается файл, не вызывается SpeechKit, текст не попадает в intent pipeline.
+- `/link` - только для dev; в продукте - username в Web + `/start`.
+- Stage 5.3: voice используется как semantic input. После STT бот показывает распознанный текст и запускает тот же pipeline, что и для `message:text` (`handleTextSemanticMessage`, `source: "voice"`).
+- Голос - только для смыслового ввода. Подтверждения, выбор пунктов, редактирование и отмена - через inline-кнопки или текстовый fallback.
+- Если у пользователя открыт blocking pending flow, голосовое сообщение блокируется **до STT**: не скачивается файл, не вызывается SpeechKit, текст не попадает в intent pipeline (`speech/voice-pending-guard.ts`). Исключение: ввод исполнителя для `create_task` (`allowCreateTaskAssigneeInput`).
 - `YANDEX_SPEECHKIT_ENABLED=false` по умолчанию: при выключенном флаге бот мягко отвечает, что голос временно недоступен.
-- Object Storage по-прежнему не используется; long audio ограничен лимитами sync STT (`duration/file size`) текущей конфигурации.
-- Bot runtime не требует запуска в Yandex Cloud: Yandex Cloud используется как внешний API-провайдер (YandexGPT/Qwen/SpeechKit).
-- Для short voice MVP Object Storage не нужен; async/long audio и Object Storage добавляются позже.
-- Уведомления по задачам — in-process scheduler в боте; позже worker/BullMQ.
+- Короткий голос (до `YANDEX_SPEECHKIT_MAX_DURATION_SEC`, по умолчанию 30 с) - sync STT без Object Storage.
+- Длинный голос - только при `YANDEX_SPEECHKIT_ASYNC_ENABLED=true` и настроенном bucket (`YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET` + ключи `YANDEX_STORAGE_*`); иначе отказ с понятным сообщением.
+- Bot runtime не требует запуска в Yandex Cloud: Yandex Cloud используется как внешний API-провайдер (YandexGPT/Qwen/SpeechKit/Object Storage).
+- Уведомления по задачам - in-process scheduler в боте; позже worker/BullMQ.
 - Webhook-режим только выставляет URL; HTTP-сервер для приёма апдейтов нужно поднимать отдельно (не в MVP).
-- Деплой в Yandex Cloud для MVP **не требуется** — только внешние API Yandex Cloud (Foundation Models / AI Studio) и SpeechKit из локального бота.
+- Деплой в Yandex Cloud для MVP **не требуется** - только внешние API Yandex Cloud из локального бота.
 
-## Long Voice Recognition (Async SpeechKit)
+## Голосовые сообщения (SpeechKit)
 
-For short Telegram voice messages bot uses sync SpeechKit STT.
-For long voice messages, when async mode is enabled, bot:
-1. Downloads file from Telegram.
-2. Uploads temporary object to Yandex Object Storage (`speechkit/tmp/...`).
-3. Starts async SpeechKit v2 recognition.
-4. Polls operation until done (bounded timeout).
-5. Deletes temporary object (best-effort).
-6. Sends recognized text into the same semantic pipeline as short voice.
+Обработчик: `message:voice` → `speech/telegram-voice-handler.ts`.
 
-If async mode is disabled, long voice is rejected with a user-facing message.
+**Короткие voice** (длительность ≤ `YANDEX_SPEECHKIT_MAX_DURATION_SEC`):
 
-Environment variables:
+1. Скачивание файла из Telegram (`telegram/download-telegram-file.ts`).
+2. Sync STT: `POST stt/v1/stt:recognize` (`speechkit-client.ts`).
+3. Очистка текста (`voice-text-cleanup.ts`).
+4. Preview распознанного текста пользователю.
+5. `handleTextSemanticMessage(ctx, text, { source: "voice", recognizedFromVoice: true })` - тот же pipeline, что для обычного текста.
 
-```env
-YANDEX_SPEECHKIT_ASYNC_ENABLED=false
-YANDEX_SPEECHKIT_ASYNC_MODEL=general
-YANDEX_SPEECHKIT_ASYNC_POLL_INTERVAL_MS=2000
-YANDEX_SPEECHKIT_ASYNC_TIMEOUT_MS=120000
-YANDEX_SPEECHKIT_ASYNC_MAX_DURATION_SEC=600
-YANDEX_SPEECHKIT_ASYNC_MAX_FILE_SIZE_MB=100
-YANDEX_SPEECHKIT_ASYNC_DELETE_OBJECT=true
-YANDEX_SPEECHKIT_OBJECT_STORAGE_BUCKET=
-YANDEX_SPEECHKIT_OBJECT_STORAGE_PREFIX=speechkit/tmp/
-YANDEX_STORAGE_ENDPOINT=https://storage.yandexcloud.net
-YANDEX_STORAGE_REGION=ru-central1
-YANDEX_STORAGE_ACCESS_KEY_ID=
-YANDEX_STORAGE_SECRET_ACCESS_KEY=
-```
+**Длинные voice** (при `YANDEX_SPEECHKIT_ASYNC_ENABLED=true` и настроенном Object Storage):
 
-Smoke helper:
+1. Скачивание файла из Telegram.
+2. Временная загрузка в Yandex Object Storage (`speechkit/tmp/...`, `storage/yandex-object-storage.ts`).
+3. Async STT v2 (`speechkit-async-client.ts`): `longRunningRecognize` + polling операции (bounded timeout).
+4. Best-effort удаление временного объекта (`YANDEX_SPEECHKIT_ASYNC_DELETE_OBJECT`).
+5. Preview + тот же semantic pipeline.
+
+Если async выключен или не настроен, длинное сообщение отклоняется с подсказкой про лимит короткого голоса.
+
+**Блокировка голоса:** при активном blocking pending (confirmation, choice, edit-flow и т.д.) STT не вызывается - пользователь должен завершить текущий шаг кнопкой или текстом.
+
+Переменные окружения - [env.md](env.md#yandex-speechkit-stt-mvp-foundation) и [env.md](env.md#speechkit-async-stt-длинный-голос-через-object-storage).
+
+Smoke-проверка async STT:
 
 ```bash
 pnpm --filter @neportal/bot exec tsx src/speech/speechkit-async-smoke.ts ./long.ogg

@@ -15,13 +15,13 @@
 
 ## `@neportal/shared`
 
-- **`loadRootEnv()`** — поиск `.env` от `process.cwd()` вверх (до 8 уровней), затем `dotenv.config`. Не логирует значения секретов.
-- **`EntityStatus`** и прочие enum'ы в `src/enums.ts` — подмножество, синхронизированное с доменом (не все Prisma-enum'ы).
-- **`name-aliases`** (`src/name-aliases/`): `generateSystemAliases(fullName)`, словарь `name_aliases.json`, `systemAliasesToString` — для поля `User.systemAliases` и поиска сотрудников в боте.
+- **`loadRootEnv()`** - поиск `.env` от `process.cwd()` вверх (до 8 уровней), затем `dotenv.config`. Не логирует значения секретов.
+- **`EntityStatus`** и прочие enum'ы в `src/enums.ts` - подмножество, синхронизированное с доменом (не все Prisma-enum'ы).
+- **`name-aliases`** (`src/name-aliases/`): `generateSystemAliases(fullName)`, словарь `name_aliases.json`, `systemAliasesToString` - для поля `User.systemAliases` и поиска сотрудников в боте.
 
-Используют: `apps/api`, `apps/bot` при bootstrap; сид и `packages/database/scripts/backfill-user-aliases.ts` — для aliases.
+Используют: `apps/api`, `apps/bot` при bootstrap; сид и `packages/database/scripts/backfill-user-aliases.ts` - для aliases.
 
-Из корня репозитория: `pnpm users:aliases:backfill` — пересчитать `systemAliases` для пользователей без значения.
+Из корня репозитория: `pnpm users:aliases:backfill` - пересчитать `systemAliases` для пользователей без значения.
 
 ## `@neportal/permissions`
 
@@ -37,7 +37,7 @@
 
 Zod-схемы для ответа **LLM intent parser** (YandexGPT или Qwen через `AiProvider`; только разбор текста, без выполнения действий).
 
-Корневой тип **`AiIntent`** — discriminated union по полю `intent`:
+Корневой тип **`AiIntent`** - discriminated union по полю `intent`:
 
 | `intent` | Ключевые поля `payload` |
 |----------|-------------------------|
@@ -60,7 +60,7 @@ Zod-схемы для ответа **LLM intent parser** (YandexGPT или Qwen 
 | `list_pending_expenses` | `{}` |
 | `unknown` | `reason?` |
 
-Общие поля ответа: `confidence` (0–1), `requiresConfirmation` (boolean).
+Общие поля ответа: `confidence` (0-1), `requiresConfirmation` (boolean).
 
 **Экспорт:** `AiIntentSchema`, `CreateTaskPayloadSchema`, …, `parseAiIntent`, `safeParseAiIntent`, `preprocessAiIntentInput`.
 
@@ -76,7 +76,7 @@ apps/api  ──► @neportal/database
           ──► @neportal/shared
 
 apps/bot  ──► @neportal/shared
-          ──► @neportal/ai-contracts (workspace; runtime — dist монорепо)
+          ──► @neportal/ai-contracts (workspace; runtime - dist монорепо)
 
 apps/web  ──► (прямого импорта database нет, только HTTP API)
 ```

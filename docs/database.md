@@ -37,11 +37,11 @@ erDiagram
 ### User
 
 - Роли org: `OWNER`, `MANAGER`, `EMPLOYEE`, `ACCOUNTANT` (`UserRole`).
-- Опционально `telegramId` (unique) — связь с Telegram после подтверждения в боте.
-- Опционально `telegramUsername` — для **первичной** привязки в боте (unique в рамках `organizationId`; несколько `NULL` допустимы). Нормализация: trim, без `@`, lowercase.
-- `systemAliases` — строка псевдонимов через запятую (генерация из ФИО: `generateSystemAliases` в `@neportal/shared`); используется ботом и LLM-контекстом (`intent-context.ts`) для распознавания имён. Backfill: `pnpm users:aliases:backfill`.
-- `telegramId` — постоянная связь после `/start`; отвязка (`DELETE /users/:id/telegram`) или архивация сотрудника обнуляет `telegramId` и `telegramUsername`.
-- `status` — `ARCHIVED` при soft delete (`DELETE /users/:id`).
+- Опционально `telegramId` (unique) - связь с Telegram после подтверждения в боте.
+- Опционально `telegramUsername` - для **первичной** привязки в боте (unique в рамках `organizationId`; несколько `NULL` допустимы). Нормализация: trim, без `@`, lowercase.
+- `systemAliases` - строка псевдонимов через запятую (генерация из ФИО: `generateSystemAliases` в `@neportal/shared`); используется ботом и LLM-контекстом (`intent-context.ts`) для распознавания имён. Backfill: `pnpm users:aliases:backfill`.
+- `telegramId` - постоянная связь после `/start`; отвязка (`DELETE /users/:id/telegram`) или архивация сотрудника обнуляет `telegramId` и `telegramUsername`.
+- `status` - `ARCHIVED` при soft delete (`DELETE /users/:id`).
 - Связи: проекты, задачи, бюджеты, расходы, отсутствия, напоминания.
 
 ### Project
@@ -62,36 +62,36 @@ erDiagram
 
 - `initialAmount`, `spentAmount` (подтверждённые расходы), `currency` (по умолчанию RUB).
 - Статус: `ACTIVE`, `ARCHIVED`.
-- `requiresReceipt` — обязательность чека для подтверждения расхода.
-- `matchingKeywords` — ключевые слова через запятую для сопоставления расходов в Telegram-боте (`budget-resolver.ts`); задаются в Web.
+- `requiresReceipt` - обязательность чека для подтверждения расхода.
+- `matchingKeywords` - ключевые слова через запятую для сопоставления расходов в Telegram-боте (`budget-resolver.ts`); задаются в Web.
 - Архивация: `archivedAt`, `archivedById`, `archiveReason`.
-- `BudgetAccess` — доступ сотрудников к бюджету (`@@unique([budgetId, userId])`).
+- `BudgetAccess` - доступ сотрудников к бюджету (`@@unique([budgetId, userId])`).
 
 ### BudgetExpense
 
 - Статус: `PENDING_RECEIPT`, `APPROVED` (`BudgetExpenseStatus`).
 - Источник: `WEB`, `TELEGRAM_TEXT`, `TELEGRAM_VOICE`.
-- При `requiresReceipt` и создании без чека — `PENDING_RECEIPT`; после вложения — `APPROVED` и инкремент `spentAmount`.
+- При `requiresReceipt` и создании без чека - `PENDING_RECEIPT`; после вложения - `APPROVED` и инкремент `spentAmount`.
 
 ### BudgetExpenseAttachment
 
-- `storageKey` — для S3 (nullable).
-- `telegramFileId` — для чеков из бота.
-- `uploadedBy` — пользователь, загрузивший файл.
+- `storageKey` - для S3 (nullable).
+- `telegramFileId` - для чеков из бота.
+- `uploadedBy` - пользователь, загрузивший файл.
 
 ### Absence
 
 - Типы: `SICK_LEAVE`, `VACATION` (`AbsenceType`).
-- Статусы: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`. Отмена через Web/Telegram — `CANCELLED` (запись в БД сохраняется).
+- Статусы: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` (`AbsenceStatus`); при создании через бота/API MVP по умолчанию `APPROVED`. Отмена через Web/Telegram - `CANCELLED` (запись в БД сохраняется).
 - Поля: `userId`, `startDate`, `endDate`, опционально `documentNumber`, `comment`; при отмене: `cancelledAt`, `cancelledById`, `cancellationReason`, связь `cancelledBy` → `User`.
-- REST: модуль `AbsencesModule` — см. [api.md](api.md).
-- В выдаче по проекту — `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия, статус `NEW` / `IN_PROGRESS`).
-- `AbsenceNotificationLog` — идемпотентный лог Telegram-уведомлений (`AbsenceNotificationType`: employee summary per task, creator warning, creator notified on delegation).
-- Связь с передачей задач: `TaskTransfer.absenceId` (optional) — передача из-за отсутствия.
+- REST: модуль `AbsencesModule` - см. [api.md](api.md).
+- В выдаче по проекту - `affectedTasks` (задачи исполнителя с `deadlineAt` в периоде отсутствия, статус `NEW` / `IN_PROGRESS`).
+- `AbsenceNotificationLog` - идемпотентный лог Telegram-уведомлений (`AbsenceNotificationType`: employee summary per task, creator warning, creator notified on delegation).
+- Связь с передачей задач: `TaskTransfer.absenceId` (optional) - передача из-за отсутствия.
 
 ### TaskTransfer (дополнение)
 
-- `absenceId` — optional FK на `Absence`; при accept бот уведомляет постановщика (`ABSENCE_TASK_DELEGATED_CREATOR`).
+- `absenceId` - optional FK на `Absence`; при accept бот уведомляет постановщика (`ABSENCE_TASK_DELEGATED_CREATOR`).
 
 ### Reminder
 
@@ -110,7 +110,7 @@ erDiagram
 | AbsenceNotificationType | ABSENCE_AFFECTED_TASKS_EMPLOYEE, ABSENCE_AFFECTED_TASK_CREATOR, ABSENCE_TASK_DELEGATED_CREATOR |
 | ReminderStatus | SCHEDULED, SENT, CANCELLED |
 
-Дублирование части enum'ов в `@neportal/shared` — для кода вне Prisma (см. [packages.md](packages.md)).
+Дублирование части enum'ов в `@neportal/shared` - для кода вне Prisma (см. [packages.md](packages.md)).
 
 ## Миграции
 
@@ -125,7 +125,7 @@ pnpm db:push       # без файлов миграций
 pnpm db:studio     # GUI
 ```
 
-**Не** вызывайте Prisma из `packages/database` без `dotenv -e .env` из корня — `DATABASE_URL` не подставится.
+**Не** вызывайте Prisma из `packages/database` без `dotenv -e .env` из корня - `DATABASE_URL` не подставится.
 
 ## Демо-данные (seed)
 
@@ -138,10 +138,10 @@ pnpm db:studio     # GUI
 |----------|--------|
 | Организация | Neportal Demo, `neportal-demo` |
 | Пользователи | Иван (OWNER), Вася, Петр (EMPLOYEE), Мария (ACCOUNTANT) |
-| `telegramUsername` | `demo_ivan`, `demo_vasya` — не реальные username |
+| `telegramUsername` | `demo_ivan`, `demo_vasya` - не реальные username |
 | `telegramId` | `seed-demo-ivan` у Ивана; у Васи пусто до `/start` |
 | Проект | «Реклама VK», участники с ролями |
 | Бюджет | 50 000 RUB, название «Реклама VK» |
-| Задачи | «Подготовить отчет» (Вася); «Подписать договор с подрядчиком» (Иван, deadline конец 22.05.2026 UTC — `ensureDemoContractTask`, без дублей) |
+| Задачи | «Подготовить отчет» (Вася); «Подписать договор с подрядчиком» (Иван, deadline конец 22.05.2026 UTC - `ensureDemoContractTask`, без дублей) |
 
 Бот и документация предполагают проект **«Реклама VK»** как проект по умолчанию.

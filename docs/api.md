@@ -8,7 +8,7 @@
 
 - Формат: JSON, `Content-Type: application/json`.
 - Валидация: `ValidationPipe` (whitelist, лишние поля → 400).
-- **Авторизация отсутствует** — подходит только для локальной разработки и демо.
+- **Авторизация отсутствует** - подходит только для локальной разработки и демо.
 - Все сущности привязаны к организации из `NEPORTAL_ORG_SLUG` / `NEPORTAL_ORGANIZATION_ID`.
 
 ## Health
@@ -21,7 +21,7 @@
 
 | Метод | Путь | Описание |
 |-------|------|----------|
-| GET | `/users` | Список ACTIVE; `?includeArchived=true` — все |
+| GET | `/users` | Список ACTIVE; `?includeArchived=true` - все |
 | POST | `/users` | Создать сотрудника (`fullName`, `role`, `telegramUsername?`, …) |
 | GET | `/users/by-telegram/:telegramId` | По Telegram id (в org) |
 | GET | `/users/by-telegram-username/:username` | По @username без `@`, case-insensitive |
@@ -35,10 +35,10 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/projects` | — | Все проекты org |
-| POST | `/projects` | — | Создать проект |
-| GET | `/projects/:id` | — | Проект с участниками |
-| GET | `/projects/:id/summary` | — | Сводка: задачи, бюджеты, счётчики |
+| GET | `/projects` | - | Все проекты org |
+| POST | `/projects` | - | Создать проект |
+| GET | `/projects/:id` | - | Проект с участниками |
+| GET | `/projects/:id/summary` | - | Сводка: задачи, бюджеты, счётчики |
 
 **POST /projects** (основные поля): `name`, `createdById`, опционально `description`.
 
@@ -47,18 +47,18 @@
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/tasks` | `projectId?` | Список задач |
-| GET | `/tasks/my` | `userId`, `limit?` (1–20, default 5) | Активные задачи исполнителя по дедлайну |
-| GET | `/tasks/:id` | — | Карточка задачи с комментариями |
-| POST | `/tasks` | — | Создать задачу |
-| GET | `/tasks/:id/comments` | — | Комментарии задачи (по `createdAt` asc) |
-| POST | `/tasks/:id/comments` | — | Добавить комментарий |
-| POST | `/tasks/:id/comments/mention` | — | Комментарий с призывом сотрудника |
-| GET | `/tasks/:id/transfers` | — | История передач задачи |
-| POST | `/tasks/:id/transfers` | — | Передать задачу другому исполнителю |
-| PATCH | `/tasks/:id/deadline` | — | Установить или сбросить дедлайн |
-| PATCH | `/tasks/:id/status` | — | Сменить статус |
+| GET | `/tasks/my` | `userId`, `limit?` (1-20, default 5) | Активные задачи исполнителя по дедлайну |
+| GET | `/tasks/:id` | - | Карточка задачи с комментариями |
+| POST | `/tasks` | - | Создать задачу |
+| GET | `/tasks/:id/comments` | - | Комментарии задачи (по `createdAt` asc) |
+| POST | `/tasks/:id/comments` | - | Добавить комментарий |
+| POST | `/tasks/:id/comments/mention` | - | Комментарий с призывом сотрудника |
+| GET | `/tasks/:id/transfers` | - | История передач задачи |
+| POST | `/tasks/:id/transfers` | - | Передать задачу другому исполнителю |
+| PATCH | `/tasks/:id/deadline` | - | Установить или сбросить дедлайн |
+| PATCH | `/tasks/:id/status` | - | Сменить статус |
 
-**POST /tasks** — тело (`CreateTaskDto`):
+**POST /tasks** - тело (`CreateTaskDto`):
 
 ```json
 {
@@ -71,14 +71,14 @@
 }
 ```
 
-`projectId` опционален — без него задача «глобальная» в рамках org.
+`projectId` опционален - без него задача «глобальная» в рамках org.
 
 **GET /tasks/my** (`MyTasksQueryDto`):
 
-- `userId` — исполнитель (должен быть в org из контекста).
-- `limit` — по умолчанию `5`, максимум `20`.
+- `userId` - исполнитель (должен быть в org из контекста).
+- `limit` - по умолчанию `5`, максимум `20`.
 - Фильтр: `status` ∈ `NEW`, `IN_PROGRESS`; `assigneeId = userId`.
-- Сортировка: `deadlineAt` asc (без дедлайна — в конце), затем `createdAt` asc.
+- Сортировка: `deadlineAt` asc (без дедлайна - в конце), затем `createdAt` asc.
 - Include: `project { id, name }`, `creator { id, fullName }`, `assignee { id, fullName }`.
 
 **PATCH /tasks/:id/deadline** (`UpdateTaskDeadlineDto`):
@@ -87,7 +87,7 @@
 { "deadlineAt": "2026-05-22" }
 ```
 
-Для date-only время нормализуется до **конца дня UTC** (`23:59:59.999`). `deadlineAt: null` — сброс дедлайна.
+Для date-only время нормализуется до **конца дня UTC** (`23:59:59.999`). `deadlineAt: null` - сброс дедлайна.
 
 **PATCH /tasks/:id/status**:
 
@@ -108,9 +108,9 @@
 
 Ответ включает `startedAt`, `creator` и `assignee` (с `telegramId`), `project`.
 
-**POST /tasks/:id/notifications** — типы включают `TASK_STARTED_CREATOR` (идемпотентный upsert по `(taskId, userId, type)`).
+**POST /tasks/:id/notifications** - типы включают `TASK_STARTED_CREATOR` (идемпотентный upsert по `(taskId, userId, type)`).
 
-**GET /tasks/:id** — поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`), `transfers[]` (с `fromUser`, `toUser`, `requestedBy`, `status`, `comment`, `rejectionReason`).
+**GET /tasks/:id** - поля задачи плюс `project`, `creator`, `assignee` (с `role`, `telegramId`), `comments[]` (с `author` и `mentions[]`), `transfers[]` (с `fromUser`, `toUser`, `requestedBy`, `status`, `comment`, `rejectionReason`).
 
 **POST /tasks/:id/comments** (`CreateTaskCommentDto`):
 
@@ -144,7 +144,7 @@
   "requestedById": "cuid инициатора",
   "toUserId": "cuid нового исполнителя",
   "comment": "потому что он отвечает за склад",
-  "absenceId": "опционально — передача из Absence Impact Flow"
+  "absenceId": "опционально - передача из Absence Impact Flow"
 }
 ```
 
@@ -155,17 +155,17 @@
 
 Ответ: `{ transfer, task }`.
 
-**POST /task-transfers/:id/accept** — body `{ userId }` (должен быть `toUserId`), transfer `PENDING` → `ACCEPTED`, обновление `assigneeId`.
+**POST /task-transfers/:id/accept** - body `{ userId }` (должен быть `toUserId`), transfer `PENDING` → `ACCEPTED`, обновление `assigneeId`.
 
-**POST /task-transfers/:id/reject** — body `{ userId, rejectionReason }`, transfer `PENDING` → `REJECTED`, `assigneeId` не меняется.
+**POST /task-transfers/:id/reject** - body `{ userId, rejectionReason }`, transfer `PENDING` → `REJECTED`, `assigneeId` не меняется.
 
 ## Notes
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/notes` | `projectId?` | Список заметок |
-| GET | `/notes/:id` | — | Одна заметка |
-| POST | `/notes` | — | Создать заметку |
+| GET | `/notes/:id` | - | Одна заметка |
+| POST | `/notes` | - | Создать заметку |
 
 **POST /notes**: `text`, `creatorId`, `source` (`WEB` | `TELEGRAM_TEXT` | `TELEGRAM_VOICE`), опционально `projectId`.
 
@@ -174,14 +174,14 @@
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/budgets` | `projectId?`, `status?`, `includeArchived?`, `userId?` | Список бюджетов (по умолчанию только `ACTIVE`) |
-| POST | `/budgets` | — | Создать бюджет |
-| PATCH | `/budgets/:id` | — | Обновить бюджет (не для `ARCHIVED`) |
-| POST | `/budgets/:id/archive` | — | Архивировать бюджет |
-| GET | `/budgets/:id` | — | Бюджет, `accessUsers`, `expenses`, `totals` |
-| GET | `/budgets/:id/expenses` | — | Расходы бюджета |
-| POST | `/budgets/:id/expenses` | — | Добавить расход |
+| POST | `/budgets` | - | Создать бюджет |
+| PATCH | `/budgets/:id` | - | Обновить бюджет (не для `ARCHIVED`) |
+| POST | `/budgets/:id/archive` | - | Архивировать бюджет |
+| GET | `/budgets/:id` | - | Бюджет, `accessUsers`, `expenses`, `totals` |
+| GET | `/budgets/:id/expenses` | - | Расходы бюджета |
+| POST | `/budgets/:id/expenses` | - | Добавить расход |
 
-**POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `matchingKeywords?` (строка через запятую — для бота), `accessUserIds?`, `createdById`.
+**POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `matchingKeywords?` (строка через запятую - для бота), `accessUserIds?`, `createdById`.
 
 **PATCH /budgets/:id** (`UpdateBudgetDto`): в т.ч. `matchingKeywords` (`string` или `null` для сброса).
 
@@ -213,30 +213,30 @@
 }
 ```
 
-Правила: бюджет `ACTIVE`; доступ — OWNER/MANAGER или `BudgetAccess`; при `requiresReceipt` и без чека — `PENDING_RECEIPT`, иначе `APPROVED`. `spentAmount` увеличивается только для `APPROVED`. Прикрепление чека (`POST .../attachments`) переводит `PENDING_RECEIPT` → `APPROVED`.
+Правила: бюджет `ACTIVE`; доступ - OWNER/MANAGER или `BudgetAccess`; при `requiresReceipt` и без чека - `PENDING_RECEIPT`, иначе `APPROVED`. `spentAmount` увеличивается только для `APPROVED`. Прикрепление чека (`POST .../attachments`) переводит `PENDING_RECEIPT` → `APPROVED`.
 
 ## Budget expenses (вложения)
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/budget-expenses/pending` | `userId` (обяз.), `limit?` (default 10, max 20) | Неподтверждённые расходы пользователя (`PENDING_RECEIPT`, бюджет `ACTIVE`) |
-| GET | `/budget-expenses/:expenseId/attachments` | — | Список вложений расхода |
+| GET | `/budget-expenses/:expenseId/attachments` | - | Список вложений расхода |
 | POST | `/budget-expenses/:expenseId/attachments` | Прикрепить чек (метаданные Telegram) |
 | POST | `/budget-expenses/:expenseId/receipt` | Загрузить чек из Web (`multipart/form-data`) |
 | GET | `/budget-expense-attachments/:id/preview` | Предпросмотр чека (Telegram или локальный файл) |
 | GET | `/budget-expense-attachments/:id/download` | Скачать чек |
-| GET | `/budget-expense-attachments/:id/open` | **Deprecated** — redirect на Telegram URL |
+| GET | `/budget-expense-attachments/:id/open` | **Deprecated** - redirect на Telegram URL |
 
-**POST /budget-expenses/:expenseId/receipt** — `multipart/form-data`:
+**POST /budget-expenses/:expenseId/receipt** - `multipart/form-data`:
 
-- `file` — JPEG, PNG, WebP или PDF (до 10 MB)
-- `uploadedById` — пользователь с доступом к бюджету (OWNER/MANAGER или `BudgetAccess`)
+- `file` - JPEG, PNG, WebP или PDF (до 10 MB)
+- `uploadedById` - пользователь с доступом к бюджету (OWNER/MANAGER или `BudgetAccess`)
 
-Логика: бюджет `ACTIVE`; файл сохраняется в `UPLOAD_DIR` (по умолчанию `uploads/receipts/{orgId}/…`), создаётся `BudgetExpenseAttachment` с `storageKey`; расход `PENDING_RECEIPT` → `APPROVED`, `spentAmount` увеличивается. Ответ — расход с `attachments`.
+Логика: бюджет `ACTIVE`; файл сохраняется в `UPLOAD_DIR` (по умолчанию `uploads/receipts/{orgId}/…`), создаётся `BudgetExpenseAttachment` с `storageKey`; расход `PENDING_RECEIPT` → `APPROVED`, `spentAmount` увеличивается. Ответ - расход с `attachments`.
 
 Переменная окружения: `UPLOAD_DIR` (опционально, абсолютный или относительный путь от cwd API).
 
-**GET /budget-expenses/pending** — элемент ответа:
+**GET /budget-expenses/pending** - элемент ответа:
 
 ```json
 {
@@ -258,7 +258,7 @@
 
 Фильтры: `organizationId` из контекста; `userId` в org; `expense.userId = userId`; `status = PENDING_RECEIPT`; `budget.status = ACTIVE`; сортировка `createdAt desc`.
 
-**POST attachment** — пример для бота:
+**POST attachment** - пример для бота:
 
 ```json
 {
@@ -273,19 +273,19 @@
 
 Права на `POST .../attachments`: автор расхода (`expense.userId`) или **OWNER** / **MANAGER**; бюджет не в архиве. Для `PENDING_RECEIPT` статус → `APPROVED` и увеличивается `spentAmount`.
 
-**Preview / download** — backend вызывает Telegram `getFile`, скачивает файл и отдаёт клиенту. `TELEGRAM_BOT_TOKEN` используется только на сервере API (тот же `.env`, что у бота). Web показывает чек в модальном окне через `/preview`, скачивание — через `/download`.
+**Preview / download** - backend вызывает Telegram `getFile`, скачивает файл и отдаёт клиенту. `TELEGRAM_BOT_TOKEN` используется только на сервере API (тот же `.env`, что у бота). Web показывает чек в модальном окне через `/preview`, скачивание - через `/download`.
 
 ## Absences
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
 | GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?`, `includeCancelled?` | Список отсутствий (по умолчанию без `CANCELLED`) |
-| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` — `affectedTasks` по проекту |
+| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` - `affectedTasks` по проекту |
 | GET | `/absences/:id/affected-tasks` | `projectId?` | Затронутые задачи (по org или по проекту) |
-| POST | `/absences` | — | Создать отсутствие (+ `affectedTasks` в ответе) |
-| POST | `/absences/:id/notifications` | — | Идемпотентная запись отправленного уведомления |
-| PATCH | `/absences/:id/status` | — | Сменить статус |
-| POST | `/absences/:id/cancel` | — | Отменить отсутствие (soft delete, `status` = `CANCELLED`) |
+| POST | `/absences` | - | Создать отсутствие (+ `affectedTasks` в ответе) |
+| POST | `/absences/:id/notifications` | - | Идемпотентная запись отправленного уведомления |
+| PATCH | `/absences/:id/status` | - | Сменить статус |
+| POST | `/absences/:id/cancel` | - | Отменить отсутствие (soft delete, `status` = `CANCELLED`) |
 
 **POST /absences** (`CreateAbsenceDto`):
 
@@ -298,20 +298,20 @@
   "documentNumber": "123456",
   "comment": "опционально",
   "status": "APPROVED",
-  "projectId": "опционально — ограничить affectedTasks проектом"
+  "projectId": "опционально - ограничить affectedTasks проектом"
 }
 ```
 
 По умолчанию `status` = `APPROVED`. `endDate` не может быть раньше `startDate`. `userId` должен быть в текущей организации.
 
-Ответ **POST** и элементы списка включают `affectedTasks` (без `projectId` в POST — по всей организации):
+Ответ **POST** и элементы списка включают `affectedTasks` (без `projectId` в POST - по всей организации):
 
 - `assigneeId` = пользователь отсутствия;
 - `deadlineAt` в `[startDate, endDate]` включительно;
 - `status` ∈ `NEW`, `IN_PROGRESS`;
 - для каждой задачи: `project`, `creator`, `assignee` (с `telegramId`).
 
-**GET /absences/:id/affected-tasks** — тот же набор полей, что в `affectedTasks` выше.
+**GET /absences/:id/affected-tasks** - тот же набор полей, что в `affectedTasks` выше.
 
 **POST /absences/:id/notifications** (идемпотентно):
 
@@ -325,10 +325,10 @@
 
 Типы: `ABSENCE_AFFECTED_TASKS_EMPLOYEE`, `ABSENCE_AFFECTED_TASK_CREATOR`, `ABSENCE_TASK_DELEGATED_CREATOR`. Уникальность: `(absenceId, taskId, userId, type)`.
 
-**GET /absences?projectId=…`** — только отсутствия участников проекта (`ProjectMember`). В каждом элементе:
+**GET /absences?projectId=…`** - только отсутствия участников проекта (`ProjectMember`). В каждом элементе:
 
 - поля отсутствия и `user` (`id`, `fullName`, `role`);
-- `affectedTasks` — только задачи этого проекта (те же правила фильтра).
+- `affectedTasks` - только задачи этого проекта (те же правила фильтра).
 
 **PATCH /absences/:id/status**:
 
@@ -345,19 +345,19 @@
 }
 ```
 
-Права: `OWNER` / `MANAGER` — любое отсутствие организации; сотрудник — только своё (`userId` = его id). Устанавливает `status` = `CANCELLED`, `cancelledAt`, `cancelledById`, `cancellationReason` (trimmed или `null`). Ответ включает `user`, `cancelledBy`. Если уже `CANCELLED` — **409** «Отсутствие уже удалено». Нет прав — **403**.
+Права: `OWNER` / `MANAGER` - любое отсутствие организации; сотрудник - только своё (`userId` = его id). Устанавливает `status` = `CANCELLED`, `cancelledAt`, `cancelledById`, `cancellationReason` (trimmed или `null`). Ответ включает `user`, `cancelledBy`. Если уже `CANCELLED` - **409** «Отсутствие уже удалено». Нет прав - **403**.
 
-**GET /absences** — по умолчанию записи со статусом `CANCELLED` скрыты. Query `includeCancelled=true` возвращает все статусы.
+**GET /absences** - по умолчанию записи со статусом `CANCELLED` скрыты. Query `includeCancelled=true` возвращает все статусы.
 
 Типы: `SICK_LEAVE`, `VACATION`. Статусы: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`.
 
-**GET /projects/:id/summary** — `absencesTotal` без `CANCELLED`; `absencesActiveNow` — одобренные (`APPROVED`) отсутствия, пересекающиеся с сегодняшним днём.
+**GET /projects/:id/summary** - `absencesTotal` без `CANCELLED`; `absencesActiveNow` - одобренные (`APPROVED`) отсутствия, пересекающиеся с сегодняшним днём.
 
 ## Коды ошибок
 
-- **400** — валидация DTO, бизнес-ограничения (сумма ≤ 0, неверный статус).
-- **404** — сущность не найдена или не принадлежит org.
-- **502** — ошибка Telegram API при загрузке вложения.
+- **400** - валидация DTO, бизнес-ограничения (сумма ≤ 0, неверный статус).
+- **404** - сущность не найдена или не принадлежит org.
+- **502** - ошибка Telegram API при загрузке вложения.
 
 ## Модули NestJS
 
@@ -374,7 +374,7 @@ app.module
 └── AbsencesModule
 
 telegram/
-└── TelegramModule       # TelegramNotifyService — sendMessage при отвязке
+└── TelegramModule       # TelegramNotifyService - sendMessage при отвязке
 ```
 
 `UsersService` при `DELETE /users/:id/telegram` вызывает `TelegramNotifyService` (тот же `TELEGRAM_BOT_TOKEN`, что у бота).

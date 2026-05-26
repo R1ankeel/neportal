@@ -2,13 +2,13 @@
 
 **Описание продукта для нетехнической аудитории:** [корневой README.md](../README.md).
 
-Перед установкой полезно прочитать [Руководство разработчика](developer-guide.md) — там описаны архитектура и сквозные сценарии проверки.
+Перед установкой полезно прочитать [Руководство разработчика](developer-guide.md) - там описаны архитектура и сквозные сценарии проверки.
 
 ## Требования
 
 - **Node.js** 20+
 - **pnpm** 11+ (версия в `package.json` → `packageManager`; удобно через [Corepack](https://nodejs.org/api/corepack.html))
-- **Docker** — для Postgres и Redis
+- **Docker** - для Postgres и Redis
 
 ## 1. Переменные окружения
 
@@ -20,12 +20,12 @@ cp .env.example .env
 
 Отредактируйте при необходимости:
 
-- `DATABASE_URL` — должен совпадать с `docker-compose.yml`
-- `TELEGRAM_BOT_TOKEN` — токен от [@BotFather](https://t.me/BotFather), если запускаете бота
-- `API_URL` / `NEXT_PUBLIC_API_URL` — обычно `http://localhost:4000` для локальной разработки
-- **AI-парсер** (опционально): `AI_PROVIDER=yandex` (по умолчанию) + `YANDEX_*`; или `AI_PROVIDER=qwen` + `QWEN_*` — см. [env.md](env.md), [ai-intent.md](ai-intent.md)
+- `DATABASE_URL` - должен совпадать с `docker-compose.yml`
+- `TELEGRAM_BOT_TOKEN` - токен от [@BotFather](https://t.me/BotFather), если запускаете бота
+- `API_URL` / `NEXT_PUBLIC_API_URL` - обычно `http://localhost:4000` для локальной разработки
+- **AI-парсер** (опционально): `AI_PROVIDER=yandex` (по умолчанию) + `YANDEX_*`; или `AI_PROVIDER=qwen` + `QWEN_*` - см. [env.md](env.md), [ai-intent.md](ai-intent.md)
 
-Подробнее о загрузке `.env` — [env.md](env.md), [architecture.md](architecture.md#переменные-окружения).
+Подробнее о загрузке `.env` - [env.md](env.md), [architecture.md](architecture.md#переменные-окружения).
 
 ## 2. Инфраструктура
 
@@ -46,7 +46,7 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-Сид создаёт организацию **Neportal Demo** (`slug`: `neportal-demo`) с проектом «Реклама VK», бюджетом, задачей и пользователями (Иван, Вася, Петр, Мария); для пользователей заполняется `systemAliases`. Подробнее — [database.md](database.md#демо-данные-seed).
+Сид создаёт организацию **Neportal Demo** (`slug`: `neportal-demo`) с проектом «Реклама VK», бюджетом, задачей и пользователями (Иван, Вася, Петр, Мария); для пользователей заполняется `systemAliases`. Подробнее - [database.md](database.md#демо-данные-seed).
 
 После миграции `user_system_aliases` на существующей БД без пересида:
 
@@ -77,8 +77,9 @@ pnpm --filter @neportal/bot dev
 3. Web: http://localhost:3000 → редирект в приложение, раздел «Проекты»
 4. Бот: `/start` в Telegram после задания `TELEGRAM_BOT_TOKEN`
 5. AI (если настроен Yandex): фраза «Запиши заметку: …» → preview → ответ `да` → заметка в Web на вкладке проекта
+6. Голос (опционально): `YANDEX_SPEECHKIT_ENABLED=true` + ключи SpeechKit → voice-сообщение → preview распознанного текста → тот же flow, что для текста
 
-Локальные URL: Web `http://localhost:3000`, API `http://localhost:4000`, бот — polling (без публичного URL).
+Локальные URL: Web `http://localhost:3000`, API `http://localhost:4000`, бот - polling (без публичного URL).
 
 ## Команды из корня
 
@@ -95,7 +96,7 @@ pnpm --filter @neportal/bot dev
 
 | Симптом | Решение |
 |---------|---------|
-| `Environment variable not found: DATABASE_URL` | Файл `.env` в корне; команды `pnpm db:*` из корня клона (скрипт `scripts/prisma-with-root-env.mjs`, работает в cmd.exe). В cmd: `set DATABASE_URL=postgresql://...` затем prisma — только для одной сессии |
+| `Environment variable not found: DATABASE_URL` | Файл `.env` в корне; команды `pnpm db:*` из корня клона (скрипт `scripts/prisma-with-root-env.mjs`, работает в cmd.exe). В cmd: `set DATABASE_URL=postgresql://...` затем prisma - только для одной сессии |
 | `Set TELEGRAM_BOT_TOKEN in the root .env file` | Задать токен в корневом `.env`, не `change_me` |
 | Пути вроде `C:\Windows\System32` в ошибках | `cd` в каталог с корневым `package.json` |
 | `Organization slug "neportal-demo" not found` | Выполнить `pnpm db:seed` |

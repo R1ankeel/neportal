@@ -1,6 +1,6 @@
 # Архитектура
 
-Карта «что менять в коде» и сценарии онбординга — в [developer-guide.md](developer-guide.md). Справочник переменных — [env.md](env.md).
+Карта «что менять в коде» и сценарии онбординга - в [developer-guide.md](developer-guide.md). Справочник переменных - [env.md](env.md).
 
 ## Обзор
 
@@ -26,7 +26,7 @@ flowchart LR
   Redis -.->|зарезервирован| API
 ```
 
-- **Единый источник правды** — PostgreSQL через Prisma (`packages/database`).
+- **Единый источник правды** - PostgreSQL через Prisma (`packages/database`).
 - **Web** и **бот** не ходят в БД напрямую; только через **API**.
 - **Организация** в MVP выбирается один раз при старте API (`OrganizationContextService`), не из JWT.
 
@@ -52,9 +52,9 @@ neportal/
 
 При старте `apps/api`:
 
-1. Если задан `NEPORTAL_ORGANIZATION_ID` — используется эта запись.
+1. Если задан `NEPORTAL_ORGANIZATION_ID` - используется эта запись.
 2. Иначе ищется организация по `NEPORTAL_ORG_SLUG` (по умолчанию `neportal-demo`).
-3. Если не найдена — приложение падает с подсказкой запустить `pnpm db:seed`.
+3. Если не найдена - приложение падает с подсказкой запустить `pnpm db:seed`.
 
 Все сервисы (projects, tasks, budgets, notes, users) фильтруют данные по `organizationId` из этого контекста.
 
@@ -74,7 +74,7 @@ neportal/
 ## Сборка (Turborepo)
 
 - `build` зависит от `^build` (сначала пакеты, потом приложения).
-- `dev` — persistent, без кэша, тоже после `^build`.
+- `dev` - persistent, без кэша, тоже после `^build`.
 - Артефакты: `dist/**` (Nest, bot), `.next/**` (web).
 
 ## Безопасность (текущее состояние)
@@ -88,16 +88,15 @@ neportal/
 
 ## AI intent (реализовано в MVP)
 
-- **`@neportal/ai-contracts`** — Zod-контракт `intent` + `payload` для ответа парсера.
-- **`apps/bot`** — текст без `/`: сначала **детерминированные парсеры**, затем при необходимости **двухэтапный LLM** → preview с **inline-кнопками** подтверждения/выбора (текстовый fallback сохранён) → REST API.
+- **`@neportal/ai-contracts`** - Zod-контракт `intent` + `payload` для ответа парсера.
+- **`apps/bot`** - текст без `/`: сначала **детерминированные парсеры**, затем при необходимости **двухэтапный LLM** → preview с **inline-кнопками** подтверждения/выбора (текстовый fallback сохранён) → REST API.
 - Yandex Cloud **не хостит** приложение в MVP; вызываются только внешние HTTP API (Foundation Models и/или AI Studio).
-- SpeechKit (голос → текст) — env в `.env.example`, код не подключён.
+- **SpeechKit** (голос → текст) - реализован в боте (`apps/bot/src/speech/`), по умолчанию **выключен** (`YANDEX_SPEECHKIT_ENABLED=false`). Короткие voice - sync STT; длинные - async STT через временный объект в Yandex Object Storage (опционально, см. [bot.md](bot.md#голосовые-сообщения-speechkit)).
 
 Подробнее: [ai-intent.md](ai-intent.md), [bot.md](bot.md).
 
 ## Планируемые направления (по схеме и env)
 
-- Redis — очереди, кэш, напоминания (`Reminder` в БД).
-- S3 — постоянное хранение вложений (сейчас чеки через `telegramFileId`).
-- SpeechKit — голосовые команды в боте (inline UX уже снижает ошибки ввода до голоса).
-- Пакет `permissions` — отдельная модель ролей; в Prisma уже есть `UserRole` / `ProjectRole`.
+- Redis - очереди, кэш, напоминания (`Reminder` в БД).
+- S3 - постоянное хранение вложений (сейчас чеки через `telegramFileId`; Object Storage уже используется для async SpeechKit).
+- Пакет `permissions` - отдельная модель ролей; в Prisma уже есть `UserRole` / `ProjectRole`.

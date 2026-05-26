@@ -1,10 +1,10 @@
 # Руководство разработчика
 
-Документ для онбординга: за **30–60 минут** можно поднять окружение, понять архитектуру и знать, куда смотреть при типовых задачах. Детали по подсистемам — в остальных файлах [docs/](README.md).
+Документ для онбординга: за **30-60 минут** можно поднять окружение, понять архитектуру и знать, куда смотреть при типовых задачах. Детали по подсистемам - в остальных файлах [docs/](README.md).
 
 ## Что это за проект
 
-**Neportal** — внутренний портал организации: проекты, задачи, заметки, бюджеты и расходы, сотрудники, отсутствия. Кратко для нетехнической аудитории — [корневой README.md](../README.md). Три клиента работают с **одним REST API** и **одной PostgreSQL**:
+**Neportal** - внутренний портал организации: проекты, задачи, заметки, бюджеты и расходы, сотрудники, отсутствия. Кратко для нетехнической аудитории - [корневой README.md](../README.md). Три клиента работают с **одним REST API** и **одной PostgreSQL**:
 
 | Клиент | Технология | Роль |
 |--------|------------|------|
@@ -22,13 +22,13 @@
 4. Пройти **сквозной сценарий** ниже (сотрудник → бот → Web).
 5. По задаче углубиться: [api.md](api.md), [web.md](web.md), [bot.md](bot.md), [database.md](database.md).
 
-Все команды `pnpm` — **только из корня** репозитория (`c:\neportal` или аналог). Иначе `.env` и Prisma не найдут `DATABASE_URL`.
+Все команды `pnpm` - **только из корня** репозитория (`c:\neportal` или аналог). Иначе `.env` и Prisma не найдут `DATABASE_URL`.
 
 ## Ментальная модель
 
 ```mermaid
 flowchart TB
-  subgraph clients [Клиенты — только HTTP]
+  subgraph clients [Клиенты - только HTTP]
     W[Web]
     T[Telegram Bot]
   end
@@ -39,13 +39,14 @@ flowchart TB
   API --> DB
   Det[Deterministic parsers] -.->|без GPT| T
   LLM[AI Provider Yandex/Qwen] -.->|classifier + extractor, опционально| T
+  STT[SpeechKit STT] -.->|voice → text, опционально| T
   TG[Telegram Bot API] <-->|чеки, уведомления| API
   TG <-->|polling| T
 ```
 
 **Правила, которые экономят время:**
 
-- Web и бот **не импортируют** `@neportal/database` — только `fetch` к API.
+- Web и бот **не импортируют** `@neportal/database` - только `fetch` к API.
 - Любая запись в БД идёт через **сервис NestJS**, который фильтрует по `organizationId` из `OrganizationContextService`.
 - Бот после подтверждения AI или slash-команды вызывает **те же REST-эндпоинты**, что и Web (обёртки в `apps/bot/src/api.ts`).
 - In-memory состояние бота (pending AI, «последний расход») **теряется при перезапуске** процесса бота.
@@ -61,6 +62,7 @@ flowchart TB
 | Страница / форма в Web | `apps/web/src/app/(app)/` + `src/lib/api.ts` → [web.md](web.md) |
 | Команда бота или AI | `apps/bot/src/main.ts`, `api.ts`, `ai-message.ts` → [bot.md](bot.md) |
 | Inline confirmation / choice | `confirmation-reply.ts`, `confirmation-callback.ts`, `choice-reply.ts`, `telegram/keyboards/*` → [bot.md#telegram-ux-inline-кнопки](bot.md#telegram-ux-inline-кнопки) |
+| Голос (SpeechKit) | `speech/telegram-voice-handler.ts`, `speech/speechkit-config.ts` → [bot.md#голосовые-сообщения-speechkit](bot.md#голосовые-сообщения-speechkit) |
 | Безопасный Telegram callback | `telegram/safe-answer-callback.ts`, `telegram-error-log.ts` |
 | Дедлайн create_task (deterministic) | `parse-ru-date.ts`, `ai/postprocess/create-task-normalize.ts` |
 | Детерминированный parse текста | `parse-expense-query.ts`, `parse-create-budget-command.ts`, `ai/deterministic/` |
@@ -77,7 +79,7 @@ flowchart TB
 
 ### Структура NestJS-модуля (API)
 
-Каждый домен — папка в `apps/api/src/`:
+Каждый домен - папка в `apps/api/src/`:
 
 ```
 <domain>/
@@ -87,7 +89,7 @@ flowchart TB
 └── dto/                       # class-validator + Swagger при необходимости
 ```
 
-Пример: задачи — `tasks/tasks.controller.ts`, `tasks/tasks.service.ts`. Паттерн: в сервисе `this.orgContext.getOrganizationId()` и `where: { organizationId }`.
+Пример: задачи - `tasks/tasks.controller.ts`, `tasks/tasks.service.ts`. Паттерн: в сервисе `this.orgContext.getOrganizationId()` и `where: { organizationId }`.
 
 ### Структура Web (App Router)
 
@@ -99,41 +101,42 @@ apps/web/src/
 └── lib/api.ts          # серверный fetch к API
 ```
 
-Мутации — через **Server Actions** рядом со страницей, затем `revalidatePath`. Списки — **Server Components** + `apiGet`.
+Мутации - через **Server Actions** рядом со страницей, затем `revalidatePath`. Списки - **Server Components** + `apiGet`.
 
 ### Структура бота
 
 | Файл | Ответственность |
 |------|-----------------|
-| `main.ts` | `bot.command`, `callback_query:data`, `message:text`, `bot.catch` |
+| `main.ts` | `bot.command`, `callback_query:data`, `message:text`, `message:voice`, фото/документы, `bot.catch` |
 | `api.ts` | HTTP-клиент к REST, выбор проекта/бюджета по умолчанию |
-| `start-binding.ts` | `/start`, привязка по username (да/нет только текстом) |
-| `ai-message.ts` | Текст без `/`: pending → deterministic → `parseTextIntent` → preview |
+| `start-binding.ts` | `/start`, привязка по username (кнопки **Да**/**Нет** + text fallback) |
+| `ai-message.ts` | `handleTextSemanticMessage`: pending → deterministic → `parseTextIntent` → preview (текст и голос) |
+| `speech/telegram-voice-handler.ts` | STT (sync/async SpeechKit) → тот же semantic pipeline |
 | `route-parsed-intent.ts` | Общий путь после parse (deterministic или GPT) |
 | `confirmation-reply.ts` | Preview + `buildConfirmationKeyboard` |
 | `confirmation-callback.ts` / `confirmation-decision.ts` | Inline confirm / edit / cancel |
 | `choice-reply.ts` / `choice-callback.ts` / `choice-state.ts` | Списки выбора + cancel |
 | `budget-resolver.ts` | Сопоставление расхода с бюджетом по `matchingKeywords` |
 | `intent-resolver.ts` / `intent-executor.ts` | hints → id → POST/PATCH API |
-| `pending-intent.ts` | In-memory pending + `confirmationId` |
+| `pending-intent.ts` | In-memory pending confirmation: `ai_intent`, `confirm_link_by_username`, `confirm_absence_delegation_distribution` |
 | `parse-ru-date.ts` | Даты для slash и дедлайнов задач (ordinal, named month, DD.MM, ISO) |
 
 ## Глоссарий домена
 
 | Термин | Значение |
 |--------|----------|
-| **Organization** | Тенант в данных; в runtime MVP — одна запись (`neportal-demo`) |
+| **Organization** | Тенант в данных; в runtime MVP - одна запись (`neportal-demo`) |
 | **User** | Сотрудник org: роль `OWNER` / `MANAGER` / `EMPLOYEE` / `ACCOUNTANT` |
 | **Project** | Проект с участниками (`ProjectMember`) |
 | **Task** | Задача, опционально в проекте; статусы `NEW` … `CANCELLED` |
 | **Note** | Текстовая заметка; источник `WEB` / `TELEGRAM_*` |
 | **Budget** | Лимит денег на проект; `spentAmount` обновляется при одобрении расхода |
-| **BudgetExpense** | Строка расхода; чек — `BudgetExpenseAttachment` (`telegramFileId`) |
-| **Absence** | Больничный / отпуск; при выдаче по проекту — `affectedTasks` |
+| **BudgetExpense** | Строка расхода; чек - `BudgetExpenseAttachment` (`telegramFileId`) |
+| **Absence** | Больничный / отпуск; при выдаче по проекту - `affectedTasks` |
 | **telegramUsername** | Для **первой** привязки через `/start` (до появления `telegramId`) |
 | **telegramId** | Постоянная связь с Telegram после подтверждения «да» |
 
-Демо-проект **«Реклама VK»** — проект и бюджет по умолчанию в боте; без него slash-команды просят создать проект в Web.
+Демо-проект **«Реклама VK»** - проект и бюджет по умолчанию в боте; без него slash-команды просят создать проект в Web.
 
 ## Сквозные сценарии (проверка понимания)
 
@@ -149,7 +152,7 @@ apps/web/src/
 ### 2. Расход и чек
 
 1. Бот (привязанный пользователь): `/expense 1500 тест`.
-2. Отправить **фото** или **документ** — вложение к последнему расходу.
+2. Отправить **фото** или **документ** - вложение к последнему расходу.
 3. Web: `/budgets/[id]` → модальный просмотр через `GET .../preview` (API проксирует файл из Telegram).
 
 ### 3. AI intent (если настроен AI provider)
@@ -164,13 +167,13 @@ apps/web/src/
 ### 4. Отсутствие и затронутые задачи
 
 1. `/sick до 25.05.2026` от привязанного Ивана (в сиде есть задача с дедлайном 22.05.2026).
-2. Web: проект → «Отсутствия» — в карточке отсутствия список `affectedTasks`.
+2. Web: проект → «Отсутствия» - в карточке отсутствия список `affectedTasks`.
 
 ### 5. Бюджет через бот (deterministic или Yandex)
 
 1. Фраза: «создай бюджет Тестовый 100000 с чеком» (или через Yandex, если deterministic не сработал).
 2. Preview → Подтвердить (кнопка) или `да`.
-3. Web: проект → «Бюджеты» — новый бюджет; при необходимости допишите **ключевые слова** на карточке бюджета.
+3. Web: проект → «Бюджеты» - новый бюджет; при необходимости допишите **ключевые слова** на карточке бюджета.
 
 ## Как вносить изменения
 
@@ -199,27 +202,27 @@ apps/web/src/
 ### Новая slash-команда бота
 
 1. Обработчик в `main.ts` через `bot.command("name", ...)`.
-2. Бизнес-логика — функция в `api.ts` (не дублировать URL вручную в handler).
-3. Для команд с датами — `parse-ru-date.ts` (slash: **DD.MM.YYYY**; в AI — также ordinal/named month, см. [bot.md](bot.md#дедлайн-задачи)).
+2. Бизнес-логика - функция в `api.ts` (не дублировать URL вручную в handler).
+3. Для команд с датами - `parse-ru-date.ts` (slash: **DD.MM.YYYY**; в AI - также ordinal/named month, см. [bot.md](bot.md#дедлайн-задачи)).
 4. Рабочие команды: `requireLinkedUser` из `current-user.ts`.
 5. Документировать в [bot.md](bot.md).
 
 ### Новый preview / selection в боте
 
-1. Confirmation: `replyWithConfirmationPreview` — не дублировать клавиатуру вручную; `confirmationId` уже в `setPendingConfirmation`.
+1. Confirmation: `replyWithConfirmationPreview` - не дублировать клавиатуру вручную; `confirmationId` уже в `setPendingConfirmation`.
 2. Choice-список: `replyWithActiveChoiceKeyboard` + `choiceId` в pending state.
-3. **Не класть** `taskId`, `userId` или payload intent в `callback_data` — только `confirmation:*` / `choice:select:…:index` и guards.
-4. Решение после кнопки — через `applyConfirmationDecision` или существующий handler выбора по номеру.
+3. **Не класть** `taskId`, `userId` или payload intent в `callback_data` - только `confirmation:*` / `choice:select:…:index` и guards.
+4. Решение после кнопки - через `applyConfirmationDecision` или существующий handler выбора по номеру.
 5. UX и guards: [bot.md#telegram-ux-inline-кнопки](bot.md#telegram-ux-inline-кнопки).
 
-**Важно:** в grammY сообщения вида `/sick …` **не попадают** в `bot.hears` — только `bot.command`.
+**Важно:** в grammY сообщения вида `/sick …` **не попадают** в `bot.hears` - только `bot.command`.
 
 ### Новый AI intent
 
 1. Расширить Zod в `packages/ai-contracts/src/index.ts`.
 2. `pnpm --filter @neportal/ai-contracts build`.
 3. Prompt в `ai/prompts/`, orchestration в `yandex-gpt.ts`, resolver/preview/executor в боте.
-4. Preview через `replyWithConfirmationPreview`; при необходимости selection — choice-layer.
+4. Preview через `replyWithConfirmationPreview`; при необходимости selection - choice-layer.
 5. [ai-intent.md](ai-intent.md) + пример фразы в [bot.md](bot.md).
 
 ## Инструменты и сборка
@@ -230,7 +233,7 @@ apps/web/src/
 | pnpm | 11 (`packageManager` в корневом `package.json`) |
 | Turborepo | `build` → `^build` сначала пакеты, потом apps |
 | Prisma | CLI через `pnpm db:*` с `dotenv-cli` |
-| Тесты | Автотестов в репозитории **нет**; `pnpm --filter @neportal/bot test` / build; `BOT_DEV_SELF_CHECKS`; проверка — ручные сценарии (в т.ч. inline-кнопки) + Swagger |
+| Тесты | Автотестов в репозитории **нет**; `pnpm --filter @neportal/bot build`; `BOT_DEV_SELF_CHECKS=true` при старте; проверка - ручные сценарии (inline-кнопки, голос) + Swagger |
 
 Запуск одного приложения:
 
@@ -240,7 +243,7 @@ pnpm --filter @neportal/web dev
 pnpm --filter @neportal/bot dev
 ```
 
-Линт: `pnpm lint` (на API/bot — заглушка; ESLint на web).
+Линт: `pnpm lint` (на API/bot - заглушка; ESLint на web).
 
 ## Переменные окружения
 
@@ -252,23 +255,25 @@ pnpm --filter @neportal/bot dev
 |---------|----------|
 | API не стартует, org not found | `pnpm db:seed`, проверить `NEPORTAL_ORG_SLUG` |
 | Бот: не привязан | Web: username + `/start` + «да» |
-| Бот: AI не работает | Slash без LLM; для текста — [env.md](env.md) (`AI_PROVIDER`, `YANDEX_*` / `QWEN_*`) |
+| Бот: AI не работает | Slash без LLM; для текста - [env.md](env.md) (`AI_PROVIDER`, `YANDEX_*` / `QWEN_*`) |
+| Бот: голос не работает | `YANDEX_SPEECHKIT_ENABLED=true`, ключи `YANDEX_SPEECHKIT_*`; для длинного голоса - async + Object Storage (см. [env.md](env.md), [bot.md](bot.md#голосовые-сообщения-speechkit)) |
 | Web: чек не открывается | `NEXT_PUBLIC_API_URL`, API запущен, `TELEGRAM_BOT_TOKEN` на API |
 | Zod `version` в боте | `pnpm --filter @neportal/ai-contracts build`, перезапуск бота |
 | Prisma без URL | Команды из корня, не из `packages/database` |
 
-Логи бота (без секретов): `BOT_DEV_LOG` не равен `0` — POST `/absences`, Yandex validation.
+Логи бота (без секретов): `BOT_DEV_LOG` не равен `0` - POST `/absences`, Yandex validation.
 
 ## Что сознательно не в MVP
 
 - JWT / сессии / мульти-org в runtime
 - Пакет `@neportal/permissions` в Nest
-- Redis, S3, SpeechKit (env есть, код частично или нет)
+- Redis; постоянное S3-хранение вложений (Object Storage только для async SpeechKit)
+- SpeechKit по умолчанию выключен (`YANDEX_SPEECHKIT_ENABLED=false`)
 - `Reminder` в БД без UI/API
 - Webhook-сервер для Telegram (только `BOT_MODE=webhook` + установка URL)
 - Автотесты
 
-Планы — раздел «Планируемые направления» в [architecture.md](architecture.md).
+Планы - раздел «Планируемые направления» в [architecture.md](architecture.md).
 
 ## Дальнейшее чтение
 

@@ -6,7 +6,7 @@
 
 | Способ | Кто |
 |--------|-----|
-| `loadRootEnv()` (`@neportal/shared`) | API, бот при старте — поиск `.env` вверх от `cwd` (до 8 уровней) |
+| `loadRootEnv()` (`@neportal/shared`) | API, бот при старте - поиск `.env` вверх от `cwd` (до 8 уровней) |
 | `NEPORTAL_ENV_PATH` | Явный абсолютный путь к файлу (до запуска Node) |
 | `dotenv-cli -e .env` | Скрипты `pnpm db:*` в корневом `package.json` |
 | `dotenv-cli -e ../../.env` | `@neportal/web` dev / build / start |
@@ -40,8 +40,8 @@
 | `API_PORT` | нет | `4000` | Порт NestJS |
 | `UPLOAD_DIR` | нет | `uploads` (cwd API) | Локальное хранение чеков, загруженных из Web (`POST .../receipt`) |
 | `NEPORTAL_ORG_SLUG` | нет | `neportal-demo` | Slug организации для всех запросов (после `pnpm db:seed`) |
-| `NEPORTAL_ORGANIZATION_ID` | нет | — | Если задан — приоритет над slug (CUID из БД) |
-| `JWT_SECRET` | нет | — | **Не используется** в MVP; заготовка |
+| `NEPORTAL_ORGANIZATION_ID` | нет | - | Если задан - приоритет над slug (CUID из БД) |
+| `JWT_SECRET` | нет | - | **Не используется** в MVP; заготовка |
 
 ### Telegram
 
@@ -61,12 +61,12 @@ API использует тот же `TELEGRAM_BOT_TOKEN` для `getFile` пр�
 | `AI_PROVIDER_TIMEOUT_MS` | `30000` | Timeout одного HTTP-запроса к LLM (все providers) |
 | `AI_PROVIDER_MAX_RETRIES` | `1` | Число **повторов** после неудачной попытки (только transient: timeout, network, 408/429/5xx) |
 | `AI_PROVIDER_RETRY_BASE_DELAY_MS` | `500` | Базовая задержка backoff между retry (`500`, `1000`, …) |
-| `QWEN_API_KEY` | — | Секретный API-ключ из Yandex Cloud; **обязателен** при `AI_PROVIDER=qwen` и `QWEN_AUTH_TYPE=api-key` |
+| `QWEN_API_KEY` | - | Секретный API-ключ из Yandex Cloud; **обязателен** при `AI_PROVIDER=qwen` и `QWEN_AUTH_TYPE=api-key` |
 | `QWEN_BASE_URL` | `https://ai.api.cloud.yandex.net/v1` | OpenAI-compatible endpoint Yandex Cloud AI Studio |
-| `QWEN_AUTH_TYPE` | `api-key` | `api-key` (`Authorization: Api-Key`) или `iam-token` (`Bearer`; при отсутствии `QWEN_API_KEY` — `YANDEX_CLOUD_IAM_TOKEN`) |
-| `QWEN_MODEL` | — | URI модели, напр. `gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest`; folder можно не дублировать, если задан `YANDEX_CLOUD_FOLDER_ID` |
+| `QWEN_AUTH_TYPE` | `api-key` | `api-key` (`Authorization: Api-Key`) или `iam-token` (`Bearer`; при отсутствии `QWEN_API_KEY` - `YANDEX_CLOUD_IAM_TOKEN`) |
+| `QWEN_MODEL` | - | URI модели, напр. `gpt://<FOLDER_ID>/<QWEN_MODEL_ID>/latest`; folder можно не дублировать, если задан `YANDEX_CLOUD_FOLDER_ID` |
 | `BOT_DEV_SELF_CHECKS` | `false` | Self-checks парсеров при старте бота |
-| `BOT_DEV_MOCK_DEADLINE_LLM` | — | Только dev: при `true` mock resolver дедлайна в self-checks (`create-task-deadline-llm.ts`) без реального LLM (named month / July cases) |
+| `BOT_DEV_MOCK_DEADLINE_LLM` | - | Только dev: при `true` mock resolver дедлайна в self-checks (`create-task-deadline-llm.ts`) без реального LLM (named month / July cases) |
 | `BOT_AI_CLEANUP_BASIC_TASKS` | `false` | LLM-очистка title для коротких deterministic `create_task` |
 | `BOT_YANDEX_PROMPT_LOG_DIR` | `logs/yandex-gpt` | Сохранение промптов при отказе модели / невалидной схеме |
 | `TASK_NOTIFICATION_SCHEDULER_ENABLED` | `true` | Scheduler уведомлений по задачам |
@@ -101,11 +101,11 @@ YANDEX_SPEECHKIT_MAX_FILE_SIZE_MB=1
 - Для short voice MVP Object Storage не требуется.
 - Object Storage и async/long audio добавляются в следующих этапах.
 - До включения Telegram voice flow SpeechKit остаётся выключенным (`YANDEX_SPEECHKIT_ENABLED=false`).
-- Backward aliases поддерживаются как fallback: `SPEECHKIT_API_KEY`, `SPEECHKIT_FOLDER_ID` (основные переменные — `YANDEX_SPEECHKIT_*`).
+- Backward aliases поддерживаются как fallback: `SPEECHKIT_API_KEY`, `SPEECHKIT_FOLDER_ID` (основные переменные - `YANDEX_SPEECHKIT_*`).
 
 Пустая строка и `change_me` считаются «переменная не задана». Без настроенного AI provider бот отвечает на произвольный текст: использовать slash-команды.
 
-**Qwen (Yandex Cloud):** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. Модель и каталог — в формате Yandex (`gpt://…`). При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
+**Qwen (Yandex Cloud):** переменные `QWEN_*` используются только при `AI_PROVIDER=qwen`. Модель и каталог - в формате Yandex (`gpt://…`). При `AI_PROVIDER=yandex` (или если переменная не задана) Qwen не вызывается.
 
 **Retry/timeout:** `AI_PROVIDER_*` применяются к YandexGPT и Qwen. Секреты (API key, Authorization) **не** попадают в логи и `AiProviderError`. Ошибки 401/403/400 не retry-ятся; token usage логируется только после успешного ответа.
 
@@ -115,7 +115,7 @@ YANDEX_SPEECHKIT_MAX_FILE_SIZE_MB=1
 
 | Переменная | Назначение |
 |------------|------------|
-| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Постоянное хранение вложений; MVP — `telegramFileId` |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Постоянное хранение вложений; MVP - `telegramFileId` |
 
 ## Минимальный `.env` для старта
 
@@ -132,16 +132,16 @@ TELEGRAM_BOT_TOKEN=<ваш токен>
 ## Отладка env
 
 ```bash
-# из корня — должен отработать без ошибки DATABASE_URL
+# из корня - должен отработать без ошибки DATABASE_URL
 pnpm db:studio
 ```
 
-При старте API/бота в консоли: `Loaded env from: <путь>` — если путь неверный, проверьте `cwd` терминала.
+При старте API/бота в консоли: `Loaded env from: <путь>` - если путь неверный, проверьте `cwd` терминала.
 
-## SpeechKit Async STT (long audio via Object Storage)
+## SpeechKit Async STT (длинный голос через Object Storage)
 
-Short voice keeps using sync STT (`stt/v1/stt:recognize`).
-Long voice can use async STT (`stt/v2/longRunningRecognize`) through Yandex Object Storage.
+Короткий голос - sync STT (`stt/v1/stt:recognize`).
+Длинный голос - async STT (`stt/v2/longRunningRecognize`) через временный объект в Yandex Object Storage.
 
 ```env
 YANDEX_SPEECHKIT_ASYNC_ENABLED=false
@@ -159,8 +159,9 @@ YANDEX_STORAGE_ACCESS_KEY_ID=
 YANDEX_STORAGE_SECRET_ACCESS_KEY=
 ```
 
-Notes:
-- Async mode is disabled by default.
-- Bot may run outside Yandex Cloud; Object Storage is used as temporary transport for long audio.
-- Keep bucket private and configure lifecycle cleanup as backup.
-- Deferred mode is not enabled by default (`YANDEX_SPEECHKIT_ASYNC_MODEL=general`).
+Заметки:
+
+- Async-режим по умолчанию выключен.
+- Бот может работать вне Yandex Cloud; Object Storage - только временный транспорт для длинного аудио.
+- Bucket должен быть приватным; настройте lifecycle cleanup как резервную очистку.
+- Deferred mode не включён по умолчанию (`YANDEX_SPEECHKIT_ASYNC_MODEL=general`).
