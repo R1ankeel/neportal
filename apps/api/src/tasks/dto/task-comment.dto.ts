@@ -18,3 +18,15 @@ export class CreateTaskCommentDto {
   @IsEnum(TaskCommentSource)
   source?: TaskCommentSource;
 }
+
+export class UpdateTaskCommentDto {
+  @ApiProperty({ description: "Кто редактирует комментарий (пользователь org)" })
+  @IsString()
+  @IsNotEmpty()
+  editorId!: string;
+
+  @ApiProperty({ example: "Обновил текст комментария" })
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+}

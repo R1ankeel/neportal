@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { NoteSource, PrismaService } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
-import { CreateNoteDto } from "./dto/note.dto";
+import { CreateNoteDto, UpdateNoteDto } from "./dto/note.dto";
 
 const noteInclude = {
   creator: { select: { id: true, fullName: true } },
@@ -78,6 +78,30 @@ export class NotesService {
         text: dto.text,
         source: dto.source ?? NoteSource.WEB,
       },
+      include: noteInclude,
+    });
+  }
+
+  async update(id: string, dto: UpdateNoteDto) {
+    const existing = await this.prisma.note.findFirst({
+      where: { id, organizationId: this.orgId() },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Note with id "${id}" not found`);
+    }
+
+    const text = dto.text.trim();
+    if (!text) {
+      throw new BadRequestException("Note text must not be empty");
+    }
+
+    if (text === existing.text.trim()) {
+      return this.findOne(id);
+    }
+
+    return this.prisma.note.update({
+      where: { id },
+      data: { text },
       include: noteInclude,
     });
   }

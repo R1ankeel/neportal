@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { CreateNoteDto } from "./dto/note.dto";
+import { CreateNoteDto, UpdateNoteDto } from "./dto/note.dto";
 import { NotesService } from "./notes.service";
 
 @ApiTags("notes")
@@ -26,5 +26,12 @@ export class NotesController {
   @ApiOperation({ summary: "Создать заметку" })
   create(@Body() dto: CreateNoteDto) {
     return this.notesService.create(dto);
+  }
+
+  @Patch(":id")
+  @ApiOperation({ summary: "Обновить текст заметки (Web)" })
+  @ApiParam({ name: "id" })
+  update(@Param("id") id: string, @Body() dto: UpdateNoteDto) {
+    return this.notesService.update(id, dto);
   }
 }

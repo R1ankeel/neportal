@@ -72,6 +72,30 @@ export class UpdateTaskStatusDto {
   cancellationReason?: string;
 }
 
+export class UpdateTaskDto {
+  @ApiPropertyOptional({ description: "Новое название задачи" })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  title?: string;
+
+  @ApiPropertyOptional({
+    description: "Новое описание; null или пустая строка — очистить",
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value != null)
+  @IsString()
+  description?: string | null;
+}
+
+export class UpdateTaskAssigneeDto {
+  @ApiProperty({ description: "Новый исполнитель (пользователь текущей организации)" })
+  @IsString()
+  @IsNotEmpty()
+  assigneeUserId!: string;
+}
+
 export class UpdateTaskDeadlineDto {
   @ApiPropertyOptional({
     description: "ISO date или datetime; для date-only — конец дня UTC. null — сбросить дедлайн",

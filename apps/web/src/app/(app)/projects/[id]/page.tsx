@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { TaskTitleCell } from "@/components/TaskTitleCell";
 import { apiGet } from "@/lib/api";
-import { budgetRemainder, formatDateTime, formatMoney, taskStatusLabel } from "@/lib/format";
+import { budgetRemainder, formatMoney, taskStatusLabel } from "@/lib/format";
+import { NoteTextEditor } from "./notes/NoteTextEditor";
 import type { ApiBudget, ApiNote, ApiTask } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -88,8 +89,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           <ul className="mt-4 space-y-3">
             {recentNotes.map((n) => (
               <li key={n.id} className="border-b border-zinc-100 pb-3 last:border-0 dark:border-zinc-800">
-                <p className="text-base text-zinc-600 dark:text-zinc-400">{formatDateTime(n.createdAt)}</p>
-                <p className="mt-1 text-lg">{n.text}</p>
+                <NoteTextEditor note={n} projectId={id} compactMeta />
               </li>
             ))}
           </ul>

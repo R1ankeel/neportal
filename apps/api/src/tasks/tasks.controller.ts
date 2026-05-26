@@ -1,11 +1,17 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { CreateTaskCommentDto } from "./dto/task-comment.dto";
+import { CreateTaskCommentDto, UpdateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskTransferDto } from "./dto/task-transfer.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import { MyTasksQueryDto } from "./dto/my-tasks-query.dto";
-import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
+import {
+  CreateTaskDto,
+  UpdateTaskAssigneeDto,
+  UpdateTaskDeadlineDto,
+  UpdateTaskDto,
+  UpdateTaskStatusDto,
+} from "./dto/task.dto";
 import { TasksService } from "./tasks.service";
 
 @ApiTags("tasks")
@@ -58,11 +64,25 @@ export class TasksController {
     return this.tasksService.updateDeadline(id, dto);
   }
 
+  @Patch(":id/assignee")
+  @ApiOperation({ summary: "Назначить исполнителя задачи (Web)" })
+  @ApiParam({ name: "id" })
+  updateAssignee(@Param("id") id: string, @Body() dto: UpdateTaskAssigneeDto) {
+    return this.tasksService.updateAssignee(id, dto);
+  }
+
   @Patch(":id/status")
   @ApiOperation({ summary: "Обновить статус задачи" })
   @ApiParam({ name: "id" })
   updateStatus(@Param("id") id: string, @Body() dto: UpdateTaskStatusDto) {
     return this.tasksService.updateStatus(id, dto);
+  }
+
+  @Patch(":id")
+  @ApiOperation({ summary: "Обновить название и/или описание задачи (Web)" })
+  @ApiParam({ name: "id" })
+  update(@Param("id") id: string, @Body() dto: UpdateTaskDto) {
+    return this.tasksService.update(id, dto);
   }
 
   @Get(":id")
@@ -84,6 +104,18 @@ export class TasksController {
   @ApiParam({ name: "id" })
   createComment(@Param("id") id: string, @Body() dto: CreateTaskCommentDto) {
     return this.tasksService.createComment(id, dto);
+  }
+
+  @Patch(":id/comments/:commentId")
+  @ApiOperation({ summary: "Обновить текст комментария задачи (Web)" })
+  @ApiParam({ name: "id" })
+  @ApiParam({ name: "commentId" })
+  updateComment(
+    @Param("id") id: string,
+    @Param("commentId") commentId: string,
+    @Body() dto: UpdateTaskCommentDto,
+  ) {
+    return this.tasksService.updateComment(id, commentId, dto);
   }
 
   @Post(":id/comments/mention")

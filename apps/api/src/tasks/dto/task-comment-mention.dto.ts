@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { TaskCommentSource } from "@neportal/database";
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateTaskCommentMentionDto {
   @ApiProperty({ description: "Автор комментария (пользователь org)" })
@@ -22,4 +22,12 @@ export class CreateTaskCommentMentionDto {
   @IsOptional()
   @IsEnum(TaskCommentSource)
   source?: TaskCommentSource;
+
+  @ApiPropertyOptional({
+    description: "Отправить Telegram-уведомление упомянутому сотруднику (Web)",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyMentioned?: boolean;
 }

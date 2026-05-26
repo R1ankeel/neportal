@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddCommentForm } from "./AddCommentForm";
+import { TaskAssigneeEditor } from "./TaskAssigneeEditor";
+import { TaskCommentEditor } from "./TaskCommentEditor";
 import { TaskDeadlineEditor } from "./TaskDeadlineEditor";
+import { TaskDescriptionEditor } from "./TaskDescriptionEditor";
+import { TaskTitleEditor } from "./TaskTitleEditor";
 import { apiGet } from "@/lib/api";
 import {
   formatDateTime,
-  noteSourceLabel,
   taskStatusLabel,
   transferStatusLabel,
 } from "@/lib/format";
@@ -46,7 +49,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
       <header className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-wrap items-start gap-3">
-          <h1 className="flex-1 text-3xl font-semibold md:text-4xl">{task.title}</h1>
+          <div className="min-w-0 flex-1">
+            <TaskTitleEditor taskId={task.id} initialTitle={task.title} projectId={task.project?.id} />
+          </div>
           <span className="inline-flex rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium dark:bg-zinc-800">
             {taskStatusLabel(task.status)}
           </span>
@@ -87,16 +92,22 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div>
             <dt className="text-sm font-medium text-zinc-500">Исполнитель</dt>
-            <dd className="mt-1 text-lg">{task.assignee?.fullName ?? "—"}</dd>
+            <dd className="mt-1">
+              <TaskAssigneeEditor
+                taskId={task.id}
+                initialAssignee={task.assignee ?? null}
+                users={users}
+                projectId={task.project?.id}
+              />
+            </dd>
           </div>
         </dl>
 
-        {task.description ? (
-          <div className="mt-6">
-            <h2 className="text-sm font-medium text-zinc-500">Описание</h2>
-            <p className="mt-2 whitespace-pre-line text-lg text-zinc-700 dark:text-zinc-300">{task.description}</p>
-          </div>
-        ) : null}
+        <TaskDescriptionEditor
+          taskId={task.id}
+          initialDescription={task.description}
+          projectId={task.project?.id}
+        />
 
         {task.status === "DONE" && task.completionResult?.trim() ? (
           <div className="mt-6 rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/40">
@@ -155,26 +166,19 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <li className="py-4 text-zinc-500">Комментариев пока нет</li>
           ) : (
             comments.map((c) => (
-              <li key={c.id} className="py-4">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-zinc-500">
-                  <span className="font-medium text-zinc-800 dark:text-zinc-200">{c.author.fullName}</span>
-                  <span>{formatDateTime(c.createdAt)}</span>
-                  <span className="rounded bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{noteSourceLabel(c.source)}</span>
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-lg text-zinc-700 dark:text-zinc-300">{c.text}</p>
-                {c.mentions && c.mentions.length > 0 ? (
-                  <p className="mt-2 text-sm text-zinc-500">
-                    Упомянуты:{" "}
-                    {c.mentions.map((m) => m.mentionedUser.fullName).join(", ")}
-                  </p>
-                ) : null}
-              </li>
+              <TaskCommentEditor
+                key={c.id}
+                taskId={task.id}
+                comment={c}
+                projectId={task.project?.id}
+                editorId={webAuthor?.id}
+              />
             ))
           )}
         </ul>
 
         {webAuthor ? (
-          <AddCommentForm taskId={task.id} authorId={webAuthor.id} projectId={task.project?.id} />
+          <AddCommentForm taskId={task.id} authorId={webAuthor.id} projectId={task.project?.id} users={users} />
         ) : (
           <p className="mt-4 text-amber-800 dark:text-amber-200">Нет пользователей для добавления комментария</p>
         )}

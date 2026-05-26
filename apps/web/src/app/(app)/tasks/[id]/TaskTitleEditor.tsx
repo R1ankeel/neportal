@@ -1,8 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { deadlineToInputValue, formatTaskDeadline } from "@/lib/format";
-import { updateTaskDeadline, type UpdateDeadlineState } from "./actions";
+import { updateTaskTitle, type UpdateTitleState } from "./actions";
 import {
   TaskFieldEditActions,
   TaskFieldEditTrigger,
@@ -10,38 +9,41 @@ import {
   taskFieldErrorMessage,
 } from "./task-edit";
 
-const DEADLINE_ERROR = taskFieldErrorMessage("дедлайн");
+const TITLE_ERROR = taskFieldErrorMessage("название");
 
-export function TaskDeadlineEditor({
+const inputClassName =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-2xl font-semibold dark:border-zinc-600 dark:bg-zinc-950 md:text-3xl";
+
+export function TaskTitleEditor({
   taskId,
-  initialDeadlineAt,
+  initialTitle,
   projectId,
 }: {
   taskId: string;
-  initialDeadlineAt: string | null;
+  initialTitle: string;
   projectId?: string | null;
 }) {
-  const [deadlineAt, setDeadlineAt] = useState(initialDeadlineAt);
+  const [title, setTitle] = useState(initialTitle);
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const [state, formAction, pending] = useActionState<UpdateDeadlineState | undefined, FormData>(
-    updateTaskDeadline,
+  const [state, formAction, pending] = useActionState<UpdateTitleState | undefined, FormData>(
+    updateTaskTitle,
     undefined,
   );
 
   useEffect(() => {
-    setDeadlineAt(initialDeadlineAt);
-  }, [initialDeadlineAt]);
+    setTitle(initialTitle);
+  }, [initialTitle]);
 
   useEffect(() => {
     if (state?.ok) {
-      setDeadlineAt(state.deadlineAt);
+      if (state.title) setTitle(state.title);
       setEditing(false);
     }
   }, [state]);
 
   function startEdit() {
-    setInputValue(deadlineToInputValue(deadlineAt));
+    setInputValue(title);
     setEditing(true);
   }
 
@@ -50,24 +52,28 @@ export function TaskDeadlineEditor({
     setInputValue("");
   }
 
+  const trimmed = inputValue.trim();
+  const unchanged = trimmed === title.trim();
+  const errorMessage = state?.ok === false ? (state.message ?? TITLE_ERROR) : null;
+
   if (editing) {
     return (
       <form action={formAction} className="space-y-2">
         <input type="hidden" name="taskId" value={taskId} />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         <input
-          type="date"
-          name="deadlineAt"
+          type="text"
+          name="title"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           required
           disabled={pending}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950"
+          className={inputClassName}
         />
-        {state?.ok === false ? <TaskFieldError message={DEADLINE_ERROR} /> : null}
+        {errorMessage ? <TaskFieldError message={errorMessage} /> : null}
         <TaskFieldEditActions
           pending={pending}
-          saveDisabled={!inputValue}
+          saveDisabled={!trimmed || unchanged}
           onCancel={cancelEdit}
         />
       </form>
@@ -75,8 +81,8 @@ export function TaskDeadlineEditor({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-lg">{formatTaskDeadline(deadlineAt)}</span>
+    <div className="flex flex-wrap items-start gap-2">
+      <h1 className="flex-1 text-3xl font-semibold md:text-4xl">{title}</h1>
       <TaskFieldEditTrigger onClick={startEdit} />
     </div>
   );

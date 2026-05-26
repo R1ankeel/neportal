@@ -8,7 +8,7 @@ import {
   UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
-import { CreateTaskCommentDto } from "./dto/task-comment.dto";
+import { CreateTaskCommentDto, UpdateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
 import {
@@ -16,12 +16,29 @@ import {
   CreateTaskTransferDto,
   RejectTaskTransferDto,
 } from "./dto/task-transfer.dto";
-import { CreateTaskDto, UpdateTaskDeadlineDto, UpdateTaskStatusDto } from "./dto/task.dto";
+import {
+  CreateTaskDto,
+  UpdateTaskAssigneeDto,
+  UpdateTaskDeadlineDto,
+  UpdateTaskDto,
+  UpdateTaskStatusDto,
+} from "./dto/task.dto";
+import {
+  buildTaskFieldsUpdatedNotifyMessage,
+  normalizeTaskDescription,
+  taskDescriptionsEqual,
+} from "./task-fields-notify.util";
 import { TelegramNotifyService } from "../telegram/telegram-notify.service";
+import {
+  buildTaskAssigneeAssignedMessage,
+  buildTaskAssigneeUnassignedMessage,
+} from "./task-assignee-notify.util";
 import {
   buildTaskDeadlineChangedMessage,
   calendarDateKey,
 } from "./task-deadline-notify.util";
+import { buildTaskCommentUpdatedMessage } from "./task-comment-notify.util";
+import { buildTaskMentionRequestedMessage } from "./task-mention-notify.util";
 
 @Injectable()
 export class TasksService {
@@ -210,6 +227,81 @@ export class TasksService {
     });
   }
 
+  async updateComment(taskId: string, commentId: string, dto: UpdateTaskCommentDto) {
+    const org = this.orgId();
+    await this.assertTaskInOrg(taskId);
+
+    const editor = await this.prisma.user.findFirst({
+      where: { id: dto.editorId, organizationId: org },
+    });
+    if (!editor) {
+      throw new NotFoundException(`User with id "${dto.editorId}" not found in this organization`);
+    }
+
+    const existing = await this.prisma.taskComment.findFirst({
+      where: { id: commentId, taskId, organizationId: org },
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+            assignee: { select: this.taskUserNotifySelect },
+          },
+        },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Comment with id "${commentId}" not found`);
+    }
+
+    const text = dto.text.trim();
+    if (!text) {
+      throw new BadRequestException("text must not be empty");
+    }
+
+    if (text === existing.text.trim()) {
+      return this.prisma.taskComment.findFirstOrThrow({
+        where: { id: commentId, taskId, organizationId: org },
+        include: this.commentInclude,
+      });
+    }
+
+    const updated = await this.prisma.taskComment.update({
+      where: { id: commentId },
+      data: { text },
+      include: this.commentInclude,
+    });
+
+    await this.notifyAssigneeCommentUpdated({
+      taskId: existing.task.id,
+      taskTitle: existing.task.title,
+      assignee: existing.task.assignee,
+      editorId: editor.id,
+    });
+
+    return updated;
+  }
+
+  private async notifyAssigneeCommentUpdated(params: {
+    taskId: string;
+    taskTitle: string;
+    assignee: { id: string; telegramId: string | null } | null;
+    editorId: string;
+  }): Promise<void> {
+    const { taskId, taskTitle, assignee, editorId } = params;
+    if (!assignee?.telegramId) return;
+    if (assignee.id === editorId) return;
+
+    const text = buildTaskCommentUpdatedMessage(taskTitle);
+
+    try {
+      await this.telegramNotify.sendMessage(assignee.telegramId, text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to notify assignee about comment update for task ${taskId}: ${msg}`);
+    }
+  }
+
   async createCommentMention(taskId: string, dto: CreateTaskCommentMentionDto) {
     const org = this.orgId();
     await this.assertTaskInOrg(taskId);
@@ -237,7 +329,7 @@ export class TasksService {
 
     const source = dto.source ?? TaskCommentSource.WEB;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const comment = await tx.taskComment.create({
         data: {
           organizationId: org,
@@ -289,6 +381,39 @@ export class TasksService {
         },
       };
     });
+
+    if (dto.notifyMentioned) {
+      await this.notifyMentionedUser({
+        taskId,
+        taskTitle: result.task.title,
+        commentText: result.comment.text,
+        authorId: result.author.id,
+        mentionedUser: result.mentionedUser,
+      });
+    }
+
+    return result;
+  }
+
+  private async notifyMentionedUser(params: {
+    taskId: string;
+    taskTitle: string;
+    commentText: string;
+    authorId: string;
+    mentionedUser: { id: string; telegramId: string | null };
+  }): Promise<void> {
+    const { taskId, taskTitle, commentText, authorId, mentionedUser } = params;
+    if (!mentionedUser.telegramId) return;
+    if (mentionedUser.id === authorId) return;
+
+    const text = buildTaskMentionRequestedMessage(taskTitle, commentText);
+
+    try {
+      await this.telegramNotify.sendMessage(mentionedUser.telegramId, text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to notify mentioned user for task ${taskId}: ${msg}`);
+    }
   }
 
   async findAll(projectId?: string) {
@@ -583,6 +708,192 @@ export class TasksService {
         project: { select: { id: true, name: true } },
       },
     });
+  }
+
+  async update(id: string, dto: UpdateTaskDto) {
+    const hasTitle = dto.title !== undefined;
+    const hasDescription = dto.description !== undefined;
+    if (!hasTitle && !hasDescription) {
+      throw new BadRequestException("At least one of title or description must be provided");
+    }
+
+    const org = this.orgId();
+    const existing = await this.prisma.task.findFirst({
+      where: { id, organizationId: org },
+      include: {
+        assignee: { select: this.taskUserNotifySelect },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Task with id "${id}" not found`);
+    }
+
+    const data: { title?: string; description?: string | null } = {};
+    let titleChanged = false;
+    let descriptionChanged = false;
+
+    if (hasTitle) {
+      const title = dto.title!.trim();
+      if (!title) {
+        throw new BadRequestException("Title must not be empty");
+      }
+      if (title !== existing.title) {
+        data.title = title;
+        titleChanged = true;
+      }
+    }
+
+    if (hasDescription) {
+      const description = normalizeTaskDescription(dto.description);
+      if (!taskDescriptionsEqual(description, existing.description)) {
+        data.description = description;
+        descriptionChanged = true;
+      }
+    }
+
+    if (!titleChanged && !descriptionChanged) {
+      return this.prisma.task.findFirstOrThrow({
+        where: { id, organizationId: org },
+        include: this.taskWithProjectInclude,
+      });
+    }
+
+    const updated = await this.prisma.task.update({
+      where: { id },
+      data,
+      include: this.taskWithProjectInclude,
+    });
+
+    await this.notifyAssigneeTaskFieldsUpdated({
+      taskId: id,
+      assignee: updated.assignee,
+      taskTitle: updated.title,
+      titleChanged,
+      descriptionChanged,
+      oldTitle: existing.title,
+      newTitle: updated.title,
+    });
+
+    return updated;
+  }
+
+  private async notifyAssigneeTaskFieldsUpdated(params: {
+    taskId: string;
+    assignee: { id: string; telegramId: string | null } | null;
+    taskTitle: string;
+    titleChanged: boolean;
+    descriptionChanged: boolean;
+    oldTitle: string;
+    newTitle: string;
+  }): Promise<void> {
+    const { taskId, assignee, taskTitle, titleChanged, descriptionChanged, oldTitle, newTitle } =
+      params;
+    if (!assignee?.telegramId) return;
+
+    const text = buildTaskFieldsUpdatedNotifyMessage({
+      taskTitle,
+      titleChanged,
+      descriptionChanged,
+      oldTitle,
+      newTitle,
+    });
+    if (!text) return;
+
+    try {
+      await this.telegramNotify.sendMessage(assignee.telegramId, text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Failed to notify assignee about task fields update for task ${taskId}: ${msg}`,
+      );
+    }
+  }
+
+  async updateAssignee(id: string, dto: UpdateTaskAssigneeDto) {
+    const org = this.orgId();
+    const existing = await this.prisma.task.findFirst({
+      where: { id, organizationId: org },
+      include: {
+        assignee: { select: this.taskUserNotifySelect },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Task with id "${id}" not found`);
+    }
+
+    if (existing.assigneeId === dto.assigneeUserId) {
+      return this.prisma.task.findFirstOrThrow({
+        where: { id, organizationId: org },
+        include: this.taskWithProjectInclude,
+      });
+    }
+
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: dto.assigneeUserId, organizationId: org },
+    });
+    if (!assignee) {
+      throw new NotFoundException(
+        `User with id "${dto.assigneeUserId}" not found in this organization`,
+      );
+    }
+
+    const oldAssignee = existing.assignee;
+
+    const updated = await this.prisma.task.update({
+      where: { id },
+      data: { assigneeId: dto.assigneeUserId },
+      include: this.taskWithProjectInclude,
+    });
+
+    await this.notifyAssigneeChanged({
+      taskId: id,
+      title: existing.title,
+      deadlineAt: existing.deadlineAt,
+      newAssignee: updated.assignee,
+      oldAssignee,
+    });
+
+    return updated;
+  }
+
+  private async notifyAssigneeChanged(params: {
+    taskId: string;
+    title: string;
+    deadlineAt: Date | null;
+    newAssignee: { id: string; telegramId: string | null } | null;
+    oldAssignee: { id: string; telegramId: string | null } | null;
+  }): Promise<void> {
+    const { taskId, title, deadlineAt, newAssignee, oldAssignee } = params;
+
+    if (
+      newAssignee?.telegramId &&
+      newAssignee.id !== oldAssignee?.id
+    ) {
+      const text = buildTaskAssigneeAssignedMessage(title, deadlineAt);
+      try {
+        await this.telegramNotify.sendMessage(newAssignee.telegramId, text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Failed to notify new assignee for task ${taskId}: ${msg}`,
+        );
+      }
+    }
+
+    if (
+      oldAssignee?.telegramId &&
+      oldAssignee.id !== newAssignee?.id
+    ) {
+      const text = buildTaskAssigneeUnassignedMessage(title);
+      try {
+        await this.telegramNotify.sendMessage(oldAssignee.telegramId, text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Failed to notify previous assignee for task ${taskId}: ${msg}`,
+        );
+      }
+    }
   }
 
   async updateDeadline(id: string, dto: UpdateTaskDeadlineDto) {

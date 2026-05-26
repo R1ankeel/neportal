@@ -27,3 +27,10 @@ export class CreateNoteDto {
   @IsEnum(NoteSource)
   source?: NoteSource;
 }
+
+export class UpdateNoteDto {
+  @ApiProperty({ example: "Обновлённый текст заметки" })
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+}
