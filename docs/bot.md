@@ -560,6 +560,7 @@ Dev-лог (без секретов): `[bot] create_task assignee before require
 **Подтверждение:** кнопки **Да** / **Нет** или текст `да` / `нет` (fallback) → `PATCH /users/:id/telegram` с `telegramId = String(ctx.from.id)` → onboarding + главное меню; `нет` → *«Привязка отменена.»*
 
 Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`): типы `ai_intent`, `confirm_link_by_username`, `confirm_absence_delegation_distribution` (поле `type` + `confirmationId`).
+При сбросе pending confirmation также сбрасывается pending confirmation edit (`pending-confirmation-edit.ts`) - чтобы после отмены/подтверждения не оставался "висящий" режим правки.
 
 После привязки рабочие действия требуют **linked user** по `telegramId` (`requireLinkedUser`). Без привязки: *«Вы не привязаны ни к какому проекту.»* - fallback на демо-пользователя **отключён**.
 
