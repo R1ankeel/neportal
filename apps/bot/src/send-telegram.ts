@@ -6,8 +6,8 @@ export async function sendTelegramMessage(
   telegramId: string,
   text: string,
   options?: { reply_markup?: InlineKeyboard },
-): Promise<void> {
-  await api.sendMessage(Number(telegramId), text, {
+): Promise<{ message_id: number; chat: { id: number } }> {
+  return api.sendMessage(Number(telegramId), text, {
     reply_markup: options?.reply_markup,
   });
 }

@@ -248,6 +248,8 @@ export async function executeMentionInTask(
     source: "TELEGRAM_TEXT",
   });
 
+  const commentId = result.comment.id;
+
   let notifyOk = false;
   try {
     notifyOk = await notifyTaskMentionRequested(api, {
@@ -261,6 +263,7 @@ export async function executeMentionInTask(
         fullName: result.mentionedUser.fullName,
         telegramId: result.mentionedUser.telegramId,
       },
+      commentId,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

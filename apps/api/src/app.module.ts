@@ -5,6 +5,7 @@ import { AbsencesModule } from "./absences/absences.module";
 import { BudgetExpensesModule } from "./budget-expenses/budget-expenses.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { NotesModule } from "./notes/notes.module";
+import { NotificationBindingsModule } from "./notification-bindings/notification-bindings.module";
 import { OrganizationModule } from "./organization/organization.module";
 import { PrismaModule } from "@neportal/database";
 import { ProjectsModule } from "./projects/projects.module";
@@ -22,6 +23,7 @@ import { UsersModule } from "./users/users.module";
     BudgetExpensesModule,
     NotesModule,
     AbsencesModule,
+    NotificationBindingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

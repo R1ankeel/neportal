@@ -11,6 +11,7 @@ import {
   fetchProjects,
   fetchUserByTelegramId,
   fetchUsers,
+  findNotificationBinding,
   linkTelegramUser,
   formatMoney,
   pickAssigneeId,
@@ -45,6 +46,7 @@ import {
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { attachTelegramReceiptToExpense } from "./receipt-attachment";
 import { handlePlainTextMessage } from "./ai-message";
+import { handleReplyToNotification } from "./reply-notification-flow";
 import {
   apiUserToCandidate,
   startPendingUserSelection,
@@ -965,7 +967,30 @@ bot.on("message:text", async (ctx) => {
     return;
   }
 
+  const replyTo = ctx.message.reply_to_message;
+  if (replyTo?.message_id) {
+    const chatId = String(ctx.chat.id);
+    const handled = await handleReplyToNotification(ctx, chatId, replyTo.message_id, text.trim());
+    if (handled) return;
+  }
+
   await handlePlainTextMessage(ctx);
+});
+
+bot.on("message", async (ctx) => {
+  const msg = ctx.message;
+  if (!msg.reply_to_message?.message_id) return;
+  if ("text" in msg && msg.text) return;
+
+  const chatId = String(ctx.chat.id);
+  try {
+    const binding = await findNotificationBinding(chatId, msg.reply_to_message.message_id);
+    if (binding) {
+      await ctx.reply("Сейчас через reply можно добавить только текстовый комментарий.");
+    }
+  } catch {
+    // ignore — don't block other handlers
+  }
 });
 
 const mode = process.env.BOT_MODE ?? "polling";

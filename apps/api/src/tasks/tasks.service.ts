@@ -8,6 +8,7 @@ import {
   UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { NotificationBindingsService } from "../notification-bindings/notification-bindings.service";
 import { CreateTaskCommentDto, UpdateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
 import { CreateTaskNotificationDto } from "./dto/task-notification.dto";
@@ -51,6 +52,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
     private readonly telegramNotify: TelegramNotifyService,
+    private readonly notificationBindings: NotificationBindingsService,
   ) {}
 
   private orgId() {
@@ -247,6 +249,7 @@ export class TasksService {
         taskId,
         taskTitle: result.task.title,
         commentText: result.comment.text,
+        commentId: result.comment.id,
         authorId: dto.authorId,
         assignee: result.task.assignee,
         mentionedUsers: [],
@@ -347,6 +350,7 @@ export class TasksService {
     taskId: string;
     taskTitle: string;
     commentText: string;
+    commentId?: string;
     assignee: { id: string; telegramId: string | null } | null;
     authorId: string;
     mentionedUsers: Array<{ id: string; telegramId: string | null }>;
@@ -357,6 +361,7 @@ export class TasksService {
       taskId,
       taskTitle,
       commentText,
+      commentId,
       assignee,
       authorId,
       mentionedUsers,
@@ -373,13 +378,23 @@ export class TasksService {
       }
     }
 
-    for (const [userId, telegramId] of mentionedMap) {
+    for (const [, telegramId] of mentionedMap) {
       const mentionText = buildTaskMentionRequestedMessage(taskTitle, commentText);
       try {
-        await this.telegramNotify.sendMessage(telegramId, mentionText);
+        const sent = await this.telegramNotify.sendMessage(telegramId, mentionText);
+        if (sent && commentId) {
+          this.notificationBindings.create({
+            telegramChatId: String(sent.chat.id),
+            telegramMessageId: sent.message_id,
+            taskId,
+            sourceCommentId: commentId,
+            sourceCommentAuthorId: authorId,
+            notificationType: "TASK_MENTION",
+          }).catch(() => {});
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Failed to notify mentioned user ${userId} for task ${taskId}: ${msg}`);
+        this.logger.warn(`Failed to notify mentioned user for task ${taskId}: ${msg}`);
       }
     }
 
@@ -391,7 +406,17 @@ export class TasksService {
     ) {
       const assigneeText = buildTaskCommentCreatedMessage(taskTitle, commentText);
       try {
-        await this.telegramNotify.sendMessage(assignee.telegramId, assigneeText);
+        const sent = await this.telegramNotify.sendMessage(assignee.telegramId, assigneeText);
+        if (sent && commentId) {
+          this.notificationBindings.create({
+            telegramChatId: String(sent.chat.id),
+            telegramMessageId: sent.message_id,
+            taskId,
+            sourceCommentId: commentId,
+            sourceCommentAuthorId: authorId,
+            notificationType: "TASK_COMMENT",
+          }).catch(() => {});
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to notify assignee about new comment for task ${taskId}: ${msg}`);
@@ -542,6 +567,7 @@ export class TasksService {
         taskId,
         taskTitle: result.task.title,
         commentText: result.comment.text,
+        commentId: result.comment.id,
         authorId: result.author.id,
         assignee: result.task.assignee,
         mentionedUsers: [result.mentionedUser],
@@ -1031,7 +1057,15 @@ export class TasksService {
     ) {
       const text = buildTaskAssigneeAssignedMessage(title, deadlineAt);
       try {
-        await this.telegramNotify.sendMessage(newAssignee.telegramId, text);
+        const sent = await this.telegramNotify.sendMessage(newAssignee.telegramId, text);
+        if (sent) {
+          this.notificationBindings.create({
+            telegramChatId: String(sent.chat.id),
+            telegramMessageId: sent.message_id,
+            taskId,
+            notificationType: "NEW_TASK",
+          }).catch(() => {});
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(

@@ -185,11 +185,32 @@ export class AbsencesService {
 
     if (filters.projectId) {
       await this.assertProjectInOrg(filters.projectId);
-      const members = await this.prisma.projectMember.findMany({
-        where: { projectId: filters.projectId },
-        select: { userId: true },
-      });
-      memberUserIds = members.map((m) => m.userId);
+
+      // Include both formal project members and users who have tasks assigned in
+      // the project — employees can be task assignees without being ProjectMembers.
+      const [members, taskAssignees] = await Promise.all([
+        this.prisma.projectMember.findMany({
+          where: { projectId: filters.projectId },
+          select: { userId: true },
+        }),
+        this.prisma.task.findMany({
+          where: {
+            projectId: filters.projectId,
+            organizationId: org,
+            assigneeId: { not: null },
+          },
+          select: { assigneeId: true },
+          distinct: ["assigneeId"],
+        }),
+      ]);
+
+      const userSet = new Set<string>([
+        ...members.map((m) => m.userId),
+        ...taskAssignees.map((t) => t.assigneeId as string),
+      ]);
+
+      memberUserIds = [...userSet];
+
       if (memberUserIds.length === 0) {
         return [];
       }

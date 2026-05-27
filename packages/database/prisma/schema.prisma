@@ -106,6 +106,13 @@ enum AbsenceNotificationType {
   ABSENCE_TASK_DELEGATED_CREATOR
 }
 
+enum NotificationBindingType {
+  NEW_TASK
+  TASK_TRANSFER
+  TASK_COMMENT
+  TASK_MENTION
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
@@ -127,11 +134,12 @@ model Organization {
   budgetExpenses BudgetExpense[]
   absences              Absence[]
   reminders             Reminder[]
-  taskNotificationLogs  TaskNotificationLog[]
-  taskComments          TaskComment[]
-  taskCommentMentions   TaskCommentMention[]
-  taskTransfers            TaskTransfer[]
-  absenceNotificationLogs  AbsenceNotificationLog[]
+  taskNotificationLogs        TaskNotificationLog[]
+  taskComments                TaskComment[]
+  taskCommentMentions         TaskCommentMention[]
+  taskTransfers               TaskTransfer[]
+  absenceNotificationLogs     AbsenceNotificationLog[]
+  notificationBindings        NotificationMessageBinding[]
 }
 
 model User {
@@ -247,12 +255,13 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reminders            Reminder[]
-  notificationLogs     TaskNotificationLog[]
-  comments             TaskComment[]
-  commentMentions      TaskCommentMention[]
-  transfers                 TaskTransfer[]
-  absenceNotificationLogs   AbsenceNotificationLog[]
+  reminders               Reminder[]
+  notificationLogs        TaskNotificationLog[]
+  comments                TaskComment[]
+  commentMentions         TaskCommentMention[]
+  transfers               TaskTransfer[]
+  absenceNotificationLogs AbsenceNotificationLog[]
+  notificationBindings    NotificationMessageBinding[]
 
   @@index([organizationId])
   @@index([projectId])
@@ -565,4 +574,23 @@ model Reminder {
   @@index([userId])
   @@index([taskId])
   @@index([remindAt])
+}
+
+model NotificationMessageBinding {
+  id                    String                  @id @default(cuid())
+  telegramChatId        String
+  telegramMessageId     Int
+  organizationId        String
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId                String
+  task                  Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  sourceCommentId       String?
+  sourceCommentAuthorId String?
+  notificationType      NotificationBindingType
+  createdAt             DateTime                @default(now())
+  expiresAt             DateTime?
+
+  @@unique([telegramChatId, telegramMessageId])
+  @@index([taskId])
+  @@index([createdAt])
 }

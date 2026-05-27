@@ -6,6 +6,7 @@ import {
   type ApiUser,
   type TaskNotificationType,
   recordTaskNotification,
+  createNotificationBinding,
 } from "./api";
 import type { ResolvedAddTaskComment } from "./intent-resolver";
 import type { TaskStatusChangeTarget } from "./task-status-flow";
@@ -43,8 +44,15 @@ export async function notifyTaskAssigned(
     `Дедлайн: ${formatTaskDeadline(task.deadlineAt)}`,
   ].join("\n");
 
-  await sendTelegramMessage(api, assignee.telegramId, text);
+  const sent = await sendTelegramMessage(api, assignee.telegramId, text);
   await recordTaskNotification(task.id, assignee.id, "TASK_ASSIGNED");
+
+  createNotificationBinding({
+    telegramChatId: String(sent.chat.id),
+    telegramMessageId: sent.message_id,
+    taskId: task.id,
+    notificationType: "NEW_TASK",
+  }).catch(() => {});
 }
 
 export function buildDeadlineTomorrowMessage(task: {
@@ -138,6 +146,7 @@ export async function notifyTaskCommentAdded(
   api: Api,
   task: ResolvedAddTaskComment,
   author: ApiUser,
+  commentId?: string,
 ): Promise<void> {
   const users = await fetchUsers();
   const creator = users.find((u) => u.id === task.creatorId);
@@ -153,12 +162,32 @@ export async function notifyTaskCommentAdded(
   const keyboard = buildTaskNotificationKeyboard(task.taskId);
 
   if (author.id === task.assigneeId && creator?.telegramId && creator.id !== author.id) {
-    await sendTelegramMessage(api, creator.telegramId, text, { reply_markup: keyboard });
+    const sent = await sendTelegramMessage(api, creator.telegramId, text, { reply_markup: keyboard });
+    if (commentId) {
+      createNotificationBinding({
+        telegramChatId: String(sent.chat.id),
+        telegramMessageId: sent.message_id,
+        taskId: task.taskId,
+        sourceCommentId: commentId,
+        sourceCommentAuthorId: author.id,
+        notificationType: "TASK_COMMENT",
+      }).catch(() => {});
+    }
     return;
   }
 
   if (author.id === task.creatorId && assignee?.telegramId && assignee.id !== author.id) {
-    await sendTelegramMessage(api, assignee.telegramId, text, { reply_markup: keyboard });
+    const sent = await sendTelegramMessage(api, assignee.telegramId, text, { reply_markup: keyboard });
+    if (commentId) {
+      createNotificationBinding({
+        telegramChatId: String(sent.chat.id),
+        telegramMessageId: sent.message_id,
+        taskId: task.taskId,
+        sourceCommentId: commentId,
+        sourceCommentAuthorId: author.id,
+        notificationType: "TASK_COMMENT",
+      }).catch(() => {});
+    }
   }
 }
 
@@ -172,6 +201,7 @@ export async function notifyTaskMentionRequested(
     text: string;
     author: ApiUser;
     mentionedUser: { id: string; fullName: string; telegramId: string | null };
+    commentId?: string;
   },
 ): Promise<boolean> {
   const { mentionedUser, taskTitle, projectName, text, taskId } = params;
@@ -184,9 +214,21 @@ export async function notifyTaskMentionRequested(
     `Комментарий: ${text}`,
   ].filter((line): line is string => line != null);
 
-  await sendTelegramMessage(api, mentionedUser.telegramId, lines.join("\n"), {
+  const sent = await sendTelegramMessage(api, mentionedUser.telegramId, lines.join("\n"), {
     reply_markup: buildTaskNotificationKeyboard(taskId),
   });
+
+  if (params.commentId) {
+    createNotificationBinding({
+      telegramChatId: String(sent.chat.id),
+      telegramMessageId: sent.message_id,
+      taskId,
+      sourceCommentId: params.commentId,
+      sourceCommentAuthorId: params.author.id,
+      notificationType: "TASK_MENTION",
+    }).catch(() => {});
+  }
+
   return true;
 }
 
@@ -206,6 +248,7 @@ export async function sendAndLogNotification(
 export async function notifyTransferImmediate(
   api: Api,
   params: {
+    taskId?: string;
     taskTitle: string;
     projectName?: string | null;
     comment: string;
@@ -223,7 +266,16 @@ export async function notifyTransferImmediate(
     `Комментарий: ${params.comment}`,
   ].filter((line): line is string => line != null);
 
-  await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+  const sent = await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+
+  if (params.taskId) {
+    createNotificationBinding({
+      telegramChatId: String(sent.chat.id),
+      telegramMessageId: sent.message_id,
+      taskId: params.taskId,
+      notificationType: "TASK_TRANSFER",
+    }).catch(() => {});
+  }
 }
 
 /** EMPLOYEE: запрос на принятие передачи. */
@@ -275,6 +327,7 @@ export async function notifyTransferAccepted(
 export async function notifyReassign(
   api: Api,
   params: {
+    taskId?: string;
     taskTitle: string;
     projectName?: string | null;
     comment: string;
@@ -308,8 +361,16 @@ export async function notifyReassign(
       `Передал: ${params.author.fullName}`,
       `Комментарий: ${params.comment}`,
     ].filter((line): line is string => line != null);
-    await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
+    const sent = await sendTelegramMessage(api, params.toUser.telegramId, lines.join("\n"));
     markSent(params.toUser.id, params.toUser.telegramId);
+    if (params.taskId) {
+      createNotificationBinding({
+        telegramChatId: String(sent.chat.id),
+        telegramMessageId: sent.message_id,
+        taskId: params.taskId,
+        notificationType: "TASK_TRANSFER",
+      }).catch(() => {});
+    }
   }
 
   if (

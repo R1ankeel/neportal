@@ -925,3 +925,60 @@ export async function cancelAbsence(
   }
   return res.json() as Promise<ApiAbsence>;
 }
+
+// ---------------------------------------------------------------------------
+// Notification message bindings (reply-to-notification flow)
+// ---------------------------------------------------------------------------
+
+export type NotificationBindingType =
+  | "NEW_TASK"
+  | "TASK_TRANSFER"
+  | "TASK_COMMENT"
+  | "TASK_MENTION";
+
+export type ApiNotificationBinding = {
+  id: string;
+  telegramChatId: string;
+  telegramMessageId: number;
+  organizationId: string;
+  taskId: string;
+  sourceCommentId: string | null;
+  sourceCommentAuthorId: string | null;
+  notificationType: NotificationBindingType;
+};
+
+export async function createNotificationBinding(data: {
+  telegramChatId: string;
+  telegramMessageId: number;
+  taskId: string;
+  sourceCommentId?: string | null;
+  sourceCommentAuthorId?: string | null;
+  notificationType: NotificationBindingType;
+}): Promise<void> {
+  const res = await fetch(`${getApiBaseUrl()}/notification-bindings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError("POST /notification-bindings", res.status, text);
+  }
+}
+
+export async function findNotificationBinding(
+  chatId: string,
+  messageId: number,
+): Promise<ApiNotificationBinding | null> {
+  const url = new URL(`${getApiBaseUrl()}/notification-bindings/lookup`);
+  url.searchParams.set("chatId", chatId);
+  url.searchParams.set("messageId", String(messageId));
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError("GET /notification-bindings/lookup", res.status, text);
+    return null;
+  }
+  return res.json() as Promise<ApiNotificationBinding>;
+}

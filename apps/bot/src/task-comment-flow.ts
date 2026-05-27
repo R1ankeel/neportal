@@ -163,23 +163,27 @@ export async function executeTaskComment(
     return "Укажите текст комментария.";
   }
 
+  let commentId: string | undefined;
+
   if (resolved.mentionedUserId) {
-    await createTaskCommentMention(resolved.taskId, {
+    const result = await createTaskCommentMention(resolved.taskId, {
       authorId: author.id,
       mentionedUserId: resolved.mentionedUserId,
       text: resolved.text,
       source: "TELEGRAM_TEXT",
     });
+    commentId = result.comment.id;
   } else {
-    await createTaskComment(resolved.taskId, {
+    const result = await createTaskComment(resolved.taskId, {
       authorId: author.id,
       text: resolved.text,
       source: "TELEGRAM_TEXT",
     });
+    commentId = result.id;
   }
 
   try {
-    await notifyTaskCommentAdded(api, resolved, author);
+    await notifyTaskCommentAdded(api, resolved, author, commentId);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[task-notifications] comment notify error: ${msg}`);
@@ -198,6 +202,7 @@ export async function executeTaskComment(
           fullName: resolved.mentionedUserName,
           telegramId: resolved.mentionedUserTelegramId ?? null,
         },
+        commentId,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
