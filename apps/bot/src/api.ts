@@ -352,6 +352,14 @@ export type ApiTask = {
   project?: { id: string; name: string } | null;
 };
 
+/** Задача с полями карточки (GET /tasks/:id). */
+export type ApiTaskDetail = ApiTask & {
+  description?: string | null;
+  completionResult?: string | null;
+  cancellationReason?: string | null;
+  completedAt?: string | null;
+};
+
 export type ApiMyTask = ApiTask & {
   completedAt?: string | null;
   completionResult?: string | null;
@@ -411,6 +419,18 @@ export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
     throw new Error(`GET /tasks → ${res.status} ${text}`.trim());
   }
   return res.json() as Promise<ApiTask[]>;
+}
+
+export async function fetchTaskById(taskId: string): Promise<ApiTaskDetail | null> {
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${encodeURIComponent(taskId)}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks/${taskId} → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskDetail>;
 }
 
 export async function fetchMyTasks(userId: string, limit = 5): Promise<ApiMyTask[]> {

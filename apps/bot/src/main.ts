@@ -67,6 +67,7 @@ import { handleStartTaskSlashCommand } from "./task-start-flow";
 import { handleTaskStatusSlashCommand } from "./task-status-flow";
 import { getPendingTaskStatusDetails } from "./pending-task-status-details";
 import { buildTaskStatusDetailsCancelKeyboard, handleTaskStatusDetailsCancelCallback } from "./task-status-details-cancel";
+import { handleTaskNotificationCallback } from "./handle-task-notification-callback";
 import { devLogVoicePendingGuardChecks } from "./speech/voice-pending-guard.dev";
 import { devLogSpeechKitAsyncRoutingChecks } from "./speech/speechkit-async-routing.dev";
 import { devLogTaskStatusFlowChecks } from "./task-status-flow.dev";
@@ -934,6 +935,7 @@ bot.on("message:voice", async (ctx) => {
 bot.on("callback_query:data", async (ctx) => {
   if (await handleStartLinkCallback(ctx)) return;
   if (await handleMainMenuCallback(ctx)) return;
+  if (await handleTaskNotificationCallback(ctx)) return;
   if (await handleTaskStatusDetailsCancelCallback(ctx)) return;
   await handleChoiceCallback(ctx);
   await handleConfirmationCallback(ctx);

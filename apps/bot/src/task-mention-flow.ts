@@ -251,6 +251,7 @@ export async function executeMentionInTask(
   let notifyOk = false;
   try {
     notifyOk = await notifyTaskMentionRequested(api, {
+      taskId: resolved.taskId,
       taskTitle: resolved.taskTitle,
       projectName: result.task.project?.name ?? resolved.projectName,
       text: resolved.text,

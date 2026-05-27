@@ -11,6 +11,7 @@ import type { ResolvedAddTaskComment } from "./intent-resolver";
 import type { TaskStatusChangeTarget } from "./task-status-flow";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { sendTelegramMessage } from "./send-telegram";
+import { buildTaskNotificationKeyboard } from "./telegram/keyboards/task-notification-keyboard";
 
 export function formatTaskDeadline(deadlineAt: string | null | undefined): string {
   if (!deadlineAt) return "не указан";
@@ -149,13 +150,15 @@ export async function notifyTaskCommentAdded(
     `Комментарий: ${task.text}`,
   ].join("\n");
 
+  const keyboard = buildTaskNotificationKeyboard(task.taskId);
+
   if (author.id === task.assigneeId && creator?.telegramId && creator.id !== author.id) {
-    await sendTelegramMessage(api, creator.telegramId, text);
+    await sendTelegramMessage(api, creator.telegramId, text, { reply_markup: keyboard });
     return;
   }
 
   if (author.id === task.creatorId && assignee?.telegramId && assignee.id !== author.id) {
-    await sendTelegramMessage(api, assignee.telegramId, text);
+    await sendTelegramMessage(api, assignee.telegramId, text, { reply_markup: keyboard });
   }
 }
 
@@ -163,6 +166,7 @@ export async function notifyTaskCommentAdded(
 export async function notifyTaskMentionRequested(
   api: Api,
   params: {
+    taskId: string;
     taskTitle: string;
     projectName?: string | null;
     text: string;
@@ -170,7 +174,7 @@ export async function notifyTaskMentionRequested(
     mentionedUser: { id: string; fullName: string; telegramId: string | null };
   },
 ): Promise<boolean> {
-  const { mentionedUser, taskTitle, projectName, text } = params;
+  const { mentionedUser, taskTitle, projectName, text, taskId } = params;
   if (!mentionedUser.telegramId) return false;
 
   const lines = [
@@ -180,7 +184,9 @@ export async function notifyTaskMentionRequested(
     `Комментарий: ${text}`,
   ].filter((line): line is string => line != null);
 
-  await sendTelegramMessage(api, mentionedUser.telegramId, lines.join("\n"));
+  await sendTelegramMessage(api, mentionedUser.telegramId, lines.join("\n"), {
+    reply_markup: buildTaskNotificationKeyboard(taskId),
+  });
   return true;
 }
 

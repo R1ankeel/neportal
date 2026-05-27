@@ -188,6 +188,7 @@ export async function executeTaskComment(
   if (resolved.mentionedUserId && resolved.mentionedUserName) {
     try {
       await notifyTaskMentionRequested(api, {
+        taskId: resolved.taskId,
         taskTitle: resolved.taskTitle,
         projectName: resolved.projectName,
         text: resolved.text,
