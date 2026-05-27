@@ -11,6 +11,7 @@ import { candidateToApiTask } from "./pending-task-selection";
 import { canCommentTask } from "./task-comment-flow";
 import { canTransferTask, isManagerOrOwner } from "./task-transfer-flow";
 import { canModifyTask } from "./task-status-flow";
+import { canReadTask } from "./task-read-access";
 
 function parseSelectionNumber(text: string): number | null {
   const trimmed = text.trim();
@@ -60,10 +61,11 @@ export async function handlePendingTaskSelectionMessage(
   const task = candidateToApiTask(selected);
 
   const canAct =
-    pending.type === "select_task_for_comment" ||
     pending.type === "select_task_for_comments_list"
-      ? canCommentTask(linked, task)
-      : pending.type === "select_task_for_transfer"
+      ? canReadTask(linked, task)
+      : pending.type === "select_task_for_comment"
+        ? canCommentTask(linked, task)
+        : pending.type === "select_task_for_transfer"
         ? canTransferTask(linked, task)
         : pending.type === "select_task_for_reassign"
           ? isManagerOrOwner(linked.role)

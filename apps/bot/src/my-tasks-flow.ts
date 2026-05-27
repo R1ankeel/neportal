@@ -10,12 +10,15 @@ import { SELF_HINT_MARKER, isSelfHint } from "./resolve-users-by-hint";
 import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { canViewOtherMemberTasks } from "./task-read-access";
 
 export const ONLY_OWN_TASKS_MESSAGE = "Вы можете смотреть только свои задачи.";
 
-export function canViewOtherUsersTasks(user: ApiUser): boolean {
-  return user.role === "OWNER" || user.role === "MANAGER";
-}
+/**
+ * @deprecated Используйте canViewOtherMemberTasks из task-read-access.ts.
+ * Оставлено для совместимости с существующими импортами.
+ */
+export { canViewOtherMemberTasks as canViewOtherUsersTasks } from "./task-read-access";
 
 export function isSelfUserHint(hint: string): boolean {
   const t = hint.trim();
@@ -144,7 +147,7 @@ export async function replyWithTasksForHint(
     return;
   }
 
-  if (!canViewOtherUsersTasks(currentUser)) {
+  if (!canViewOtherMemberTasks(currentUser)) {
     await ctx.reply(ONLY_OWN_TASKS_MESSAGE);
     return;
   }

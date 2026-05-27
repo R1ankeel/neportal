@@ -10,6 +10,7 @@ import {
 } from "./pending-task-selection";
 import { formatTaskCandidates } from "./task-selection-format";
 import { canModifyTask, type TaskStatusChangeTarget } from "./task-status-flow";
+import { canReadTask } from "./task-read-access";
 
 export type TaskResolvePurpose =
   | "complete"
@@ -67,8 +68,9 @@ function filterTasksForPurpose(
   purpose: TaskResolvePurpose,
 ): ApiTask[] {
   return tasks.filter((task) => {
+    if (purpose === "comments_list") return canReadTask(user, task);
     if (!canModifyTask(user, task)) return false;
-    if (purpose === "comment" || purpose === "comments_list" || purpose === "mention") return true;
+    if (purpose === "comment" || purpose === "mention") return true;
     if (purpose === "transfer" || purpose === "reassign") {
       return task.status === "NEW" || task.status === "IN_PROGRESS";
     }
@@ -186,14 +188,15 @@ export async function resolveTaskByTitle(
   }
 
   if (filtered.length === 0) {
+    if (purpose === "comments_list") {
+      return { kind: "not_found" };
+    }
     if (matchedTasks.length === 1 && !canModifyTask(user, matchedTasks[0])) {
       return {
         kind: "cannot_modify",
         message:
-          purpose === "comment" || purpose === "comments_list" || purpose === "mention"
-            ? purpose === "comments_list"
-              ? "Вы не можете просматривать комментарии этой задачи."
-              : "Вы не можете комментировать эту задачу."
+          purpose === "comment" || purpose === "mention"
+            ? "Вы не можете комментировать эту задачу."
             : purpose === "transfer"
               ? "Вы не можете передать эту задачу."
               : purpose === "reassign"
@@ -201,14 +204,8 @@ export async function resolveTaskByTitle(
                 : "Вы не можете изменить эту задачу.",
       };
     }
-    if (purpose === "comment" || purpose === "comments_list" || purpose === "mention") {
-      return {
-        kind: "no_modifiable",
-        message:
-          purpose === "comments_list"
-            ? "Вы не можете просматривать комментарии найденных задач."
-            : "Вы не можете комментировать найденные задачи.",
-      };
+    if (purpose === "comment" || purpose === "mention") {
+      return { kind: "no_modifiable", message: "Вы не можете комментировать найденные задачи." };
     }
     if (purpose === "transfer") {
       return { kind: "no_modifiable", message: "Вы не можете передать найденные задачи." };

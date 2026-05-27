@@ -11,9 +11,9 @@ import { formatUserCandidates, userNotFoundMessage } from "./user-selection-form
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 import {
   ONLY_OWN_TASKS_MESSAGE,
-  canViewOtherUsersTasks,
   isSelfUserHint,
 } from "./my-tasks-flow";
+import { canViewOtherMemberTasks } from "./task-read-access";
 
 export function formatTaskCompletedAt(completedAt: string | null | undefined): string | null {
   if (!completedAt) return null;
@@ -105,7 +105,7 @@ export async function replyWithCompletedTasksForHint(
     return;
   }
 
-  if (!canViewOtherUsersTasks(currentUser)) {
+  if (!canViewOtherMemberTasks(currentUser)) {
     await ctx.reply(ONLY_OWN_TASKS_MESSAGE);
     return;
   }

@@ -11,7 +11,7 @@ import {
   resolveResultToMessage,
   resolveTaskByTitle,
 } from "./resolve-task-by-title";
-import { canCommentTask } from "./task-comment-flow";
+import { canReadTask } from "./task-read-access";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 export function formatCommentCreatedAt(createdAt: string): string {
@@ -94,7 +94,7 @@ export async function replyWithTaskCommentsForHint(
       await ctx.reply("Задача не найдена.");
       return;
     }
-    if (!canCommentTask(currentUser, task)) {
+    if (!canReadTask(currentUser, task)) {
       await ctx.reply("Вы не можете просматривать комментарии этой задачи.");
       return;
     }
@@ -120,7 +120,7 @@ export async function replyWithTaskCommentsForHint(
   }
 
   const task = resolution.task;
-  if (!canCommentTask(currentUser, task)) {
+  if (!canReadTask(currentUser, task)) {
     await ctx.reply("Вы не можете просматривать комментарии этой задачи.");
     return;
   }
