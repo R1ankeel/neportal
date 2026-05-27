@@ -963,6 +963,8 @@ export async function createNotificationBinding(data: {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     devLogApiError("POST /notification-bindings", res.status, text);
+  } else {
+    console.log(`[reply-notification] binding saved msgId=${data.telegramMessageId} taskId=${data.taskId} type=${data.notificationType}`);
   }
 }
 

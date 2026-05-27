@@ -26,14 +26,23 @@ export async function handleReplyToNotification(
   messageId: number,
   text: string,
 ): Promise<boolean> {
+  console.log(`[reply-notification] reply detected chatId=${chatId} messageId=${messageId}`);
+
   let binding;
   try {
     binding = await findNotificationBinding(chatId, messageId);
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[reply-notification] binding lookup error: ${msg}`);
     return false;
   }
 
-  if (!binding) return false;
+  if (!binding) {
+    console.log(`[reply-notification] binding not found, continuing normal flow`);
+    return false;
+  }
+
+  console.log(`[reply-notification] binding found taskId=${binding.taskId} type=${binding.notificationType}`);
 
   const telegramUserId = ctx.from?.id;
   if (!telegramUserId) return true;

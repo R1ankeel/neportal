@@ -45,7 +45,6 @@ export async function notifyTaskAssigned(
   ].join("\n");
 
   const sent = await sendTelegramMessage(api, assignee.telegramId, text);
-  await recordTaskNotification(task.id, assignee.id, "TASK_ASSIGNED");
 
   createNotificationBinding({
     telegramChatId: String(sent.chat.id),
@@ -53,6 +52,8 @@ export async function notifyTaskAssigned(
     taskId: task.id,
     notificationType: "NEW_TASK",
   }).catch(() => {});
+
+  await recordTaskNotification(task.id, assignee.id, "TASK_ASSIGNED");
 }
 
 export function buildDeadlineTomorrowMessage(task: {
