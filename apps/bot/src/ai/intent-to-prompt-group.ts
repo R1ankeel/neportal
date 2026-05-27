@@ -22,12 +22,15 @@ export function intentToExtractorGroup(intent: AiIntentName): ExtractorPromptGro
     case "start_task":
       return "task-status";
     case "add_task_comment":
+    case "list_task_comments":
     case "mention_in_task":
     case "transfer_task":
     case "reassign_task":
       return "collaboration";
     case "list_my_tasks":
     case "list_user_tasks":
+    case "list_my_completed_tasks":
+    case "list_user_completed_tasks":
     case "list_pending_expenses":
       return "task-list";
     case "unknown":

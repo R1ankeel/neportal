@@ -38,8 +38,15 @@ import { finalizeBasicCreateTask } from "./finalize-basic-create-task";
 import { parseTaskTransferLikeQuery } from "./parse-task-transfer-query";
 import { isManagerOrOwner } from "./task-transfer-flow";
 import { parseExpenseQuery } from "./parse-expense-query";
+import { parseCompletedTaskListQuery } from "./parse-completed-task-list-query";
+import { parseTaskCommentsListQuery } from "./parse-task-comments-list-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
 import { routeParsedAiIntent } from "./route-parsed-intent";
+import {
+  formatMyCompletedTasksReply,
+  replyWithCompletedTasksForHint,
+} from "./completed-tasks-flow";
+import { replyWithTaskCommentsForHint } from "./task-comments-list-flow";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
 import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-expense-receipt-selection";
 import { handlePendingExpenseReceiptUploadMessage } from "./handle-pending-expense-receipt-upload";
@@ -202,6 +209,60 @@ export async function handleTextSemanticMessage(
       console.error(`[bot] list_pending_expenses (deterministic) error: ${msg}`);
       await ctx.reply(
         msg.startsWith("GET /budget-expenses/pending") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
+    }
+    return;
+  }
+
+  const taskCommentsListQuery = parseTaskCommentsListQuery(inputText);
+  if (taskCommentsListQuery) {
+    try {
+      await replyWithTaskCommentsForHint(
+        ctx,
+        linked,
+        telegramUserId,
+        taskCommentsListQuery.taskHint,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_task_comments (deterministic) error: ${msg}`);
+      await ctx.reply(
+        msg.includes("GET /tasks/") && msg.includes("/comments")
+          ? `Ошибка API: ${msg}`
+          : `Ошибка: ${msg}`,
+      );
+    }
+    return;
+  }
+
+  const completedTaskListQuery = parseCompletedTaskListQuery(inputText);
+  if (completedTaskListQuery?.type === "my") {
+    try {
+      const reply = await formatMyCompletedTasksReply(linked.id, 5);
+      await ctx.reply(reply);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_my_completed_tasks (deterministic) error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /tasks/completed") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
+    }
+    return;
+  }
+  if (completedTaskListQuery?.type === "user") {
+    try {
+      await replyWithCompletedTasksForHint(
+        ctx,
+        linked,
+        telegramUserId,
+        completedTaskListQuery.userHint,
+        5,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_user_completed_tasks (deterministic) error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /tasks/completed") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
       );
     }
     return;

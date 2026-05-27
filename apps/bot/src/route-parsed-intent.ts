@@ -13,11 +13,16 @@ import { questionForCreateTaskAssigneeWithButtons } from "./create-task-assignee
 import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { handleAddTaskCommentIntent } from "./handle-task-comment-intent";
+import { handleListTaskCommentsIntent } from "./handle-task-comments-list-intent";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
 import { findProjectByHint } from "./hint-matchers";
+import {
+  formatMyCompletedTasksReply,
+  replyWithCompletedTasksForHint,
+} from "./completed-tasks-flow";
 import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
@@ -76,6 +81,21 @@ export async function routeParsedAiIntent(
     return;
   }
 
+  if (intent.intent === "list_task_comments") {
+    try {
+      await handleListTaskCommentsIntent(ctx, linked, telegramUserId, intent);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_task_comments error: ${msg}`);
+      await ctx.reply(
+        msg.includes("GET /tasks/") && msg.includes("/comments")
+          ? `Ошибка API: ${msg}`
+          : `Ошибка: ${msg}`,
+      );
+    }
+    return;
+  }
+
   if (intent.intent === "mention_in_task") {
     await handleMentionInTaskIntent(ctx, linked, telegramUserId, intent);
     return;
@@ -122,6 +142,40 @@ export async function routeParsedAiIntent(
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[bot] list_user_tasks error: ${msg}`);
       await ctx.reply(msg.startsWith("GET /tasks/my") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`);
+    }
+    return;
+  }
+
+  if (intent.intent === "list_my_completed_tasks") {
+    try {
+      const reply = await formatMyCompletedTasksReply(linked.id, 5);
+      await ctx.reply(reply);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_my_completed_tasks error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /tasks/completed") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
+    }
+    return;
+  }
+
+  if (intent.intent === "list_user_completed_tasks") {
+    try {
+      await replyWithCompletedTasksForHint(
+        ctx,
+        linked,
+        telegramUserId,
+        intent.payload.userHint,
+        5,
+        intent.payload.userId,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] list_user_completed_tasks error: ${msg}`);
+      await ctx.reply(
+        msg.startsWith("GET /tasks/completed") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
+      );
     }
     return;
   }

@@ -24,11 +24,14 @@ export const AiIntentNameSchema = z.enum([
   "cancel_task",
   "start_task",
   "add_task_comment",
+  "list_task_comments",
   "mention_in_task",
   "transfer_task",
   "reassign_task",
   "list_my_tasks",
   "list_user_tasks",
+  "list_my_completed_tasks",
+  "list_user_completed_tasks",
   "list_pending_expenses",
   "unknown",
 ]);
@@ -120,6 +123,12 @@ export const AddTaskCommentPayloadSchema = z.object({
   mentionedUserId: optionalAiString,
 });
 
+export const ListTaskCommentsPayloadSchema = z.object({
+  taskQuery: optionalAiStringMin1,
+  taskId: optionalAiString,
+  taskTitle: optionalAiStringMin1,
+});
+
 export const MentionInTaskPayloadSchema = z.object({
   userHint: z.string().min(1),
   mentionedUserId: optionalAiString,
@@ -146,6 +155,13 @@ export const ReassignTaskPayloadSchema = z.object({
 export const ListMyTasksPayloadSchema = z.object({});
 
 export const ListUserTasksPayloadSchema = z.object({
+  userHint: z.string().min(1),
+  userId: optionalAiString,
+});
+
+export const ListMyCompletedTasksPayloadSchema = z.object({});
+
+export const ListUserCompletedTasksPayloadSchema = z.object({
   userHint: z.string().min(1),
   userId: optionalAiString,
 });
@@ -219,6 +235,11 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: AddTaskCommentPayloadSchema,
   }),
   z.object({
+    intent: z.literal("list_task_comments"),
+    ...intentFields,
+    payload: ListTaskCommentsPayloadSchema,
+  }),
+  z.object({
     intent: z.literal("mention_in_task"),
     ...intentFields,
     payload: MentionInTaskPayloadSchema,
@@ -244,6 +265,16 @@ export const AiIntentSchema = z.discriminatedUnion("intent", [
     payload: ListUserTasksPayloadSchema,
   }),
   z.object({
+    intent: z.literal("list_my_completed_tasks"),
+    ...intentFields,
+    payload: ListMyCompletedTasksPayloadSchema,
+  }),
+  z.object({
+    intent: z.literal("list_user_completed_tasks"),
+    ...intentFields,
+    payload: ListUserCompletedTasksPayloadSchema,
+  }),
+  z.object({
     intent: z.literal("list_pending_expenses"),
     ...intentFields,
     payload: ListPendingExpensesPayloadSchema,
@@ -267,11 +298,14 @@ export type CompleteTaskPayload = z.infer<typeof CompleteTaskPayloadSchema>;
 export type CancelTaskPayload = z.infer<typeof CancelTaskPayloadSchema>;
 export type StartTaskPayload = z.infer<typeof StartTaskPayloadSchema>;
 export type AddTaskCommentPayload = z.infer<typeof AddTaskCommentPayloadSchema>;
+export type ListTaskCommentsPayload = z.infer<typeof ListTaskCommentsPayloadSchema>;
 export type MentionInTaskPayload = z.infer<typeof MentionInTaskPayloadSchema>;
 export type TransferTaskPayload = z.infer<typeof TransferTaskPayloadSchema>;
 export type ReassignTaskPayload = z.infer<typeof ReassignTaskPayloadSchema>;
 export type ListMyTasksPayload = z.infer<typeof ListMyTasksPayloadSchema>;
 export type ListUserTasksPayload = z.infer<typeof ListUserTasksPayloadSchema>;
+export type ListMyCompletedTasksPayload = z.infer<typeof ListMyCompletedTasksPayloadSchema>;
+export type ListUserCompletedTasksPayload = z.infer<typeof ListUserCompletedTasksPayloadSchema>;
 export type ListPendingExpensesPayload = z.infer<typeof ListPendingExpensesPayloadSchema>;
 export type UnknownPayload = z.infer<typeof UnknownPayloadSchema>;
 

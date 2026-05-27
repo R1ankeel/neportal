@@ -600,6 +600,29 @@ export class TasksService {
     });
   }
 
+  async findCompletedTasks(userId: string, limit = 5) {
+    const org = this.orgId();
+    const cappedLimit = Math.min(Math.max(limit, 1), 20);
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId: org },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with id "${userId}" not found in this organization`);
+    }
+
+    return this.prisma.task.findMany({
+      where: {
+        organizationId: org,
+        assigneeId: userId,
+        status: TaskStatus.DONE,
+      },
+      orderBy: [{ completedAt: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }],
+      take: cappedLimit,
+      include: this.myTaskInclude,
+    });
+  }
+
   async create(dto: CreateTaskDto) {
     const org = this.orgId();
 

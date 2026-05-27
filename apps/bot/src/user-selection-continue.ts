@@ -33,6 +33,7 @@ import {
   startPendingAbsenceDelegationItemAssignee,
   type PendingAbsenceDelegationItemAssignee,
 } from "./pending-absence-delegation";
+import { replyWithCompletedTasksForUser } from "./completed-tasks-flow";
 import {
   canViewOtherUsersTasks,
   ONLY_OWN_TASKS_MESSAGE,
@@ -313,5 +314,14 @@ export async function continueAfterUserSelection(
       return;
     }
     await replyWithTasksForUser(ctx, selectedUser, false, payload.limit ?? 5);
+    return;
+  }
+
+  if (payload.intent === "completed_task_list") {
+    if (!canViewOtherUsersTasks(linked)) {
+      await ctx.reply(ONLY_OWN_TASKS_MESSAGE);
+      return;
+    }
+    await replyWithCompletedTasksForUser(ctx, selectedUser, false, payload.limit ?? 5);
   }
 }

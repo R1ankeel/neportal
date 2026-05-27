@@ -105,6 +105,7 @@ export function extractUserHintFromIntent(intent: AiIntent): string | undefined 
       raw = intent.payload.toUserHint;
       break;
     case "list_user_tasks":
+    case "list_user_completed_tasks":
       raw = intent.payload.userHint;
       break;
     default:

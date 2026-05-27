@@ -352,7 +352,10 @@ export type ApiTask = {
   project?: { id: string; name: string } | null;
 };
 
-export type ApiMyTask = ApiTask;
+export type ApiMyTask = ApiTask & {
+  completedAt?: string | null;
+  completionResult?: string | null;
+};
 
 export type ApiTaskStatusUpdated = ApiTaskCreated;
 
@@ -418,6 +421,18 @@ export async function fetchMyTasks(userId: string, limit = 5): Promise<ApiMyTask
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`GET /tasks/my → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiMyTask[]>;
+}
+
+export async function fetchCompletedTasks(userId: string, limit = 5): Promise<ApiMyTask[]> {
+  const url = new URL(`${getApiBaseUrl()}/tasks/completed`);
+  url.searchParams.set("userId", userId);
+  url.searchParams.set("limit", String(limit));
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks/completed → ${res.status} ${text}`.trim());
   }
   return res.json() as Promise<ApiMyTask[]>;
 }
@@ -544,6 +559,31 @@ export type ApiTaskCommentCreated = {
   createdAt: string;
   author: { id: string; fullName: string; role: string };
 };
+
+export type ApiTaskCommentMention = {
+  id: string;
+  mentionedUser: { id: string; fullName: string; role: string };
+};
+
+export type ApiTaskComment = {
+  id: string;
+  text: string;
+  source: string;
+  createdAt: string;
+  author: { id: string; fullName: string; role: string };
+  mentions?: ApiTaskCommentMention[];
+};
+
+export async function fetchTaskComments(taskId: string): Promise<ApiTaskComment[]> {
+  const res = await fetch(`${getApiBaseUrl()}/tasks/${encodeURIComponent(taskId)}/comments`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /tasks/${taskId}/comments → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiTaskComment[]>;
+}
 
 export async function createTaskComment(
   taskId: string,

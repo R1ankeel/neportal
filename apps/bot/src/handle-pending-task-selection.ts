@@ -60,7 +60,8 @@ export async function handlePendingTaskSelectionMessage(
   const task = candidateToApiTask(selected);
 
   const canAct =
-    pending.type === "select_task_for_comment"
+    pending.type === "select_task_for_comment" ||
+    pending.type === "select_task_for_comments_list"
       ? canCommentTask(linked, task)
       : pending.type === "select_task_for_transfer"
         ? canTransferTask(linked, task)
@@ -72,7 +73,9 @@ export async function handlePendingTaskSelectionMessage(
     const msg =
       pending.type === "select_task_for_comment"
         ? "Вы не можете комментировать эту задачу."
-        : pending.type === "select_task_for_transfer"
+        : pending.type === "select_task_for_comments_list"
+          ? "Вы не можете просматривать комментарии этой задачи."
+          : pending.type === "select_task_for_transfer"
           ? "Вы не можете передать эту задачу."
           : pending.type === "select_task_for_reassign"
             ? "Только руководитель или менеджер может менять задачи сотрудников."

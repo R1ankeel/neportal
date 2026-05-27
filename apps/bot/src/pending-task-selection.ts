@@ -18,6 +18,7 @@ export type PendingTaskSelectionType =
   | "select_task_for_start"
   | "select_task_for_deadline"
   | "select_task_for_comment"
+  | "select_task_for_comments_list"
   | "select_task_for_mention"
   | "select_task_for_transfer"
   | "select_task_for_reassign";

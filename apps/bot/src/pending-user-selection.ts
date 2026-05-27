@@ -24,6 +24,7 @@ export type PendingUserSelectionType =
   | "select_user_for_absence_delegation_item"
   | "select_user_for_link"
   | "select_user_for_task_list"
+  | "select_user_for_completed_task_list"
   | "select_user_for_other";
 
 export type UserCandidate = {
@@ -104,6 +105,11 @@ export type TaskListUserSelectionPayload = {
   limit?: number;
 };
 
+export type CompletedTaskListUserSelectionPayload = {
+  intent: "completed_task_list";
+  limit?: number;
+};
+
 export type UserSelectionPayload =
   | CreateTaskUserSelectionPayload
   | TransferUserSelectionPayload
@@ -113,7 +119,8 @@ export type UserSelectionPayload =
   | CancelAbsenceUserSelectionPayload
   | AbsenceDelegationItemUserSelectionPayload
   | LinkUserSelectionPayload
-  | TaskListUserSelectionPayload;
+  | TaskListUserSelectionPayload
+  | CompletedTaskListUserSelectionPayload;
 
 export type PendingUserSelection = {
   choiceId: string;

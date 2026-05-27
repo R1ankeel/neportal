@@ -11,11 +11,12 @@ import {
   type PendingLinkByUsername,
 } from "./pending-intent";
 import { buildStartLinkKeyboard } from "./telegram/keyboards/start-link-keyboard";
-import { replyWithMainMenu } from "./main-menu-reply";
+import { replyWithMainMenuAndPersistentButton } from "./main-menu-reply";
 import type { StartLinkAction } from "./telegram/keyboards/start-link-keyboard";
 
 export async function finalizeLinkSuccess(ctx: Context): Promise<void> {
-  await ctx.reply(
+  await replyWithMainMenuAndPersistentButton(
+    ctx,
     [
       "Готово, Telegram привязан к Neportal.",
       "",
@@ -23,7 +24,6 @@ export async function finalizeLinkSuccess(ctx: Context): Promise<void> {
       "отчитываться по расходам и управлять задачами текстом или голосом.",
     ].join("\n"),
   );
-  await replyWithMainMenu(ctx);
 }
 
 export async function applyLinkByUsernameDecision(

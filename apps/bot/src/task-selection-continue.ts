@@ -13,6 +13,7 @@ import {
   buildResolvedAddTaskComment,
   startPendingTaskCommentDetails,
 } from "./task-comment-flow";
+import { replyWithTaskComments } from "./task-comments-list-flow";
 import {
   buildResolvedMentionInTask,
   startPendingTaskMentionDetails,
@@ -151,6 +152,11 @@ export async function continueAfterTaskSelection(
       resolved,
     });
     await replyWithIntentPreview(ctx, telegramUserId, resolved);
+    return;
+  }
+
+  if (selectionType === "select_task_for_comments_list") {
+    await replyWithTaskComments(ctx, task);
     return;
   }
 

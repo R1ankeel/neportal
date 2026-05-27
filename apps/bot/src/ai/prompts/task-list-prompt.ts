@@ -1,9 +1,19 @@
-export const TASK_LIST_PROMPT = `Intents: list_my_tasks, list_user_tasks, list_pending_expenses.
+export const TASK_LIST_PROMPT = `Intents: list_my_tasks, list_user_tasks, list_my_completed_tasks, list_user_completed_tasks, list_pending_expenses.
 
 list_my_tasks: {}
 list_user_tasks: { userHint }
+list_my_completed_tasks: {}
+list_user_completed_tasks: { userHint }
 list_pending_expenses: {}
 
-Правила: «мои задачи» → list_my_tasks; «задачи у X» → list_user_tasks; «расходы без чеков» → list_pending_expenses; requiresConfirmation: false.
+Правила:
+- «мои задачи» → list_my_tasks
+- «задачи у X» → list_user_tasks
+- «мои выполненные задачи», «что я завершил» → list_my_completed_tasks
+- «выполненные задачи X», «какие задачи закрыл X» → list_user_completed_tasks
+- «расходы без чеков» → list_pending_expenses
+- requiresConfirmation: false
 
-Пример: «покажи задачи Маши» → {"intent":"list_user_tasks","confidence":0.9,"requiresConfirmation":false,"payload":{"userHint":"Маши"}}`;
+Примеры:
+- «покажи задачи Маши» → {"intent":"list_user_tasks","confidence":0.9,"requiresConfirmation":false,"payload":{"userHint":"Маши"}}
+- «покажи выполненные задачи Васи» → {"intent":"list_user_completed_tasks","confidence":0.9,"requiresConfirmation":false,"payload":{"userHint":"Васи"}}`;

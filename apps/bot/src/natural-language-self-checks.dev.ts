@@ -2,6 +2,8 @@ import type { ApiTask, ApiUser } from "./api";
 import { devLog } from "./dev-log";
 import { findTaskByTitle } from "./hint-matchers";
 import { parseTaskTransferLikeQuery } from "./parse-task-transfer-query";
+import { parseCompletedTaskListQuery } from "./parse-completed-task-list-query";
+import { parseTaskCommentsListQuery } from "./parse-task-comments-list-query";
 import { parseTaskListQuery } from "./parse-task-list-query";
 import {
   removeLeadingUserHintPrepositions,
@@ -112,6 +114,28 @@ function devCheckUserHintCleanup(): void {
     listQuery?.type === "user" &&
     removeLeadingUserHintPrepositions(listQuery.userHint.toLowerCase()) === "васи";
   devLog(`parseTaskListQuery у васи ${listOk ? "OK" : "FAIL"}`, { listQuery });
+
+  const commentsQuery = parseTaskCommentsListQuery("покажи комментарии по задаче склад");
+  const commentsOk =
+    commentsQuery?.taskHint.toLowerCase().replace(/ё/g, "е") === "склад";
+  devLog(`parseTaskCommentsListQuery склад ${commentsOk ? "OK" : "FAIL"}`, { commentsQuery });
+
+  const myCompleted = parseCompletedTaskListQuery("мои выполненные задачи");
+  devLog(`parseCompletedTaskListQuery my ${myCompleted?.type === "my" ? "OK" : "FAIL"}`, {
+    myCompleted,
+  });
+
+  const userCompleted = parseCompletedTaskListQuery("покажи выполненные задачи васи");
+  const userCompletedOk =
+    userCompleted?.type === "user" &&
+    removeLeadingUserHintPrepositions(userCompleted.userHint.toLowerCase()) === "васи";
+  devLog(`parseCompletedTaskListQuery васи ${userCompletedOk ? "OK" : "FAIL"}`, { userCompleted });
+
+  const activeNotCompleted = parseTaskListQuery("покажи выполненные задачи васи");
+  devLog(
+    `parseTaskListQuery не ловит выполненные ${activeNotCompleted === null ? "OK" : "FAIL"}`,
+    { activeNotCompleted },
+  );
 }
 
 function devCheckTaskMatching(): void {

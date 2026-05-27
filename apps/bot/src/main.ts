@@ -54,7 +54,8 @@ import { formatUserCandidates, userNotFoundMessage } from "./user-selection-form
 import { handleStartBinding } from "./start-binding";
 import { handleStartLinkCallback } from "./start-link-callback";
 import { handleMainMenuCallback } from "./main-menu-callback";
-import { replyWithMainMenu } from "./main-menu-reply";
+import { replyWithMainMenu, replyWithMainMenuAndPersistentButton } from "./main-menu-reply";
+import { isMainMenuTrigger } from "./telegram/keyboards/persistent-menu-keyboard";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
 import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
@@ -106,7 +107,7 @@ async function handleStartCommand(ctx: Context): Promise<void> {
   try {
     const linked = await fetchUserByTelegramId(String(telegramId));
     if (linked) {
-      await replyWithMainMenu(
+      await replyWithMainMenuAndPersistentButton(
         ctx,
         `Здравствуйте, ${linked.fullName}.\nВы можете создавать задачи, записывать заметки и управлять ими текстом или голосом.`,
       );
@@ -123,6 +124,29 @@ async function handleStartCommand(ctx: Context): Promise<void> {
 
 bot.command("start", async (ctx) => {
   await handleStartCommand(ctx);
+});
+
+bot.command("menu", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) {
+    await ctx.reply("Не удалось определить Telegram ID.");
+    return;
+  }
+
+  try {
+    const linked = await fetchUserByTelegramId(String(telegramId));
+    if (!linked) {
+      await ctx.reply(
+        "Вы не привязаны к Neportal. Отправьте /start, чтобы привязать аккаунт.",
+      );
+      return;
+    }
+    await replyWithMainMenu(ctx);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[bot] menu command error: ${msg}`);
+    await ctx.reply(`Ошибка API: ${msg}`);
+  }
 });
 
 bot.command("demo", async (ctx) => {
@@ -918,6 +942,27 @@ bot.on("callback_query:data", async (ctx) => {
 bot.on("message:text", async (ctx) => {
   const text = ctx.message.text;
   if (!text || text.startsWith("/")) return;
+
+  if (isMainMenuTrigger(text)) {
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return;
+    try {
+      const linked = await fetchUserByTelegramId(String(telegramId));
+      if (!linked) {
+        await ctx.reply(
+          "Вы не привязаны к Neportal. Отправьте /start, чтобы привязать аккаунт.",
+        );
+        return;
+      }
+      await replyWithMainMenu(ctx);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] main menu trigger error: ${msg}`);
+      await ctx.reply(`Ошибка API: ${msg}`);
+    }
+    return;
+  }
+
   await handlePlainTextMessage(ctx);
 });
 

@@ -17,6 +17,7 @@ export type TaskResolvePurpose =
   | "start"
   | "deadline"
   | "comment"
+  | "comments_list"
   | "mention"
   | "transfer"
   | "reassign";
@@ -45,6 +46,8 @@ export function purposeToSelectionType(purpose: TaskResolvePurpose): PendingTask
       return "select_task_for_deadline";
     case "comment":
       return "select_task_for_comment";
+    case "comments_list":
+      return "select_task_for_comments_list";
     case "mention":
       return "select_task_for_mention";
     case "transfer":
@@ -65,7 +68,7 @@ function filterTasksForPurpose(
 ): ApiTask[] {
   return tasks.filter((task) => {
     if (!canModifyTask(user, task)) return false;
-    if (purpose === "comment" || purpose === "mention") return true;
+    if (purpose === "comment" || purpose === "comments_list" || purpose === "mention") return true;
     if (purpose === "transfer" || purpose === "reassign") {
       return task.status === "NEW" || task.status === "IN_PROGRESS";
     }
@@ -85,6 +88,9 @@ function emptyTitleMessage(purpose: TaskResolvePurpose): string {
   if (purpose === "start") return "Укажите название: /start-task Проверить склад";
   if (purpose === "comment") {
     return "Использование: /comment <задача> — <комментарий>";
+  }
+  if (purpose === "comments_list") {
+    return "Укажите название задачи, например: «Покажи комментарии по задаче склад».";
   }
   if (purpose === "mention") {
     return "Использование: /mention <сотрудник> | <задача> | <комментарий>";
@@ -184,8 +190,10 @@ export async function resolveTaskByTitle(
       return {
         kind: "cannot_modify",
         message:
-          purpose === "comment" || purpose === "mention"
-            ? "Вы не можете комментировать эту задачу."
+          purpose === "comment" || purpose === "comments_list" || purpose === "mention"
+            ? purpose === "comments_list"
+              ? "Вы не можете просматривать комментарии этой задачи."
+              : "Вы не можете комментировать эту задачу."
             : purpose === "transfer"
               ? "Вы не можете передать эту задачу."
               : purpose === "reassign"
@@ -193,8 +201,14 @@ export async function resolveTaskByTitle(
                 : "Вы не можете изменить эту задачу.",
       };
     }
-    if (purpose === "comment" || purpose === "mention") {
-      return { kind: "no_modifiable", message: "Вы не можете комментировать найденные задачи." };
+    if (purpose === "comment" || purpose === "comments_list" || purpose === "mention") {
+      return {
+        kind: "no_modifiable",
+        message:
+          purpose === "comments_list"
+            ? "Вы не можете просматривать комментарии найденных задач."
+            : "Вы не можете комментировать найденные задачи.",
+      };
     }
     if (purpose === "transfer") {
       return { kind: "no_modifiable", message: "Вы не можете передать найденные задачи." };
