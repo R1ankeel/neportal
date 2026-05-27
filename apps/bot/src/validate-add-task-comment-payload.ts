@@ -4,6 +4,7 @@ import {
   getAddTaskCommentComment,
   getAddTaskCommentTaskQuery,
 } from "./add-task-comment-payload";
+import { extractMentionUserHintFromCommentPhrase } from "./extract-mention-user-hint-from-comment";
 import { splitCommentByExplicitSeparator } from "./ai/deterministic/split-comment-by-explicit-separator";
 import {
   stemRussianWord,
@@ -214,6 +215,8 @@ export function validateAddTaskCommentPayload(params: {
     taskTitle: params.payload.taskTitle,
     comment: params.payload.comment ?? params.payload.text,
     text: params.payload.text,
+    mentionedUserId: params.payload.mentionedUserId,
+    mentionUserHints: params.payload.mentionUserHints,
   });
 
   if (payload.taskId?.trim()) {
@@ -269,10 +272,19 @@ export function validateAddTaskCommentPayload(params: {
     }
   }
 
+  let mentionUserHints =
+    params.payload.mentionUserHints?.map((h) => h.trim()).filter(Boolean) ?? [];
+  if (mentionUserHints.length === 0 && userText) {
+    const extracted = extractMentionUserHintFromCommentPhrase(userText);
+    if (extracted) mentionUserHints = [extracted];
+  }
+
   payload = buildAddTaskCommentPayload({
     taskQuery,
     taskTitle: payload.taskTitle ?? taskQuery,
     comment,
+    mentionedUserId: params.payload.mentionedUserId,
+    mentionUserHints: mentionUserHints.length > 0 ? mentionUserHints : undefined,
   });
   if (params.payload.taskId?.trim()) {
     payload = { ...payload, taskId: params.payload.taskId.trim() };

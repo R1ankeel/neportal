@@ -26,6 +26,7 @@ export function buildAddTaskCommentPayload(
     comment?: string;
     text?: string;
     mentionedUserId?: string;
+    mentionUserHints?: string[];
   },
 ): AddTaskCommentPayload {
   const taskQuery = partial.taskQuery?.trim();
@@ -36,5 +37,7 @@ export function buildAddTaskCommentPayload(
   if (taskTitle) payload.taskTitle = taskTitle;
   if (comment) payload.comment = comment;
   if (partial.mentionedUserId) payload.mentionedUserId = partial.mentionedUserId;
+  const hints = partial.mentionUserHints?.map((h) => h.trim()).filter(Boolean);
+  if (hints && hints.length > 0) payload.mentionUserHints = hints;
   return payload;
 }

@@ -82,7 +82,9 @@ export async function handleAddTaskCommentIntent(
       const hint = mentionHints[0]!;
       const match = resolveMentionedUser(users, hint, linked);
       if (match.kind === "none") {
-        await ctx.reply(match.message ?? `Сотрудник «${hint}» не найден.`);
+        await ctx.reply(
+          match.message ?? `Не нашёл сотрудника «${hint}». Уточните, кого нужно упомянуть.`,
+        );
         return;
       }
       if (match.kind === "many") {
@@ -141,6 +143,7 @@ export async function handleAddTaskCommentIntent(
           taskTitle: resolved.taskTitle,
           comment: resolved.text,
           mentionedUserId: resolved.mentionedUserId,
+          mentionUserHints: mentionHints,
         }),
       },
       resolved,

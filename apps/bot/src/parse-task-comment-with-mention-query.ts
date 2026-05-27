@@ -55,11 +55,47 @@ const PATTERNS: PatternEntry[] = [
     taskIdx: 2,
   },
 
+  // (verb) комментарий для USER в TASK (без слова «задаче»): «для Леры в разборе документов. …»
+  {
+    regex: new RegExp(
+      String.raw`^(?:(?:напиши|добавь|оставь)(?:те)?\s+)?комментарий\s+для\s+(.+?)\s+в\s+(?!задач[аеийу])(.+?)(?:` +
+        SEP +
+        String.raw`)(.+)$`,
+      "si",
+    ),
+    userIdx: 1,
+    taskIdx: 2,
+  },
+
+  // (verb) комментарий для USER в задаче TASK (без «по»): «в задаче разбор документов. …»
+  {
+    regex: new RegExp(
+      String.raw`^(?:(?:напиши|добавь|оставь)(?:те)?\s+)?комментарий\s+для\s+(.+?)\s+в\s+задач[аеий]?\s+(?!по\s)(.+?)(?:` +
+        SEP +
+        String.raw`)(.+)$`,
+      "si",
+    ),
+    userIdx: 1,
+    taskIdx: 2,
+  },
+
   // (verb) комментарий USER_DAT (в|к) задаче (по) TASK sep TEXT
   // Negative lookahead guards against prepositions starting the user hint.
   {
     regex: new RegExp(
       String.raw`^(?:(?:напиши|добавь|оставь)(?:те)?\s+)?комментарий\s+(?!для\s|в\s|к\s|по\s|на\s|из\s|со?\s|за\s|от\s|об?\s|при\s)(.+?)\s+(?:в|к)\s+задач[аеий]?\s+(?:по\s+)?(.+?)(?:` +
+        SEP +
+        String.raw`)(.+)$`,
+      "si",
+    ),
+    userIdx: 1,
+    taskIdx: 2,
+  },
+
+  // (verb) комментарий USER_DAT в TASK (без «задаче»): «Лере в разборе документов. …»
+  {
+    regex: new RegExp(
+      String.raw`^(?:(?:напиши|добавь|оставь)(?:те)?\s+)?комментарий\s+(?!для\s|в\s|к\s|по\s|на\s|из\s|со?\s|за\s|от\s|об?\s|при\s)(.+?)\s+в\s+(?!задач[аеийу])(.+?)(?:` +
         SEP +
         String.raw`)(.+)$`,
       "si",

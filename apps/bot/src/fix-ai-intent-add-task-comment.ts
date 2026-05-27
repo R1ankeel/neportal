@@ -13,6 +13,12 @@ export function applyAddTaskCommentPayloadFix(
 ): void {
   const legacyText = asTrimmedString(p.text);
   const comment = asTrimmedString(p.comment);
+  const mentionUserHints = Array.isArray(p.mentionUserHints)
+    ? p.mentionUserHints
+        .filter((h): h is string => typeof h === "string" && h.trim().length > 0)
+        .map((h) => h.trim())
+    : undefined;
+
   const { payload } = validateAddTaskCommentPayload({
     payload: {
       taskQuery: asTrimmedString(p.taskQuery),
@@ -20,6 +26,8 @@ export function applyAddTaskCommentPayloadFix(
       taskId: asTrimmedString(p.taskId),
       comment: comment ?? legacyText,
       text: legacyText,
+      mentionedUserId: asTrimmedString(p.mentionedUserId),
+      mentionUserHints,
     },
     userText: userText?.trim() ?? "",
   });
@@ -33,4 +41,8 @@ export function applyAddTaskCommentPayloadFix(
   else delete p.taskId;
   if (payload.comment) p.comment = payload.comment;
   else delete p.comment;
+  if (payload.mentionedUserId) p.mentionedUserId = payload.mentionedUserId;
+  else delete p.mentionedUserId;
+  if (payload.mentionUserHints?.length) p.mentionUserHints = payload.mentionUserHints;
+  else delete p.mentionUserHints;
 }

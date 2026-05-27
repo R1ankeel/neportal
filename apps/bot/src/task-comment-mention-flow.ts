@@ -15,7 +15,7 @@ import {
 } from "./task-comment-flow";
 import { resolveMentionedUser } from "./task-mention-flow";
 import { resolveTaskByTitle, resolveResultToMessage } from "./resolve-task-by-title";
-import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
+import { formatUserCandidates } from "./user-selection-format";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 import type { TaskCommentWithMentionResult } from "./parse-task-comment-with-mention-query";
 
@@ -46,7 +46,9 @@ export async function replyWithCommentWithMentionQuery(
   const userMatch = resolveMentionedUser(users, userHint, linked);
 
   if (userMatch.kind === "none") {
-    await ctx.reply(userMatch.message ?? userNotFoundMessage(userHint));
+    await ctx.reply(
+      userMatch.message ?? `Не нашёл сотрудника «${userHint}». Уточните, кого нужно упомянуть.`,
+    );
     return;
   }
 

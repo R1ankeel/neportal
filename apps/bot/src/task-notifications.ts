@@ -170,11 +170,11 @@ export async function notifyTaskMentionRequested(
     mentionedUser: { id: string; fullName: string; telegramId: string | null };
   },
 ): Promise<boolean> {
-  const { mentionedUser, author, taskTitle, projectName, text } = params;
+  const { mentionedUser, taskTitle, projectName, text } = params;
   if (!mentionedUser.telegramId) return false;
 
   const lines = [
-    `${author.fullName} попросил вас прокомментировать задачу «${taskTitle}».`,
+    `Вас упомянули в комментарии к задаче «${taskTitle}».`,
     "",
     projectName ? `Проект: ${projectName}` : null,
     `Комментарий: ${text}`,
