@@ -980,13 +980,14 @@ bot.on("message:text", async (ctx) => {
 bot.on("message", async (ctx) => {
   const msg = ctx.message;
   if (!msg.reply_to_message?.message_id) return;
-  if ("text" in msg && msg.text) return;
+  if ("text" in msg && msg.text) return;  // handled by message:text handler
+  if ("voice" in msg && msg.voice) return; // handled by message:voice handler
 
   const chatId = String(ctx.chat.id);
   try {
     const binding = await findNotificationBinding(chatId, msg.reply_to_message.message_id);
     if (binding) {
-      await ctx.reply("Сейчас через reply можно добавить только текстовый комментарий.");
+      await ctx.reply("Через reply можно добавить текстовый или голосовой комментарий.");
     }
   } catch {
     // ignore — don't block other handlers

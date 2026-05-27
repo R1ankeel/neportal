@@ -11,6 +11,7 @@ import { recognizeOggOpusAsyncFromObject } from "./speechkit-async-client";
 import { SpeechKitError } from "./types";
 import { hasBlockingPendingState } from "./voice-pending-guard";
 import { deleteObjectBestEffort, uploadTempObject } from "../storage/yandex-object-storage";
+import { handleReplyToNotification } from "../reply-notification-flow";
 
 function previewText(text: string, max = 80): string {
   return text.slice(0, max);
@@ -177,6 +178,13 @@ export async function handleTelegramVoiceMessage(ctx: Context): Promise<boolean>
 
     const textToShow = cleanupResult.changed ? finalText : text;
     await ctx.reply(`🎙 Распознал:\n"${textToShow}"`);
+
+    const replyTo = ctx.message?.reply_to_message;
+    if (replyTo?.message_id && ctx.chat?.id) {
+      const chatId = String(ctx.chat.id);
+      const handled = await handleReplyToNotification(ctx, chatId, replyTo.message_id, finalText);
+      if (handled) return true;
+    }
 
     try {
       await handleTextSemanticMessage(ctx, finalText, {
