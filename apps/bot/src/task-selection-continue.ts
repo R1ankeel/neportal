@@ -11,6 +11,7 @@ import {
 } from "./pending-task-selection";
 import {
   buildResolvedAddTaskComment,
+  buildResolvedAddTaskCommentWithMention,
   startPendingTaskCommentDetails,
 } from "./task-comment-flow";
 import { replyWithTaskComments } from "./task-comments-list-flow";
@@ -162,7 +163,17 @@ export async function continueAfterTaskSelection(
 
   if (selectionType === "select_task_for_comment") {
     if (payload.commentText?.trim()) {
-      const resolved = buildResolvedAddTaskComment(task, payload.commentText);
+      let resolved;
+      if (payload.mentionedUserId) {
+        const users = await fetchUsers();
+        const mentionedUser = users.find((u) => u.id === payload.mentionedUserId);
+        if (mentionedUser) {
+          resolved = buildResolvedAddTaskCommentWithMention(task, payload.commentText, mentionedUser);
+        }
+      }
+      if (!resolved) {
+        resolved = buildResolvedAddTaskComment(task, payload.commentText);
+      }
       setPendingConfirmation(telegramUserId, {
         type: "ai_intent",
         intent: {
@@ -172,6 +183,7 @@ export async function continueAfterTaskSelection(
           payload: {
             taskTitle: resolved.taskTitle,
             comment: resolved.text,
+            mentionedUserId: resolved.mentionedUserId,
           },
         },
         resolved,

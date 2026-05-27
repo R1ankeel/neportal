@@ -35,7 +35,12 @@ export function buildAbsenceTransferComment(
   endDate: string,
 ): string {
   const label = absenceTypeLabelRu(type);
-  return `${ABSENCE_TRANSFER_COMMENT_PREFIX}: ${label} ${formatIsoDateRu(startDate)}—${formatIsoDateRu(endDate)}`;
+  const startRu = formatIsoDateRu(startDate);
+  const endRu = formatIsoDateRu(endDate);
+  if (startRu === endRu) {
+    return `${ABSENCE_TRANSFER_COMMENT_PREFIX}: ${label} ${startRu}`;
+  }
+  return `${ABSENCE_TRANSFER_COMMENT_PREFIX}: ${label} с ${startRu} по ${endRu}`;
 }
 
 export async function createAbsenceWithImpact(
@@ -61,8 +66,8 @@ export async function handleAbsenceImpact(
   const affectedTasks = absence.affectedTasks ?? [];
   if (affectedTasks.length === 0) return;
 
-  const startRu = formatIsoDateRu(absence.startDate.slice(0, 10));
-  const endRu = formatIsoDateRu(absence.endDate.slice(0, 10));
+  const startRu = formatIsoDateRu(absence.startDate);
+  const endRu = formatIsoDateRu(absence.endDate);
   const delegationTasks = toAbsenceDelegationTasks(affectedTasks);
 
   if (absenceUser.telegramId) {

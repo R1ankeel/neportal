@@ -25,6 +25,7 @@ export function buildAddTaskCommentPayload(
     taskTitle?: string;
     comment?: string;
     text?: string;
+    mentionedUserId?: string;
   },
 ): AddTaskCommentPayload {
   const taskQuery = partial.taskQuery?.trim();
@@ -34,5 +35,6 @@ export function buildAddTaskCommentPayload(
   if (taskQuery) payload.taskQuery = taskQuery;
   if (taskTitle) payload.taskTitle = taskTitle;
   if (comment) payload.comment = comment;
+  if (partial.mentionedUserId) payload.mentionedUserId = partial.mentionedUserId;
   return payload;
 }

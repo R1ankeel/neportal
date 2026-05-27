@@ -19,6 +19,7 @@ export type PendingUserSelectionType =
   | "select_user_for_reassign_from"
   | "select_user_for_reassign_to"
   | "select_user_for_mention"
+  | "select_user_for_comment_mention"
   | "select_user_for_absence"
   | "select_user_for_absence_cancel"
   | "select_user_for_absence_delegation_item"
@@ -110,6 +111,12 @@ export type CompletedTaskListUserSelectionPayload = {
   limit?: number;
 };
 
+export type CommentMentionUserSelectionPayload = {
+  intent: "comment_mention";
+  taskHint: string;
+  commentText: string;
+};
+
 export type UserSelectionPayload =
   | CreateTaskUserSelectionPayload
   | TransferUserSelectionPayload
@@ -120,7 +127,8 @@ export type UserSelectionPayload =
   | AbsenceDelegationItemUserSelectionPayload
   | LinkUserSelectionPayload
   | TaskListUserSelectionPayload
-  | CompletedTaskListUserSelectionPayload;
+  | CompletedTaskListUserSelectionPayload
+  | CommentMentionUserSelectionPayload;
 
 export type PendingUserSelection = {
   choiceId: string;

@@ -40,6 +40,10 @@ import {
   replyWithTasksForUser,
 } from "./my-tasks-flow";
 import { continueCancelAbsenceForUser } from "./absence-cancel-flow";
+import { buildResolvedAddTaskCommentWithMention } from "./task-comment-flow";
+import { resolveTaskByTitle, resolveResultToMessage } from "./resolve-task-by-title";
+import { buildAddTaskCommentPayload } from "./add-task-comment-payload";
+import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -323,5 +327,52 @@ export async function continueAfterUserSelection(
       return;
     }
     await replyWithCompletedTasksForUser(ctx, selectedUser, false, payload.limit ?? 5);
+    return;
+  }
+
+  if (payload.intent === "comment_mention") {
+    // selectedUser is the mentioned user; now resolve the task
+    const { taskHint, commentText } = payload;
+
+    const selectionPayload = {
+      commentText,
+      mentionedUserId: selectedUser.id,
+      mentionedUserName: selectedUser.fullName,
+    };
+
+    const resolution = await resolveTaskByTitle(linked, taskHint, "comment", {
+      telegramUserId,
+      selectionPayload,
+    });
+
+    if (resolution.kind !== "found") {
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramUserId,
+        resolveResultToMessage(resolution),
+      );
+      return;
+    }
+
+    const task = resolution.task;
+    const resolved = buildResolvedAddTaskCommentWithMention(task, commentText, selectedUser);
+
+    const intentForPending = {
+      intent: "add_task_comment" as const,
+      confidence: 1,
+      requiresConfirmation: true,
+      payload: buildAddTaskCommentPayload({
+        taskTitle: task.title,
+        comment: commentText,
+        mentionedUserId: selectedUser.id,
+      }),
+    };
+
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: intentForPending,
+      resolved,
+    });
+    await replyWithIntentPreview(ctx, telegramUserId, resolved);
   }
 }

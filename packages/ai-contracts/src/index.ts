@@ -121,6 +121,8 @@ export const AddTaskCommentPayloadSchema = z.object({
   /** @deprecated use comment */
   text: optionalAiStringMin1,
   mentionedUserId: optionalAiString,
+  /** User hints for mentions (resolved to mentionedUserId before execution). */
+  mentionUserHints: z.array(z.string().min(1)).optional(),
 });
 
 export const ListTaskCommentsPayloadSchema = z.object({

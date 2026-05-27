@@ -114,6 +114,11 @@ export type ResolvedAddTaskComment = {
   text: string;
   creatorId: string;
   assigneeId: string | null;
+  /** Set when the comment includes a user mention. */
+  mentionedUserId?: string;
+  mentionedUserName?: string;
+  mentionedUserTelegramId?: string | null;
+  projectName?: string;
 };
 
 export type ResolvedMentionInTask = {

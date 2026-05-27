@@ -578,11 +578,32 @@ export function stripDeadlineMarkersFromText(text: string): string | undefined {
   return s.length > 0 ? s : undefined;
 }
 
-/** ISO date → DD.MM.YYYY для ответов бота. */
+/** ISO date (YYYY-MM-DD) or ISO datetime → DD.MM.YYYY. Calendar date uses UTC components. */
 export function formatIsoDateRu(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${d}.${m}.${y}`;
+  const trimmed = iso.trim();
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    return `${d}.${m}.${y}`;
+  }
+
+  const parsed = Date.parse(trimmed);
+  if (!Number.isNaN(parsed)) {
+    const dt = new Date(parsed);
+    const d = String(dt.getUTCDate()).padStart(2, "0");
+    const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const y = String(dt.getUTCFullYear());
+    return `${d}.${m}.${y}`;
+  }
+
+  const prefix = trimmed.slice(0, 10);
+  const prefixMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(prefix);
+  if (prefixMatch) {
+    const [, y, m, d] = prefixMatch;
+    return `${d}.${m}.${y}`;
+  }
+
+  return iso;
 }
 
 const ISO_DATE_IN_TEXT_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/g;

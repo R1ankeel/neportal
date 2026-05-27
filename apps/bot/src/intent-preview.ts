@@ -107,12 +107,17 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
     case "start_task":
       return `Взять задачу «${resolved.taskTitle}» в работу?` + CONFIRM_FOOTER;
 
-    case "add_task_comment":
-      return [
+    case "add_task_comment": {
+      const lines = [
         `Добавить комментарий к задаче «${resolved.taskTitle}»?`,
         "",
         `Комментарий: ${resolved.text}`,
-      ].join("\n") + CONFIRM_FOOTER;
+      ];
+      if (resolved.mentionedUserName) {
+        lines.push(`Упомянуть: ${resolved.mentionedUserName}`);
+      }
+      return lines.join("\n") + CONFIRM_FOOTER;
+    }
 
     case "mention_in_task":
       return [

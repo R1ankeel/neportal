@@ -40,6 +40,8 @@ import { isManagerOrOwner } from "./task-transfer-flow";
 import { parseExpenseQuery } from "./parse-expense-query";
 import { parseCompletedTaskListQuery } from "./parse-completed-task-list-query";
 import { parseTaskCommentsListQuery } from "./parse-task-comments-list-query";
+import { parseTaskCommentWithMentionQuery } from "./parse-task-comment-with-mention-query";
+import { replyWithCommentWithMentionQuery } from "./task-comment-mention-flow";
 import { parseTaskListQuery } from "./parse-task-list-query";
 import { routeParsedAiIntent } from "./route-parsed-intent";
 import {
@@ -210,6 +212,18 @@ export async function handleTextSemanticMessage(
       await ctx.reply(
         msg.startsWith("GET /budget-expenses/pending") ? `Ошибка API: ${msg}` : `Ошибка: ${msg}`,
       );
+    }
+    return;
+  }
+
+  const commentWithMentionQuery = parseTaskCommentWithMentionQuery(inputText);
+  if (commentWithMentionQuery) {
+    try {
+      await replyWithCommentWithMentionQuery(ctx, linked, telegramUserId, commentWithMentionQuery);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bot] add_task_comment_mention (deterministic) error: ${msg}`);
+      await ctx.reply(`Ошибка: ${msg}`);
     }
     return;
   }

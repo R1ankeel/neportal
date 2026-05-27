@@ -1,6 +1,6 @@
 import type { Api } from "grammy";
 import type { ApiTask, ApiUser } from "./api";
-import { createTaskComment } from "./api";
+import { createTaskComment, createTaskCommentMention } from "./api";
 import type { ResolvedAddTaskComment } from "./intent-resolver";
 import { clearPendingConfirmation } from "./pending-intent";
 import {
@@ -16,7 +16,7 @@ import {
 } from "./resolve-task-by-title";
 import type { TaskSelectionPayload } from "./pending-task-selection";
 import { canModifyTask, parseTaskTitleAndSuffix } from "./task-status-flow";
-import { notifyTaskCommentAdded } from "./task-notifications";
+import { notifyTaskCommentAdded, notifyTaskMentionRequested } from "./task-notifications";
 
 export { canModifyTask as canCommentTask };
 
@@ -39,6 +39,27 @@ export function buildResolvedAddTaskComment(
     text: text.trim(),
     creatorId: task.creatorId,
     assigneeId: task.assigneeId,
+    projectName: task.project?.name,
+  };
+}
+
+/** Builds a resolved comment that includes a user mention. */
+export function buildResolvedAddTaskCommentWithMention(
+  task: ApiTask,
+  text: string,
+  mentionedUser: ApiUser,
+): ResolvedAddTaskComment {
+  return {
+    intent: "add_task_comment",
+    taskId: task.id,
+    taskTitle: task.title,
+    text: text.trim(),
+    creatorId: task.creatorId,
+    assigneeId: task.assigneeId,
+    mentionedUserId: mentionedUser.id,
+    mentionedUserName: mentionedUser.fullName,
+    mentionedUserTelegramId: mentionedUser.telegramId ?? null,
+    projectName: task.project?.name,
   };
 }
 
@@ -142,17 +163,45 @@ export async function executeTaskComment(
     return "Укажите текст комментария.";
   }
 
-  await createTaskComment(resolved.taskId, {
-    authorId: author.id,
-    text: resolved.text,
-    source: "TELEGRAM_TEXT",
-  });
+  if (resolved.mentionedUserId) {
+    await createTaskCommentMention(resolved.taskId, {
+      authorId: author.id,
+      mentionedUserId: resolved.mentionedUserId,
+      text: resolved.text,
+      source: "TELEGRAM_TEXT",
+    });
+  } else {
+    await createTaskComment(resolved.taskId, {
+      authorId: author.id,
+      text: resolved.text,
+      source: "TELEGRAM_TEXT",
+    });
+  }
 
   try {
     await notifyTaskCommentAdded(api, resolved, author);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[task-notifications] comment notify error: ${msg}`);
+  }
+
+  if (resolved.mentionedUserId && resolved.mentionedUserName) {
+    try {
+      await notifyTaskMentionRequested(api, {
+        taskTitle: resolved.taskTitle,
+        projectName: resolved.projectName,
+        text: resolved.text,
+        author,
+        mentionedUser: {
+          id: resolved.mentionedUserId,
+          fullName: resolved.mentionedUserName,
+          telegramId: resolved.mentionedUserTelegramId ?? null,
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[task-notifications] mention notify error: ${msg}`);
+    }
   }
 
   return `Комментарий добавлен к задаче «${resolved.taskTitle}».`;
