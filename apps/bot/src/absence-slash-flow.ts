@@ -10,7 +10,7 @@ import {
   apiUserToCandidate,
   startPendingUserSelection,
 } from "./pending-user-selection";
-import { formatIsoDateRu, parseRuDate, todayIsoDate } from "./parse-ru-date";
+import { parseRuDate, todayIsoDate } from "./parse-ru-date";
 import { resolveUsersByHint } from "./resolve-users-by-hint";
 import { formatUserCandidates, userNotFoundMessage } from "./user-selection-format";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
@@ -128,9 +128,9 @@ export async function handleSickSlashCommand(ctx: Context, payload: string): Pro
   if (!currentUser) return;
 
   if (!userHint) {
-    await createAbsenceWithImpact(
-      ctx.api,
-      {
+    const { replyMessage } = await createAbsenceWithImpact(ctx.api, {
+      actorUserId: currentUser.id,
+      body: {
         userId: currentUser.id,
         type: "SICK_LEAVE",
         startDate: startIso,
@@ -138,14 +138,9 @@ export async function handleSickSlashCommand(ctx: Context, payload: string): Pro
         documentNumber,
         status: "APPROVED",
       },
-      currentUser,
-    );
-    await ctx.reply(
-      [
-        `Больничный добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`,
-        `Номер: ${documentNumber ?? "не указан"}.`,
-      ].join("\n"),
-    );
+      absenceUser: currentUser,
+    });
+    await ctx.reply(replyMessage);
     return;
   }
 
@@ -201,18 +196,18 @@ export async function handleVacationSlashCommand(ctx: Context, payload: string):
   }
 
   if (!userHint) {
-    await createAbsenceWithImpact(
-      ctx.api,
-      {
+    const { replyMessage } = await createAbsenceWithImpact(ctx.api, {
+      actorUserId: currentUser.id,
+      body: {
         userId: currentUser.id,
         type: "VACATION",
         startDate: startIso,
         endDate: endIso,
         status: "APPROVED",
       },
-      currentUser,
-    );
-    await ctx.reply(`Отпуск добавлен: с ${formatIsoDateRu(startIso)} по ${formatIsoDateRu(endIso)}.`);
+      absenceUser: currentUser,
+    });
+    await ctx.reply(replyMessage);
     return;
   }
 

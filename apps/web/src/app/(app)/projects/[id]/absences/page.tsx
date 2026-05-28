@@ -1,11 +1,13 @@
+import Link from "next/link";
 import { ProjectPageShell } from "@/components/projects/ProjectPageShell";
+import { AbsenceAffectedTasksList } from "@/components/absences/AbsenceAffectedTasksList";
 import { apiGet } from "@/lib/api";
+import { withActorQuery } from "@/lib/actor-user";
 import { resolveProjectActor } from "@/lib/resolve-project-actor";
 import {
   absenceStatusLabel,
   absenceTypeLabel,
   formatDate,
-  taskStatusLabel,
 } from "@/lib/format";
 import type { ApiAbsence } from "@/lib/types";
 import { findWebAuthor } from "@/lib/webAuthor";
@@ -46,6 +48,18 @@ export default async function ProjectAbsencesPage({
     <ProjectPageShell projectId={id} actorUserId={actorUserId} users={users}>
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold">Отсутствия</h2>
+
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-base text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+          Отсутствия оформляются глобально на сотрудника. Здесь — read-only проекция по участникам
+          проекта.{" "}
+          <Link
+            href={withActorQuery("/absences", actorUserId)}
+            className="font-medium underline hover:no-underline"
+          >
+            Все отсутствия организации
+          </Link>
+        </p>
+
         {error ? (
           <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
             {error}
@@ -110,27 +124,9 @@ export default async function ProjectAbsencesPage({
 
                 <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                   <h4 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                    Задачи на период отсутствия
+                    Задачи на период отсутствия (в этом проекте)
                   </h4>
-                  {a.affectedTasks.length === 0 ? (
-                    <p className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
-                      Нет задач с дедлайном на период отсутствия.
-                    </p>
-                  ) : (
-                    <ul className="mt-2 space-y-2">
-                      {a.affectedTasks.map((t) => (
-                        <li
-                          key={t.id}
-                          className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/50"
-                        >
-                          <span className="font-medium">{t.title}</span>
-                          <span className="text-sm text-zinc-500">
-                            {formatDate(t.deadlineAt)} · {taskStatusLabel(t.status)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <AbsenceAffectedTasksList absence={a} tasks={a.affectedTasks} />
                 </div>
               </li>
             ))}

@@ -8,6 +8,7 @@ import {
 import {
   AbsenceStatus,
   AbsenceType,
+  EntityStatus,
   PrismaService,
   TaskStatus,
   UserRole,
@@ -16,6 +17,8 @@ import { OrganizationContextService } from "../organization/organization-context
 import { ProjectAccessService } from "../projects/project-access.service";
 import { CancelAbsenceDto, CreateAbsenceDto, UpdateAbsenceStatusDto } from "./dto/absence.dto";
 import { RecordAbsenceNotificationDto } from "./dto/absence-notification.dto";
+
+export const AFFECTED_TASKS_CAP = 20;
 
 export type AbsenceAffectedTask = {
   id: string;
@@ -43,6 +46,16 @@ export type AbsenceListItem = {
   user: { id: string; fullName: string; role: string };
   cancelledBy: { id: string; fullName: string; role: string } | null;
   affectedTasks: AbsenceAffectedTask[];
+  affectedTasksTotal: number;
+  affectedTasksTruncated: boolean;
+  membershipProjectCount: number;
+};
+
+type AffectedTasksResult = {
+  tasks: AbsenceAffectedTask[];
+  total: number;
+  truncated: boolean;
+  membershipProjectCount: number;
 };
 
 const affectedTaskSelect = {
@@ -85,6 +98,50 @@ export class AbsencesService {
     );
   }
 
+  private async assertActor(actorUserId: string | undefined): Promise<{
+    id: string;
+    fullName: string;
+    role: UserRole;
+  }> {
+    const trimmed = actorUserId?.trim();
+    if (!trimmed) {
+      throw new BadRequestException("actorUserId is required");
+    }
+
+    const actor = await this.prisma.user.findFirst({
+      where: { id: trimmed, organizationId: this.orgId() },
+      select: { id: true, fullName: true, role: true },
+    });
+    if (!actor) {
+      throw new NotFoundException(`User with id "${trimmed}" not found in this organization`);
+    }
+    return actor;
+  }
+
+  private actorSeesAllAbsences(role: UserRole): boolean {
+    return role === UserRole.OWNER || role === UserRole.MANAGER;
+  }
+
+  private assertActorCanViewAbsenceUser(
+    actor: { id: string; role: UserRole },
+    absenceUserId: string,
+  ): void {
+    if (this.actorSeesAllAbsences(actor.role)) return;
+    if (actor.id !== absenceUserId) {
+      throw new NotFoundException("Absence not found");
+    }
+  }
+
+  private assertActorCanCreateForUser(
+    actor: { id: string; role: UserRole },
+    targetUserId: string,
+  ): void {
+    if (this.actorSeesAllAbsences(actor.role)) return;
+    if (actor.id !== targetUserId) {
+      throw new ForbiddenException("Вы можете оформить отсутствие только для себя");
+    }
+  }
+
   private async assertProjectAccessForActor(actorUserId: string | undefined, projectId: string) {
     if (!actorUserId?.trim()) {
       throw new BadRequestException("actorUserId is required when projectId is set");
@@ -92,16 +149,62 @@ export class AbsencesService {
     await this.projectAccess.assertActorCanAccessActiveProject(actorUserId.trim(), projectId);
   }
 
+  private async getMemberProjectIds(userId: string): Promise<string[]> {
+    const members = await this.prisma.projectMember.findMany({
+      where: {
+        userId,
+        project: {
+          organizationId: this.orgId(),
+          status: EntityStatus.ACTIVE,
+        },
+      },
+      select: { projectId: true },
+    });
+    return members.map((m) => m.projectId);
+  }
+
+  private sortAffectedTasks(tasks: AbsenceAffectedTask[]): AbsenceAffectedTask[] {
+    return [...tasks].sort((a, b) => {
+      const deadlineA = a.deadlineAt?.getTime() ?? 0;
+      const deadlineB = b.deadlineAt?.getTime() ?? 0;
+      if (deadlineA !== deadlineB) return deadlineA - deadlineB;
+
+      const projectA = a.project?.name ?? "";
+      const projectB = b.project?.name ?? "";
+      const byProject = projectA.localeCompare(projectB, "ru", { sensitivity: "base" });
+      if (byProject !== 0) return byProject;
+
+      return a.title.localeCompare(b.title, "ru", { sensitivity: "base" });
+    });
+  }
+
   private async getAffectedTasks(
     userId: string,
     startDate: Date,
     endDate: Date,
     projectId?: string,
-  ): Promise<AbsenceAffectedTask[]> {
-    return this.prisma.task.findMany({
+  ): Promise<AffectedTasksResult> {
+    const memberProjectIds = await this.getMemberProjectIds(userId);
+    const membershipProjectCount = memberProjectIds.length;
+
+    if (membershipProjectCount === 0) {
+      return { tasks: [], total: 0, truncated: false, membershipProjectCount: 0 };
+    }
+
+    let projectFilter: string | { in: string[] };
+    if (projectId != null) {
+      if (!memberProjectIds.includes(projectId)) {
+        return { tasks: [], total: 0, truncated: false, membershipProjectCount };
+      }
+      projectFilter = projectId;
+    } else {
+      projectFilter = { in: memberProjectIds };
+    }
+
+    const rows = await this.prisma.task.findMany({
       where: {
         organizationId: this.orgId(),
-        ...(projectId != null ? { projectId } : {}),
+        projectId: projectFilter,
         assigneeId: userId,
         deadlineAt: {
           not: null,
@@ -110,9 +213,15 @@ export class AbsencesService {
         },
         status: { in: [TaskStatus.NEW, TaskStatus.IN_PROGRESS] },
       },
-      orderBy: { deadlineAt: "asc" },
       select: affectedTaskSelect,
     });
+
+    const sorted = this.sortAffectedTasks(rows);
+    const total = sorted.length;
+    const truncated = total > AFFECTED_TASKS_CAP;
+    const tasks = sorted.slice(0, AFFECTED_TASKS_CAP);
+
+    return { tasks, total, truncated, membershipProjectCount };
   }
 
   private async mapListItem(
@@ -133,13 +242,11 @@ export class AbsencesService {
       cancelledBy: { id: string; fullName: string; role: string } | null;
     },
     projectId?: string,
-    affectedTasksOverride?: AbsenceAffectedTask[],
+    affectedOverride?: AffectedTasksResult,
   ): Promise<AbsenceListItem> {
-    const affectedTasks =
-      affectedTasksOverride ??
-      (projectId != null
-        ? await this.getAffectedTasks(absence.user.id, absence.startDate, absence.endDate, projectId)
-        : await this.getAffectedTasks(absence.user.id, absence.startDate, absence.endDate));
+    const affected =
+      affectedOverride ??
+      (await this.getAffectedTasks(absence.user.id, absence.startDate, absence.endDate, projectId));
 
     return {
       id: absence.id,
@@ -156,7 +263,10 @@ export class AbsencesService {
       updatedAt: absence.updatedAt,
       user: absence.user,
       cancelledBy: absence.cancelledBy,
-      affectedTasks,
+      affectedTasks: affected.tasks,
+      affectedTasksTotal: affected.total,
+      affectedTasksTruncated: affected.truncated,
+      membershipProjectCount: affected.membershipProjectCount,
     };
   }
 
@@ -180,39 +290,28 @@ export class AbsencesService {
     status?: AbsenceStatus;
     includeCancelled?: boolean;
   }) {
+    const actor = await this.assertActor(filters.actorUserId);
     const org = this.orgId();
     let memberUserIds: string[] | undefined;
 
     if (filters.projectId) {
-      await this.assertProjectAccessForActor(filters.actorUserId, filters.projectId);
+      await this.assertProjectAccessForActor(actor.id, filters.projectId);
 
-      // Include both formal project members and users who have tasks assigned in
-      // the project — employees can be task assignees without being ProjectMembers.
-      const [members, taskAssignees] = await Promise.all([
-        this.prisma.projectMember.findMany({
-          where: { projectId: filters.projectId },
-          select: { userId: true },
-        }),
-        this.prisma.task.findMany({
-          where: {
-            projectId: filters.projectId,
-            organizationId: org,
-            assigneeId: { not: null },
-          },
-          select: { assigneeId: true },
-          distinct: ["assigneeId"],
-        }),
-      ]);
+      const members = await this.prisma.projectMember.findMany({
+        where: { projectId: filters.projectId },
+        select: { userId: true },
+      });
 
-      const userSet = new Set<string>([
-        ...members.map((m) => m.userId),
-        ...taskAssignees.map((t) => t.assigneeId as string),
-      ]);
-
-      memberUserIds = [...userSet];
+      memberUserIds = members.map((m) => m.userId);
 
       if (memberUserIds.length === 0) {
         return [];
+      }
+    }
+
+    if (!this.actorSeesAllAbsences(actor.role)) {
+      if (filters.userId && filters.userId !== actor.id) {
+        throw new ForbiddenException("Вы можете просматривать только свои отсутствия");
       }
     }
 
@@ -220,6 +319,7 @@ export class AbsencesService {
       where: {
         organizationId: org,
         ...(filters.userId ? { userId: filters.userId } : {}),
+        ...(!this.actorSeesAllAbsences(actor.role) ? { userId: actor.id } : {}),
         ...(filters.type ? { type: filters.type } : {}),
         ...(filters.status ? { status: filters.status } : {}),
         ...(!filters.includeCancelled && !filters.status
@@ -241,6 +341,8 @@ export class AbsencesService {
   }
 
   async findOne(id: string, projectId?: string, actorUserId?: string) {
+    const actor = await this.assertActor(actorUserId);
+
     const absence = await this.prisma.absence.findFirst({
       where: { id, organizationId: this.orgId() },
       include: {
@@ -252,36 +354,25 @@ export class AbsencesService {
       throw new NotFoundException(`Absence with id "${id}" not found`);
     }
 
+    this.assertActorCanViewAbsenceUser(actor, absence.userId);
+
     if (projectId) {
-      await this.assertProjectAccessForActor(actorUserId, projectId);
+      await this.assertProjectAccessForActor(actor.id, projectId);
     }
 
     return this.mapListItem(absence, projectId);
   }
 
   async findAffectedTasks(id: string, projectId?: string, actorUserId?: string) {
-    const absence = await this.prisma.absence.findFirst({
-      where: { id, organizationId: this.orgId() },
-      include: { user: { select: { id: true } } },
-    });
-    if (!absence) {
-      throw new NotFoundException(`Absence with id "${id}" not found`);
-    }
-
-    if (projectId) {
-      await this.assertProjectAccessForActor(actorUserId, projectId);
-    }
-
-    return this.getAffectedTasks(
-      absence.user.id,
-      absence.startDate,
-      absence.endDate,
-      projectId,
-    );
+    const item = await this.findOne(id, projectId, actorUserId);
+    return item.affectedTasks;
   }
 
-  async create(dto: CreateAbsenceDto) {
+  async create(dto: CreateAbsenceDto, actorUserId?: string) {
+    const actor = await this.assertActor(actorUserId);
     const org = this.orgId();
+
+    this.assertActorCanCreateForUser(actor, dto.userId);
 
     const user = await this.prisma.user.findFirst({
       where: { id: dto.userId, organizationId: org },
@@ -316,14 +407,13 @@ export class AbsencesService {
       },
     });
 
-    const affectedTasks = await this.getAffectedTasks(
+    const affected = await this.getAffectedTasks(
       absence.user.id,
       absence.startDate,
       absence.endDate,
-      dto.projectId,
     );
 
-    return this.mapListItem(absence, dto.projectId, affectedTasks);
+    return this.mapListItem(absence, undefined, affected);
   }
 
   async cancel(id: string, dto: CancelAbsenceDto) {

@@ -3,7 +3,7 @@ import { AbsenceStatus, AbsenceType } from "@neportal/database";
 import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateAbsenceDto {
-  @ApiProperty({ description: "Сотрудник той же организации" })
+  @ApiProperty({ description: "Сотрудник, для которого оформляется отсутствие" })
   @IsString()
   @IsNotEmpty()
   userId!: string;
@@ -34,13 +34,6 @@ export class CreateAbsenceDto {
   @IsOptional()
   @IsEnum(AbsenceStatus)
   status?: AbsenceStatus;
-
-  @ApiPropertyOptional({
-    description: "Если указан — affectedTasks только по этому проекту; иначе по всей организации",
-  })
-  @IsOptional()
-  @IsString()
-  projectId?: string;
 }
 
 export class UpdateAbsenceStatusDto {

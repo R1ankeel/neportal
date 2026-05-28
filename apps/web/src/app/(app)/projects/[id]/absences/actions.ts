@@ -22,6 +22,7 @@ export async function cancelProjectAbsence(
     });
     revalidatePath(`/projects/${projectId}/absences`);
     revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/absences");
     return { ok: true };
   } catch (e) {
     const raw = e instanceof Error ? e.message : "Ошибка отмены";

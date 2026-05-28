@@ -861,16 +861,22 @@ export type ApiAbsence = {
   comment?: string | null;
   user: { id: string; fullName: string; role: string };
   affectedTasks?: ApiAbsenceAffectedTask[];
+  affectedTasksTotal?: number;
+  affectedTasksTruncated?: boolean;
+  membershipProjectCount?: number;
 };
 
-export async function createAbsence(body: {
-  userId: string;
-  type: "SICK_LEAVE" | "VACATION";
-  startDate: string;
-  endDate: string;
-  documentNumber?: string;
-  status?: "APPROVED";
-}): Promise<ApiAbsence> {
+export async function createAbsence(
+  actorUserId: string,
+  body: {
+    userId: string;
+    type: "SICK_LEAVE" | "VACATION";
+    startDate: string;
+    endDate: string;
+    documentNumber?: string;
+    status?: "APPROVED";
+  },
+): Promise<ApiAbsence> {
   const payload = {
     userId: body.userId,
     type: body.type,
@@ -882,7 +888,10 @@ export async function createAbsence(body: {
 
   devLog("POST /absences payload", payload as Record<string, unknown>);
 
-  const res = await fetch(`${getApiBaseUrl()}/absences`, {
+  const url = new URL(`${getApiBaseUrl()}/absences`);
+  url.searchParams.set("actorUserId", actorUserId);
+
+  const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
@@ -897,8 +906,11 @@ export async function createAbsence(body: {
 
 export async function fetchAbsenceAffectedTasks(
   absenceId: string,
+  actorUserId: string,
 ): Promise<ApiAbsenceAffectedTask[]> {
-  const res = await fetch(`${getApiBaseUrl()}/absences/${absenceId}/affected-tasks`, {
+  const url = new URL(`${getApiBaseUrl()}/absences/${absenceId}/affected-tasks`);
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
@@ -928,9 +940,13 @@ export async function recordAbsenceNotification(
   }
 }
 
-export async function fetchAbsences(projectId: string): Promise<ApiAbsence[]> {
+export async function fetchAbsences(
+  projectId: string,
+  actorUserId: string,
+): Promise<ApiAbsence[]> {
   const url = new URL(`${getApiBaseUrl()}/absences`);
   url.searchParams.set("projectId", projectId);
+  url.searchParams.set("actorUserId", actorUserId);
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -939,9 +955,13 @@ export async function fetchAbsences(projectId: string): Promise<ApiAbsence[]> {
   return res.json() as Promise<ApiAbsence[]>;
 }
 
-export async function fetchAbsencesByUserId(userId: string): Promise<ApiAbsence[]> {
+export async function fetchAbsencesByUserId(
+  userId: string,
+  actorUserId: string,
+): Promise<ApiAbsence[]> {
   const url = new URL(`${getApiBaseUrl()}/absences`);
   url.searchParams.set("userId", userId);
+  url.searchParams.set("actorUserId", actorUserId);
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

@@ -16,7 +16,12 @@ export class AbsencesController {
 
   @Get()
   @ApiOperation({ summary: "Список отсутствий" })
-  @ApiQuery({ name: "projectId", required: false, description: "Только участники проекта + affectedTasks" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь" })
+  @ApiQuery({
+    name: "projectId",
+    required: false,
+    description: "Read-only проекция: отсутствия участников проекта",
+  })
   @ApiQuery({ name: "userId", required: false })
   @ApiQuery({ name: "type", required: false, enum: AbsenceType })
   @ApiQuery({ name: "status", required: false, enum: AbsenceStatus })
@@ -25,10 +30,9 @@ export class AbsencesController {
     required: false,
     description: "Если true — включить отменённые (CANCELLED) в список",
   })
-  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
   findAll(
+    @Query("actorUserId") actorUserId: string,
     @Query("projectId") projectId?: string,
-    @Query("actorUserId") actorUserId?: string,
     @Query("userId") userId?: string,
     @Query("type") type?: AbsenceType,
     @Query("status") status?: AbsenceStatus,
@@ -45,18 +49,18 @@ export class AbsencesController {
   }
 
   @Get(":id/affected-tasks")
-  @ApiOperation({ summary: "Задачи, затронутые отсутствием" })
+  @ApiOperation({ summary: "Задачи, затронутые отсутствием (до 20, membership-scoped)" })
   @ApiParam({ name: "id" })
+  @ApiQuery({ name: "actorUserId", required: true })
   @ApiQuery({
     name: "projectId",
     required: false,
-    description: "Ограничить задачами проекта",
+    description: "Ограничить задачами проекта (read projection)",
   })
-  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
   findAffectedTasks(
     @Param("id") id: string,
+    @Query("actorUserId") actorUserId: string,
     @Query("projectId") projectId?: string,
-    @Query("actorUserId") actorUserId?: string,
   ) {
     return this.absencesService.findAffectedTasks(id, projectId, actorUserId);
   }
@@ -74,24 +78,25 @@ export class AbsencesController {
   @Get(":id")
   @ApiOperation({ summary: "Отсутствие по id" })
   @ApiParam({ name: "id" })
+  @ApiQuery({ name: "actorUserId", required: true })
   @ApiQuery({
     name: "projectId",
     required: false,
-    description: "Если указан — вернуть affectedTasks для этого проекта",
+    description: "Read projection: affectedTasks только этого проекта",
   })
-  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
   findOne(
     @Param("id") id: string,
+    @Query("actorUserId") actorUserId: string,
     @Query("projectId") projectId?: string,
-    @Query("actorUserId") actorUserId?: string,
   ) {
     return this.absencesService.findOne(id, projectId, actorUserId);
   }
 
   @Post()
-  @ApiOperation({ summary: "Создать отсутствие (по умолчанию status APPROVED)" })
-  create(@Body() dto: CreateAbsenceDto) {
-    return this.absencesService.create(dto);
+  @ApiOperation({ summary: "Создать отсутствие (глобально на пользователя)" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Кто оформляет отсутствие" })
+  create(@Query("actorUserId") actorUserId: string, @Body() dto: CreateAbsenceDto) {
+    return this.absencesService.create(dto, actorUserId);
   }
 
   @Patch(":id/status")

@@ -1,8 +1,11 @@
 import type { Api } from "grammy";
 import {
+  formatAbsenceDelegationIntroShort,
+  formatCreateAbsenceSummaryMessage,
+} from "./absence-affected-tasks-format";
+import {
   createAbsence,
   createTaskTransfer,
-  fetchAbsenceAffectedTasks,
   fetchUsers,
   recordAbsenceNotification,
   type ApiAbsence,
@@ -11,7 +14,6 @@ import {
 import {
   absenceTypeLabelRu,
   buildDistributionResultMessage,
-  formatAbsenceImpactIntroMessage,
   toAbsenceDelegationTasks,
 } from "./absence-delegation-format";
 import { formatIsoDateRu } from "./parse-ru-date";
@@ -45,17 +47,25 @@ export function buildAbsenceTransferComment(
 
 export async function createAbsenceWithImpact(
   api: Api,
-  body: Parameters<typeof createAbsence>[0],
-  absenceUser: ApiUser,
-): Promise<ApiAbsence> {
-  const absence = await createAbsence(body);
-  let affectedTasks = absence.affectedTasks;
-  if (!affectedTasks?.length) {
-    affectedTasks = await fetchAbsenceAffectedTasks(absence.id);
-  }
+  params: {
+    actorUserId: string;
+    body: Parameters<typeof createAbsence>[1];
+    absenceUser: ApiUser;
+  },
+): Promise<{ absence: ApiAbsence; replyMessage: string }> {
+  const absence = await createAbsence(params.actorUserId, params.body);
+  const affectedTasks = absence.affectedTasks ?? [];
   const fullAbsence: ApiAbsence = { ...absence, affectedTasks };
-  await handleAbsenceImpact(api, fullAbsence, absenceUser);
-  return fullAbsence;
+
+  const forSelf = params.actorUserId === params.absenceUser.id;
+  const replyMessage = formatCreateAbsenceSummaryMessage(fullAbsence, {
+    forSelf,
+    employeeName: params.absenceUser.fullName,
+  });
+
+  await handleAbsenceImpact(api, fullAbsence, params.absenceUser);
+
+  return { absence: fullAbsence, replyMessage };
 }
 
 export async function handleAbsenceImpact(
@@ -69,12 +79,13 @@ export async function handleAbsenceImpact(
   const startRu = formatIsoDateRu(absence.startDate);
   const endRu = formatIsoDateRu(absence.endDate);
   const delegationTasks = toAbsenceDelegationTasks(affectedTasks);
+  const totalCount = absence.affectedTasksTotal ?? affectedTasks.length;
 
   if (absenceUser.telegramId) {
     await sendTelegramMessage(
       api,
       absenceUser.telegramId,
-      formatAbsenceImpactIntroMessage(absence.type, delegationTasks),
+      formatAbsenceDelegationIntroShort(totalCount),
     );
 
     const telegramNumeric = Number(absenceUser.telegramId);

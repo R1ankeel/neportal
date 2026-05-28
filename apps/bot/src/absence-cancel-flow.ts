@@ -76,9 +76,10 @@ export function absenceToCandidate(absence: ApiAbsence): AbsenceCandidate {
 
 export async function findCancellableAbsences(
   userId: string,
+  actorUserId: string,
   type?: "SICK_LEAVE" | "VACATION",
 ): Promise<ApiAbsence[]> {
-  const absences = await fetchAbsencesByUserId(userId);
+  const absences = await fetchAbsencesByUserId(userId, actorUserId);
   const filtered = absences.filter((a) => {
     if (a.status === "CANCELLED") return false;
     if (type && a.type !== type) return false;
@@ -143,7 +144,7 @@ export async function continueCancelAbsenceForUser(
   type?: "SICK_LEAVE" | "VACATION",
   cancellationReason?: string,
 ): Promise<void> {
-  const absences = await findCancellableAbsences(targetUser.id, type);
+  const absences = await findCancellableAbsences(targetUser.id, linked.id, type);
   const self = targetUser.id === linked.id;
 
   if (absences.length === 0) {

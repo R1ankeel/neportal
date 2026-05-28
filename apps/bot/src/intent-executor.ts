@@ -114,9 +114,16 @@ export async function executeResolvedIntent(
       if (!botApi) {
         return "Не удалось обработать отсутствие: бот недоступен.";
       }
-      await createAbsenceWithImpact(
-        botApi,
-        {
+      if (telegramUserId == null) {
+        return "Не удалось обработать отсутствие: пользователь не определён.";
+      }
+      const actor = await getLinkedUserByTelegramId(telegramUserId);
+      if (!actor) {
+        return "Сначала привяжите аккаунт через /start.";
+      }
+      const { replyMessage } = await createAbsenceWithImpact(botApi, {
+        actorUserId: actor.id,
+        body: {
           userId: resolved.user.id,
           type: resolved.type,
           startDate: resolved.startDate,
@@ -124,11 +131,9 @@ export async function executeResolvedIntent(
           documentNumber: resolved.documentNumber,
           status: "APPROVED",
         },
-        resolved.user,
-      );
-
-      const label = resolved.type === "SICK_LEAVE" ? "Больничный" : "Отпуск";
-      return `${label} добавлен для ${resolved.user.fullName}: с ${formatIsoDateRu(resolved.startDate)} по ${formatIsoDateRu(resolved.endDate)}.`;
+        absenceUser: resolved.user,
+      });
+      return replyMessage;
     }
 
     case "cancel_absence":

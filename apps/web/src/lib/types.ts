@@ -177,4 +177,7 @@ export type ApiAbsence = {
   comment: string | null;
   user: { id: string; fullName: string; role: string };
   affectedTasks: ApiAbsenceAffectedTask[];
+  affectedTasksTotal?: number;
+  affectedTasksTruncated?: boolean;
+  membershipProjectCount?: number;
 };
