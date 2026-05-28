@@ -16,9 +16,10 @@ export class ProjectsController {
   }
 
   @Post()
-  @ApiOperation({ summary: "Создать проект" })
-  create(@Body() dto: CreateProjectDto) {
-    return this.projectsService.create(dto);
+  @ApiOperation({ summary: "Создать проект (только OWNER)" })
+  @ApiQuery({ name: "actorUserId", required: true })
+  create(@Query("actorUserId") actorUserId: string, @Body() dto: CreateProjectDto) {
+    return this.projectsService.create(dto, actorUserId);
   }
 
   @Get(":id/summary")

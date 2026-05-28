@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
+import { CreateProjectForm } from "@/components/projects/CreateProjectForm";
 import { apiGet } from "@/lib/api";
 import { pickDefaultActorUserId, readActorUserIdFromSearchParams, withActorQuery } from "@/lib/actor-user";
 import type { ApiProject, ApiUser } from "@/lib/types";
@@ -31,6 +32,9 @@ export default async function ProjectsPage({
     redirect(`/projects?actorUserId=${encodeURIComponent(defaultActor)}`);
   }
 
+  const actorUser = users.find((u) => u.id === actorUserId);
+  const isOwner = actorUser?.role === "OWNER";
+
   let projects: ApiProject[] = [];
   let error: string | null = null;
   try {
@@ -55,10 +59,14 @@ export default async function ProjectsPage({
         </p>
       ) : null}
 
+      {isOwner ? <CreateProjectForm actorUserId={actorUserId} /> : null}
+
       <ul className="space-y-3">
         {projects.length === 0 && !error ? (
           <li className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-lg text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-            Проектов пока нет
+            {isOwner
+              ? "Проектов пока нет. Создайте первый проект с помощью формы выше."
+              : "Вас ещё не добавили ни в один проект. Обратитесь к владельцу организации."}
           </li>
         ) : (
           projects.map((p) => (

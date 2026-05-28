@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 const tabDefs = [
   { suffix: "", label: "Обзор" },
   { suffix: "/tasks", label: "Задачи" },
+  { suffix: "/members", label: "Участники" },
   { suffix: "/notes", label: "Заметки" },
   { suffix: "/budgets", label: "Бюджеты" },
   { suffix: "/absences", label: "Отсутствия" },

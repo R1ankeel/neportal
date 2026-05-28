@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
-import { AbsenceStatus, TaskStatus } from "@neportal/database";
+import { AbsenceStatus, EntityStatus, ProjectRole, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 import { ProjectAccessService } from "./project-access.service";
 import { CreateProjectDto } from "./dto/create-project.dto";
@@ -138,23 +138,39 @@ export class ProjectsService {
     };
   }
 
-  async create(dto: CreateProjectDto) {
-    const creator = await this.prisma.user.findFirst({
-      where: { id: dto.createdById, organizationId: this.orgId() },
-    });
-    if (!creator) {
-      throw new NotFoundException(`User with id "${dto.createdById}" not found in this organization`);
+  async create(dto: CreateProjectDto, actorUserId?: string) {
+    const actor = await this.projectAccess.assertActorIsOwner(
+      this.projectAccess.requireActorId(actorUserId),
+    );
+
+    const legacyCreatedById = dto.createdById?.trim();
+    if (legacyCreatedById && legacyCreatedById !== actor.id) {
+      throw new BadRequestException("createdById must match actorUserId");
     }
 
-    return this.prisma.project.create({
-      data: {
-        organizationId: this.orgId(),
-        name: dto.name,
-        description: dto.description,
-        createdById: dto.createdById,
-        status: dto.status ?? undefined,
-      },
-      include: { createdBy: { select: { id: true, fullName: true, email: true } } },
+    const org = this.orgId();
+
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          organizationId: org,
+          name: dto.name.trim(),
+          description: dto.description?.trim() || null,
+          createdById: actor.id,
+          status: EntityStatus.ACTIVE,
+        },
+        include: { createdBy: { select: { id: true, fullName: true, email: true } } },
+      });
+
+      await tx.projectMember.create({
+        data: {
+          projectId: project.id,
+          userId: actor.id,
+          role: ProjectRole.MANAGER,
+        },
+      });
+
+      return project;
     });
   }
 }

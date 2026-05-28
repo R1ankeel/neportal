@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { EntityStatus, PrismaService, UserRole } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 
@@ -191,6 +196,45 @@ export class ProjectAccessService {
   }
 
   /** Project ids for filtering pending expenses (ACTIVE only). */
+  async assertActorIsOwner(actorUserId: string) {
+    const actor = await this.getActorOrThrow(actorUserId);
+    if (!this.isOwner(actor.role)) {
+      throw new ForbiddenException("Only OWNER can perform this action");
+    }
+    return actor;
+  }
+
+  /**
+   * OWNER: any ACTIVE project in org.
+   * MANAGER: only if ProjectMember on ACTIVE project.
+   */
+  async assertActorCanManageProjectMembers(actorUserId: string, projectId: string) {
+    const actor = await this.getActorOrThrow(actorUserId);
+    const project = await this.assertActorCanAccessActiveProject(actorUserId, projectId);
+
+    if (this.isOwner(actor.role)) {
+      return { actor, project };
+    }
+
+    if (this.isManager(actor.role)) {
+      const membership = await this.prisma.projectMember.findFirst({
+        where: { projectId: project.id, userId: actor.id },
+      });
+      if (membership) {
+        return { actor, project };
+      }
+    }
+
+    const membership = await this.prisma.projectMember.findFirst({
+      where: { projectId: project.id, userId: actor.id },
+    });
+    if (membership) {
+      throw new ForbiddenException("You cannot manage project members");
+    }
+
+    throw new NotFoundException(`Project with id "${projectId}" not found`);
+  }
+
   async getPendingExpenseProjectIds(actorUserId: string, targetUserId: string): Promise<string[]> {
     const actor = await this.getActorOrThrow(actorUserId);
     await this.assertActorCanViewPendingForUser(actorUserId, targetUserId);

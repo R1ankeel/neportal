@@ -19,6 +19,15 @@ export type ApiProject = {
   createdBy?: { id: string; fullName: string; email: string | null };
 };
 
+export type ApiProjectMember = {
+  id: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+  alreadyMember?: boolean;
+  user: { id: string; fullName: string; email: string | null; role: string };
+};
+
 export type ApiTaskUser = {
   id: string;
   fullName: string;

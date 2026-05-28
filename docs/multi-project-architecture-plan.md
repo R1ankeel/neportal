@@ -179,21 +179,16 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Готовность**:
   - доступ централизован, базовая видимость проектов работает
 
-### Этап 4 — API/Web для создания проектов и ProjectMember
-- **Цель**: создать полный Web-флоу: OWNER создаёт проект, управление участниками через Web.
-- **Модули/файлы**:
-  - API: `apps/api/src/projects/*` (POST /projects + members endpoints)
-  - Web: `/projects`, `/projects/[id]/*` (UI создания проекта + UI участников)
-- **Изменения**:
-  - создание проекта: только OWNER, только Web
-  - CRUD по ProjectMember для OWNER (и MANAGER, если разрешено)
-- **Проверки**:
-  - нельзя создать проект не-OWNER
-  - нельзя добавить пользователя из другой org
-- **Риски**:
-  - необходимость idempotency и аккуратных ошибок
-- **Готовность**:
-  - Web умеет создавать проект и управлять участниками
+### Этап 4 — API/Web для создания проектов и ProjectMember ✅ (реализован)
+- **Цель**: Web-флоу: OWNER создаёт проект; управление участниками.
+- **API**:
+  - `POST /projects?actorUserId=` — только OWNER; `createdById = actor`; транзакция + `ProjectMember(MANAGER)` для создателя; legacy `createdById` в body ≠ actor → 400
+  - `GET/POST/DELETE /projects/:id/members` — list/add (idempotent 200 + `alreadyMember`) / remove
+  - PATCH/archive проекта — **не в Stage 4**
+- **Права members**: OWNER — все ACTIVE; MANAGER — только где member (add/remove с ограничениями на delete); ACCOUNTANT/EMPLOYEE — read only
+- **MANAGER delete**: нельзя self, org-OWNER, `createdById`, последнего member
+- **Web**: `CreateProjectForm` (OWNER), вкладка «Участники», `ProjectMembersPanel`
+- **Не делали**: backfill старых проектов без members; Bot/AI/Notes/Absences
 
 ### Этап 5 — AI contracts minimal projectHint
 - **Цель**: научить AI возвращать `projectHint` в проектных intent’ах.
