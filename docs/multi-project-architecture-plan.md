@@ -159,17 +159,21 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Готовность**:
   - приватность notes соблюдена, UX не зависит от проектов
 
-### Этап 3 — ProjectAccessService + actorUserId + фильтрация проектов
+### Этап 3 — ProjectAccessService + actorUserId + фильтрация проектов ✅ (реализован)
 - **Цель**: централизовать доступ и включить actor-based фильтрацию.
 - **Модули/файлы**:
-  - API: `apps/api/src/projects/*` (ProjectAccessService)
+  - API: `apps/api/src/projects/project-access.service.ts`, `projects/*`
   - интеграция в `tasks`, `budgets`, `budget-expenses`, `absences` (project views)
+  - Web: `/projects?actorUserId=...`, project tabs сохраняют query, `ProjectPageShell`
+  - Bot: `fetchProjects` / `fetchTasks` / `fetchBudgets` / `fetchPendingExpenses` с `actorUserId`
 - **Изменения**:
-  - `ProjectAccessService` становится единой точкой проверок
-  - `GET /projects` фильтруется по actor (OWNER vs ProjectMember)
-  - ввод `actorUserId` в project-scoped операции
-- **Проверки**:
-  - non-OWNER не видит чужие проекты
+  - `ProjectAccessService`: OWNER → все ACTIVE проекты org; иначе → ACTIVE + `ProjectMember`
+  - 404 (не 403) при отсутствии доступа / не найден
+  - `actorUserId` обязателен на read: `GET /projects`, `GET /projects/:id`, summary, tasks, budgets, budget detail/expenses list, `/budget-expenses/pending`
+  - Absences: при `projectId` в query — `actorUserId` обязателен, project gate
+  - `/budget-expenses/pending`: OWNER — чужие pending по всем ACTIVE; MANAGER — только по shared projects; свои — в accessible ACTIVE projects
+  - BudgetAccess на Stage 3 не переписывали
+- **Проверки** (ручные): два пользователя, разные ProjectMember → списки и 404 на cross-access
 - **Риски**:
   - MVP без auth → важно единообразно передавать actorUserId из Web/Bot
 - **Готовность**:

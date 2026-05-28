@@ -1,28 +1,60 @@
+import { redirect } from "next/navigation";
+import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
 import { TaskTitleCell } from "@/components/TaskTitleCell";
 import { apiGet } from "@/lib/api";
+import {
+  pickDefaultActorUserId,
+  readActorUserIdFromSearchParams,
+} from "@/lib/actor-user";
 import { formatDate, taskStatusLabel } from "@/lib/format";
-import type { ApiTask } from "@/lib/types";
+import type { ApiTask, ApiUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function TasksPage() {
+export default async function TasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const users = await apiGet<ApiUser[]>("/users");
+  const defaultActor = pickDefaultActorUserId(users);
+  if (!defaultActor) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <h1 className="text-3xl font-semibold md:text-4xl">Задачи</h1>
+        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          Нет пользователей.
+        </p>
+      </div>
+    );
+  }
+
+  const actorUserId = readActorUserIdFromSearchParams(sp);
+  if (!actorUserId) {
+    redirect(`/tasks?actorUserId=${encodeURIComponent(defaultActor)}`);
+  }
+
   let tasks: ApiTask[] = [];
   let error: string | null = null;
   try {
-    tasks = await apiGet<ApiTask[]>("/tasks");
+    tasks = await apiGet<ApiTask[]>("/tasks", { actorUserId });
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header>
+      <header className="space-y-3">
         <h1 className="text-3xl font-semibold md:text-4xl">Задачи</h1>
-        <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">Статус, исполнитель, дедлайн</p>
+        <p className="text-lg text-zinc-600 dark:text-zinc-400">Статус, исполнитель, дедлайн</p>
+        <ActorUserSelector users={users} actorUserId={actorUserId} />
       </header>
 
       {error ? (
-        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">{error}</p>
+        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          {error}
+        </p>
       ) : null}
 
       <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -46,7 +78,7 @@ export default async function TasksPage() {
               tasks.map((t) => (
                 <tr key={t.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800">
                   <td className="px-4 py-4 align-top">
-                    <TaskTitleCell task={t} />
+                    <TaskTitleCell task={t} actorUserId={actorUserId} />
                     <div className="mt-1 text-sm text-zinc-500 sm:hidden">
                       {taskStatusLabel(t.status)}
                       {t.assignee ? ` · ${t.assignee.fullName}` : ""}
@@ -60,7 +92,9 @@ export default async function TasksPage() {
                   <td className="hidden px-4 py-4 align-top text-zinc-700 dark:text-zinc-300 md:table-cell">
                     {t.assignee?.fullName ?? "—"}
                   </td>
-                  <td className="px-4 py-4 align-top text-zinc-700 dark:text-zinc-300">{formatDate(t.deadlineAt)}</td>
+                  <td className="px-4 py-4 align-top text-zinc-700 dark:text-zinc-300">
+                    {formatDate(t.deadlineAt)}
+                  </td>
                 </tr>
               ))
             )}

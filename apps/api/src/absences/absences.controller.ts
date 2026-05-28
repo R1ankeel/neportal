@@ -25,8 +25,10 @@ export class AbsencesController {
     required: false,
     description: "Если true — включить отменённые (CANCELLED) в список",
   })
+  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
   findAll(
     @Query("projectId") projectId?: string,
+    @Query("actorUserId") actorUserId?: string,
     @Query("userId") userId?: string,
     @Query("type") type?: AbsenceType,
     @Query("status") status?: AbsenceStatus,
@@ -34,6 +36,7 @@ export class AbsencesController {
   ) {
     return this.absencesService.findAll({
       projectId,
+      actorUserId,
       userId,
       type,
       status,
@@ -49,11 +52,13 @@ export class AbsencesController {
     required: false,
     description: "Ограничить задачами проекта",
   })
+  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
   findAffectedTasks(
     @Param("id") id: string,
     @Query("projectId") projectId?: string,
+    @Query("actorUserId") actorUserId?: string,
   ) {
-    return this.absencesService.findAffectedTasks(id, projectId);
+    return this.absencesService.findAffectedTasks(id, projectId, actorUserId);
   }
 
   @Post(":id/notifications")
@@ -74,8 +79,13 @@ export class AbsencesController {
     required: false,
     description: "Если указан — вернуть affectedTasks для этого проекта",
   })
-  findOne(@Param("id") id: string, @Query("projectId") projectId?: string) {
-    return this.absencesService.findOne(id, projectId);
+  @ApiQuery({ name: "actorUserId", required: false, description: "Обязателен при projectId" })
+  findOne(
+    @Param("id") id: string,
+    @Query("projectId") projectId?: string,
+    @Query("actorUserId") actorUserId?: string,
+  ) {
+    return this.absencesService.findOne(id, projectId, actorUserId);
   }
 
   @Post()

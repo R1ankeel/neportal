@@ -134,8 +134,14 @@ export function findUserByNameHint(
   return resolveUsersByHint(users, hint, currentUser ?? null);
 }
 
-export async function fetchProjects(): Promise<ApiProject[]> {
-  const res = await fetch(`${getApiBaseUrl()}/projects`, {
+export function pickDefaultActorUserId(users: ApiUser[]): string | null {
+  return users.find((u) => u.role === "OWNER")?.id ?? users[0]?.id ?? null;
+}
+
+export async function fetchProjects(actorUserId: string): Promise<ApiProject[]> {
+  const url = new URL(`${getApiBaseUrl()}/projects`);
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
@@ -158,8 +164,13 @@ export function pickDefaultProject(projects: ApiProject[]): ApiProject | null {
   return preferred ?? projects[0];
 }
 
-export async function fetchBudgets(projectId: string, userId?: string): Promise<ApiBudget[]> {
+export async function fetchBudgets(
+  projectId: string,
+  actorUserId: string,
+  userId?: string,
+): Promise<ApiBudget[]> {
   const url = new URL(`${getApiBaseUrl()}/budgets`);
+  url.searchParams.set("actorUserId", actorUserId);
   url.searchParams.set("projectId", projectId);
   url.searchParams.set("status", "ACTIVE");
   if (userId) url.searchParams.set("userId", userId);
@@ -302,10 +313,12 @@ export type ApiPendingExpense = {
 };
 
 export async function fetchPendingExpenses(
+  actorUserId: string,
   userId: string,
   limit = 10,
 ): Promise<ApiPendingExpense[]> {
   const url = new URL(`${getApiBaseUrl()}/budget-expenses/pending`);
+  url.searchParams.set("actorUserId", actorUserId);
   url.searchParams.set("userId", userId);
   url.searchParams.set("limit", String(limit));
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
@@ -410,8 +423,9 @@ export type OverdueNotificationItem = DeadlineTomorrowNotificationItem & {
   notifyCreator: boolean;
 };
 
-export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
+export async function fetchTasks(actorUserId: string, projectId?: string): Promise<ApiTask[]> {
   const url = new URL(`${getApiBaseUrl()}/tasks`);
+  url.searchParams.set("actorUserId", actorUserId);
   if (projectId) url.searchParams.set("projectId", projectId);
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) {
@@ -421,8 +435,13 @@ export async function fetchTasks(projectId?: string): Promise<ApiTask[]> {
   return res.json() as Promise<ApiTask[]>;
 }
 
-export async function fetchTaskById(taskId: string): Promise<ApiTaskDetail | null> {
-  const res = await fetch(`${getApiBaseUrl()}/tasks/${encodeURIComponent(taskId)}`, {
+export async function fetchTaskById(
+  taskId: string,
+  actorUserId: string,
+): Promise<ApiTaskDetail | null> {
+  const url = new URL(`${getApiBaseUrl()}/tasks/${encodeURIComponent(taskId)}`);
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
   });
   if (res.status === 404) return null;

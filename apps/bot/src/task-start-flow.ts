@@ -60,7 +60,7 @@ export async function executeStartTask(
   currentUser: ApiUser,
   resolved: ResolvedStartTask,
 ): Promise<string> {
-  const tasks = await fetchTasks();
+  const tasks = await fetchTasks(currentUser.id);
   const task = tasks.find((t) => t.id === resolved.taskId);
   if (!task) {
     return "Задача не найдена.";

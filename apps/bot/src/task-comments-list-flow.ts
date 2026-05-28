@@ -73,8 +73,8 @@ export async function replyWithTaskComments(
   await ctx.reply(reply);
 }
 
-async function findTaskById(taskId: string): Promise<ApiTask | null> {
-  const tasks = await fetchTasks();
+async function findTaskById(taskId: string, actorUserId: string): Promise<ApiTask | null> {
+  const tasks = await fetchTasks(actorUserId);
   return tasks.find((t) => t.id === taskId) ?? null;
 }
 
@@ -89,7 +89,7 @@ export async function replyWithTaskCommentsForHint(
   const trimmedHint = hint.trim();
 
   if (taskId) {
-    const task = await findTaskById(taskId);
+    const task = await findTaskById(taskId, currentUser.id);
     if (!task) {
       await ctx.reply("Задача не найдена.");
       return;

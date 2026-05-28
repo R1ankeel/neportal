@@ -6,9 +6,16 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { BudgetExpenseStatus, BudgetStatus, PrismaService, UserRole } from "@neportal/database";
+import {
+  BudgetExpenseStatus,
+  BudgetStatus,
+  EntityStatus,
+  PrismaService,
+  UserRole,
+} from "@neportal/database";
 import { BudgetsService } from "../budgets/budgets.service";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { ProjectAccessService } from "../projects/project-access.service";
 import { CreateBudgetExpenseAttachmentDto } from "./dto/create-budget-expense-attachment.dto";
 import { ReceiptStorageService } from "./receipt-storage.service";
 
@@ -41,6 +48,7 @@ export class BudgetExpensesService {
     private readonly organization: OrganizationContextService,
     private readonly budgetsService: BudgetsService,
     private readonly receiptStorage: ReceiptStorageService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private orgId() {
@@ -51,13 +59,14 @@ export class BudgetExpensesService {
     return role === UserRole.OWNER || role === UserRole.MANAGER;
   }
 
-  async listPending(userId: string, limit = 10) {
+  async listPending(actorUserId: string, userId: string, limit = 10) {
     const org = this.orgId();
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId, organizationId: org },
-    });
-    if (!user) {
-      throw new NotFoundException(`User with id "${userId}" not found in this organization`);
+    const projectIds = await this.projectAccess.getPendingExpenseProjectIds(
+      this.projectAccess.requireActorId(actorUserId),
+      userId,
+    );
+    if (projectIds.length === 0) {
+      return [];
     }
 
     const take = Math.min(Math.max(1, limit), 20);
@@ -67,7 +76,11 @@ export class BudgetExpensesService {
         organizationId: org,
         userId,
         status: BudgetExpenseStatus.PENDING_RECEIPT,
-        budget: { status: BudgetStatus.ACTIVE },
+        budget: {
+          status: BudgetStatus.ACTIVE,
+          projectId: { in: projectIds },
+          project: { status: EntityStatus.ACTIVE },
+        },
       },
       orderBy: { createdAt: "desc" },
       take,

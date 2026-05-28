@@ -1,8 +1,8 @@
 import {
   fetchMyTasks,
   fetchProjects,
-  fetchTasks,
   fetchUsers,
+  pickDefaultActorUserId,
   type ApiProject,
   type ApiUser,
 } from "./api";
@@ -57,17 +57,7 @@ async function loadActiveTasks(
       }));
   }
 
-  const allTasks = await fetchTasks();
-  return allTasks
-    .filter((t) => isActiveTaskStatus(t.status))
-    .slice(0, MAX_TASKS_IN_CONTEXT)
-    .map((task) => ({
-      title: task.title,
-      projectName:
-        task.project?.name ??
-        (task.project?.id ? projectNameById.get(task.project.id) : undefined) ??
-        "—",
-    }));
+  return [];
 }
 
 function normalizeForTaskFilter(text: string): string {
@@ -138,11 +128,15 @@ export async function loadIntentPromptContext(
   switch (group) {
     case "create-task-rich":
     case "create-note": {
-      const [projects, users] = await Promise.all([fetchProjects(), fetchUsers()]);
+      const users = await fetchUsers();
+      const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
+      const projects = actorId ? await fetchProjects(actorId) : [];
       return { ...empty, projects, users };
     }
     case "expense": {
-      const projects = await fetchProjects();
+      const users = await fetchUsers();
+      const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
+      const projects = actorId ? await fetchProjects(actorId) : [];
       const { rows: budgets } = await loadPromptBudgetContext(projects, {
         linkedUserId: options?.linkedUserId,
       });
@@ -154,7 +148,9 @@ export async function loadIntentPromptContext(
       return { ...empty, users };
     }
     case "task-status": {
-      const projects = await fetchProjects();
+      const users = await fetchUsers();
+      const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
+      const projects = actorId ? await fetchProjects(actorId) : [];
       const tasks = await loadActiveTasks(options?.linkedUserId, projects);
       return {
         ...empty,
@@ -162,7 +158,9 @@ export async function loadIntentPromptContext(
       };
     }
     case "collaboration": {
-      const [projects, users] = await Promise.all([fetchProjects(), fetchUsers()]);
+      const users = await fetchUsers();
+      const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
+      const projects = actorId ? await fetchProjects(actorId) : [];
       const tasks = await loadActiveTasks(options?.linkedUserId, projects);
       return {
         ...empty,

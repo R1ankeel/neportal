@@ -11,6 +11,7 @@ import {
   UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { ProjectAccessService } from "../projects/project-access.service";
 import { computeBudgetTotals } from "./budget-totals";
 import { ArchiveBudgetDto } from "./dto/archive-budget.dto";
 import { CreateBudgetExpenseDto } from "./dto/create-budget-expense.dto";
@@ -44,6 +45,7 @@ export class BudgetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private orgId() {
@@ -55,19 +57,23 @@ export class BudgetsService {
   }
 
   async findAll(options: {
+    actorUserId?: string;
     projectId?: string;
     status?: BudgetStatus;
     includeArchived?: boolean;
     userId?: string;
   }) {
     const org = this.orgId();
+    const actorId = this.projectAccess.requireActorId(options.actorUserId);
 
+    let projectIds: string[];
     if (options.projectId) {
-      const project = await this.prisma.project.findFirst({
-        where: { id: options.projectId, organizationId: org },
-      });
-      if (!project) {
-        throw new NotFoundException(`Project with id "${options.projectId}" not found`);
+      await this.projectAccess.assertActorCanAccessActiveProject(actorId, options.projectId);
+      projectIds = [options.projectId];
+    } else {
+      projectIds = await this.projectAccess.getAccessibleActiveProjectIds(actorId);
+      if (projectIds.length === 0) {
+        return [];
       }
     }
 
@@ -80,13 +86,13 @@ export class BudgetsService {
 
     const where: {
       organizationId: string;
-      projectId?: string;
+      projectId: { in: string[] };
       status: BudgetStatus | { in: BudgetStatus[] };
       OR?: Array<{ access: { some: { userId: string } } }>;
     } = {
       organizationId: org,
       status: statusFilter,
-      ...(options.projectId ? { projectId: options.projectId } : {}),
+      projectId: { in: projectIds },
     };
 
     if (options.userId) {
@@ -120,7 +126,11 @@ export class BudgetsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actorUserId?: string) {
+    await this.projectAccess.assertActorCanAccessBudget(
+      this.projectAccess.requireActorId(actorUserId),
+      id,
+    );
     const budget = await this.prisma.budget.findFirst({
       where: { id, organizationId: this.orgId() },
       include: {
@@ -292,7 +302,11 @@ export class BudgetsService {
     };
   }
 
-  async listExpenses(budgetId: string) {
+  async listExpenses(budgetId: string, actorUserId?: string) {
+    await this.projectAccess.assertActorCanAccessBudget(
+      this.projectAccess.requireActorId(actorUserId),
+      budgetId,
+    );
     await this.ensureBudgetInOrg(budgetId);
 
     return this.prisma.budgetExpense.findMany({

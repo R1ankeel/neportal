@@ -33,7 +33,7 @@ export async function handleTaskNotificationCallback(ctx: Context): Promise<bool
 
   let task;
   try {
-    task = await fetchTaskById(parsed.taskId);
+    task = await fetchTaskById(parsed.taskId, linked.id);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] fetchTaskById error: ${msg}`);

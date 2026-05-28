@@ -6,7 +6,14 @@ import { TaskCommentEditor } from "./TaskCommentEditor";
 import { TaskDeadlineEditor } from "./TaskDeadlineEditor";
 import { TaskDescriptionEditor } from "./TaskDescriptionEditor";
 import { TaskTitleEditor } from "./TaskTitleEditor";
+import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
 import { apiGet } from "@/lib/api";
+import {
+  pickDefaultActorUserId,
+  readActorUserIdFromSearchParams,
+  withActorQuery,
+} from "@/lib/actor-user";
+import { redirect } from "next/navigation";
 import {
   formatDateTime,
   taskStatusLabel,
@@ -17,14 +24,33 @@ import { findWebAuthor } from "@/lib/webAuthor";
 
 export const dynamic = "force-dynamic";
 
-export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TaskDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const users = await apiGet<ApiUser[]>("/users");
+  const defaultActor = pickDefaultActorUserId(users);
+  if (!defaultActor) {
+    return (
+      <div className="mx-auto max-w-3xl p-6 text-lg text-amber-900 dark:text-amber-100">
+        Нет пользователей.
+      </div>
+    );
+  }
+  const actorUserId = readActorUserIdFromSearchParams(sp);
+  if (!actorUserId) {
+    redirect(`/tasks/${id}?actorUserId=${encodeURIComponent(defaultActor)}`);
+  }
 
   let task: ApiTask;
-  let users: ApiUser[];
 
   try {
-    [task, users] = await Promise.all([apiGet<ApiTask>(`/tasks/${id}`), apiGet<ApiUser[]>("/users")]);
+    task = await apiGet<ApiTask>(`/tasks/${id}`, { actorUserId });
   } catch {
     notFound();
   }
@@ -35,9 +61,13 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
+      <ActorUserSelector users={users} actorUserId={actorUserId} />
       <nav className="text-base text-zinc-500 dark:text-zinc-400">
         {task.project ? (
-          <Link href={`/projects/${task.project.id}/tasks`} className="hover:underline">
+          <Link
+            href={withActorQuery(`/projects/${task.project.id}/tasks`, actorUserId)}
+            className="hover:underline"
+          >
             ← {task.project.name}
           </Link>
         ) : (

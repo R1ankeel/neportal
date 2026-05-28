@@ -67,7 +67,7 @@ export async function showPendingExpenses(
   telegramUserId: number,
   limit = 10,
 ): Promise<void> {
-  const expenses = await fetchPendingExpenses(currentUser.id, limit);
+  const expenses = await fetchPendingExpenses(currentUser.id, currentUser.id, limit);
 
   if (expenses.length === 0) {
     await ctx.reply("У вас нет неподтверждённых расходов.");

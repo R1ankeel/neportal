@@ -33,7 +33,7 @@ export async function confirmCreateTaskWithAssigneeId(
   pending: PendingCreateTaskAssignee,
   assigneeId: string,
 ): Promise<void> {
-  const projects = await fetchProjects();
+  const projects = await fetchProjects(pending.creatorId);
   const project = findProjectByHint(projects, pending.projectHint);
   if (!project) {
     await ctx.reply("Нет проектов. Сначала создайте проект в Web.");

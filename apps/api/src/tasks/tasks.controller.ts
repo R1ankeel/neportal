@@ -22,9 +22,13 @@ export class TasksController {
 
   @Get()
   @ApiOperation({ summary: "Список задач" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
   @ApiQuery({ name: "projectId", required: false, description: "Фильтр по проекту" })
-  findAll(@Query("projectId") projectId?: string) {
-    return this.tasksService.findAll(projectId);
+  findAll(
+    @Query("actorUserId") actorUserId?: string,
+    @Query("projectId") projectId?: string,
+  ) {
+    return this.tasksService.findAll(actorUserId, projectId);
   }
 
   @Post()
@@ -95,8 +99,9 @@ export class TasksController {
   @Get(":id")
   @ApiOperation({ summary: "Задача по id с комментариями" })
   @ApiParam({ name: "id" })
-  findOne(@Param("id") id: string) {
-    return this.tasksService.findOne(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  findOne(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.tasksService.findOne(id, actorUserId);
   }
 
   @Get(":id/comments")

@@ -205,8 +205,11 @@ export async function resolveIntent(
     return { ok: false, message: NOT_LINKED_MESSAGE };
   }
 
-  const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
   const currentUser = linkedUser;
+  const [users, projects] = await Promise.all([
+    fetchUsers(),
+    fetchProjects(currentUser.id),
+  ]);
 
   switch (intent.intent) {
     case "create_task": {
@@ -288,7 +291,7 @@ export async function resolveIntent(
         return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
       }
 
-      const budgets = await fetchBudgets(project.id, userId);
+      const budgets = await fetchBudgets(project.id, currentUser.id, userId);
       const budgetResult = resolveBudgetForExpense({
         budgets,
         budgetHint: intent.payload.budgetHint,

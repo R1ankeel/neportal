@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { ProjectsService } from "./projects.service";
 
@@ -9,9 +9,10 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Get()
-  @ApiOperation({ summary: "Список проектов" })
-  findAll() {
-    return this.projectsService.findAll();
+  @ApiOperation({ summary: "Список проектов (ACTIVE, доступные актору)" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  findAll(@Query("actorUserId") actorUserId?: string) {
+    return this.projectsService.findAll(actorUserId);
   }
 
   @Post()
@@ -23,14 +24,16 @@ export class ProjectsController {
   @Get(":id/summary")
   @ApiOperation({ summary: "Сводка по проекту (задачи, бюджеты)" })
   @ApiParam({ name: "id" })
-  getSummary(@Param("id") id: string) {
-    return this.projectsService.getSummary(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  getSummary(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.projectsService.getSummary(id, actorUserId);
   }
 
   @Get(":id")
-  @ApiOperation({ summary: "Проект по id" })
+  @ApiOperation({ summary: "Проект по id (ACTIVE)" })
   @ApiParam({ name: "id" })
-  findOne(@Param("id") id: string) {
-    return this.projectsService.findOne(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  findOne(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.projectsService.findOne(id, actorUserId);
   }
 }

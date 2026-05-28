@@ -1,27 +1,58 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
 import { apiGet } from "@/lib/api";
-import type { ApiProject } from "@/lib/types";
+import { pickDefaultActorUserId, readActorUserIdFromSearchParams, withActorQuery } from "@/lib/actor-user";
+import type { ApiProject, ApiUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const users = await apiGet<ApiUser[]>("/users");
+  const defaultActor = pickDefaultActorUserId(users);
+  if (!defaultActor) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <h1 className="text-3xl font-semibold md:text-4xl">Проекты</h1>
+        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          Нет пользователей. Сначала создайте сотрудника.
+        </p>
+      </div>
+    );
+  }
+
+  const actorUserId = readActorUserIdFromSearchParams(sp);
+  if (!actorUserId) {
+    redirect(`/projects?actorUserId=${encodeURIComponent(defaultActor)}`);
+  }
+
   let projects: ApiProject[] = [];
   let error: string | null = null;
   try {
-    projects = await apiGet<ApiProject[]>("/projects");
+    projects = await apiGet<ApiProject[]>("/projects", { actorUserId });
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header>
+      <header className="space-y-3">
         <h1 className="text-3xl font-semibold md:text-4xl">Проекты</h1>
-        <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">Выберите проект — внутри задачи, бюджеты и заметки</p>
+        <p className="text-lg text-zinc-600 dark:text-zinc-400">
+          Выберите проект — внутри задачи, бюджеты и отсутствия
+        </p>
+        <ActorUserSelector users={users} actorUserId={actorUserId} />
       </header>
 
       {error ? (
-        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">{error}</p>
+        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          {error}
+        </p>
       ) : null}
 
       <ul className="space-y-3">
@@ -33,7 +64,7 @@ export default async function ProjectsPage() {
           projects.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/projects/${p.id}`}
+                href={withActorQuery(`/projects/${p.id}`, actorUserId)}
                 className="block rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -48,7 +79,9 @@ export default async function ProjectsPage() {
                   </span>
                 </div>
                 {p.createdBy ? (
-                  <p className="mt-3 text-base text-zinc-500 dark:text-zinc-400">Создал: {p.createdBy.fullName}</p>
+                  <p className="mt-3 text-base text-zinc-500 dark:text-zinc-400">
+                    Создал: {p.createdBy.fullName}
+                  </p>
                 ) : null}
               </Link>
             </li>

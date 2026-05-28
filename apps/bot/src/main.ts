@@ -323,7 +323,10 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
     const currentUser = await requireLinkedUser(ctx);
     if (!currentUser) return;
 
-    const [users, projects] = await Promise.all([fetchUsers(), fetchProjects()]);
+    const [users, projects] = await Promise.all([
+      fetchUsers(),
+      fetchProjects(currentUser.id),
+    ]);
     const creatorId = currentUser.id;
     const assigneeId = pickAssigneeId(users);
 
@@ -403,7 +406,7 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
     const currentUser = await requireLinkedUser(ctx);
     if (!currentUser) return;
 
-    const projects = await fetchProjects();
+    const projects = await fetchProjects(currentUser.id);
 
     const project = pickDefaultProject(projects);
     if (!project) {

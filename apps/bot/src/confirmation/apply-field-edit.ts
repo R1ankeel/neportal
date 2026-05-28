@@ -11,7 +11,7 @@ import {
 } from "../parse-ru-date";
 import { parseBudgetReceiptEdit } from "../parse-budget-receipt-edit";
 import { isSelfHint, SELF_HINT_MARKER } from "../resolve-users-by-hint";
-import { fetchProjects } from "../api";
+import { fetchProjects, fetchUsers, pickDefaultActorUserId } from "../api";
 
 export type ApplyFieldEditResult =
   | { ok: true; intent: AiIntent }
@@ -359,7 +359,12 @@ export async function applyFieldEdit(
     }
 
     case "project": {
-      const projects = await fetchProjects();
+      const users = await fetchUsers();
+      const actorId = pickDefaultActorUserId(users);
+      if (!actorId) {
+        return { ok: false, message: "Нет пользователей в системе." };
+      }
+      const projects = await fetchProjects(actorId);
       const project = findProjectByHint(projects, value);
       if (!project) {
         return { ok: false, message: "Проект не найден. Укажите название из списка проектов." };

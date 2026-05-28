@@ -70,7 +70,7 @@ export async function resolveCreateExpense(
   },
   projects?: ApiProject[],
 ): Promise<ResolveCreateExpenseResult> {
-  const projectList = projects ?? (await fetchProjects());
+  const projectList = projects ?? (await fetchProjects(currentUser.id));
   const project = findProjectByHint(projectList, params.projectHint);
   if (!project) {
     return { kind: "error", message: "Нет проектов. Сначала создайте проект в Web." };

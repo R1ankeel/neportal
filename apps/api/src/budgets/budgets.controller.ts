@@ -14,17 +14,20 @@ export class BudgetsController {
 
   @Get()
   @ApiOperation({ summary: "Список бюджетов" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
   @ApiQuery({ name: "projectId", required: false })
   @ApiQuery({ name: "status", required: false, enum: BudgetStatus })
   @ApiQuery({ name: "includeArchived", required: false, type: Boolean })
   @ApiQuery({ name: "userId", required: false, description: "Фильтр доступа для не-менеджеров" })
   findAll(
+    @Query("actorUserId") actorUserId?: string,
     @Query("projectId") projectId?: string,
     @Query("status") status?: BudgetStatus,
     @Query("includeArchived") includeArchived?: string,
     @Query("userId") userId?: string,
   ) {
     return this.budgetsService.findAll({
+      actorUserId,
       projectId,
       status,
       includeArchived: includeArchived === "true" || includeArchived === "1",
@@ -55,8 +58,9 @@ export class BudgetsController {
   @Get(":id/expenses")
   @ApiOperation({ summary: "Расходы по бюджету" })
   @ApiParam({ name: "id", description: "Budget id" })
-  listExpenses(@Param("id") id: string) {
-    return this.budgetsService.listExpenses(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  listExpenses(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.budgetsService.listExpenses(id, actorUserId);
   }
 
   @Post(":id/expenses")
@@ -69,7 +73,8 @@ export class BudgetsController {
   @Get(":id")
   @ApiOperation({ summary: "Бюджет по id с расходами и totals" })
   @ApiParam({ name: "id" })
-  findOne(@Param("id") id: string) {
-    return this.budgetsService.findOne(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  findOne(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.budgetsService.findOne(id, actorUserId);
   }
 }

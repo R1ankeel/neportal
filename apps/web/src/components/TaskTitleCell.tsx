@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withActorQuery } from "@/lib/actor-user";
 import type { ApiTask } from "@/lib/types";
 
 function outcomeSubtext(task: ApiTask): { label: string; text: string } | null {
@@ -14,12 +15,21 @@ function outcomeSubtext(task: ApiTask): { label: string; text: string } | null {
 }
 
 /** Название задачи и при необходимости результат/причина отмены. */
-export function TaskTitleCell({ task }: { task: ApiTask }) {
+export function TaskTitleCell({
+  task,
+  actorUserId,
+}: {
+  task: ApiTask;
+  actorUserId?: string;
+}) {
   const outcome = outcomeSubtext(task);
+  const href = actorUserId
+    ? withActorQuery(`/tasks/${task.id}`, actorUserId)
+    : `/tasks/${task.id}`;
 
   return (
     <div>
-      <Link href={`/tasks/${task.id}`} className="font-medium hover:underline">
+      <Link href={href} className="font-medium hover:underline">
         {task.title}
       </Link>
       {outcome ? (

@@ -1,19 +1,28 @@
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
+import { pickDefaultActorUserId, withActorQuery } from "@/lib/actor-user";
 import type { ApiProject, ApiUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   let projects: ApiProject[] = [];
-  let users: ApiUser[] = [];
   let error: string | null = null;
 
+  const users = await apiGet<ApiUser[]>("/users").catch(() => [] as ApiUser[]);
+  const defaultActor = pickDefaultActorUserId(users);
+
   try {
-    [projects, users] = await Promise.all([apiGet<ApiProject[]>("/projects"), apiGet<ApiUser[]>("/users")]);
+    if (defaultActor) {
+      projects = await apiGet<ApiProject[]>("/projects", { actorUserId: defaultActor });
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка загрузки";
   }
+
+  const projectsHref = defaultActor
+    ? withActorQuery("/projects", defaultActor)
+    : "/projects";
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -36,7 +45,7 @@ export default async function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2">
         <Link
-          href="/projects"
+          href={projectsHref}
           className="block rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
         >
           <p className="text-base font-medium text-zinc-500 dark:text-zinc-400">Проекты</p>
@@ -58,7 +67,14 @@ export default async function DashboardPage() {
         <ul className="mt-4 space-y-2">
           {projects.slice(0, 6).map((p) => (
             <li key={p.id}>
-              <Link href={`/projects/${p.id}`} className="text-lg font-medium text-zinc-800 hover:underline dark:text-zinc-100">
+              <Link
+                href={
+                  defaultActor
+                    ? withActorQuery(`/projects/${p.id}`, defaultActor)
+                    : `/projects/${p.id}`
+                }
+                className="text-lg font-medium text-zinc-800 hover:underline dark:text-zinc-100"
+              >
                 {p.name}
               </Link>
             </li>

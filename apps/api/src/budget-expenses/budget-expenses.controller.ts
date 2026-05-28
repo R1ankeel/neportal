@@ -21,15 +21,27 @@ export class BudgetExpensesController {
 
   @Get("pending")
   @ApiOperation({ summary: "Неподтверждённые расходы пользователя (ожидают чек)" })
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
   @ApiQuery({ name: "userId", required: true })
   @ApiQuery({ name: "limit", required: false, description: "default 10, max 20" })
-  listPending(@Query("userId") userId: string, @Query("limit") limit?: string) {
+  listPending(
+    @Query("actorUserId") actorUserId: string,
+    @Query("userId") userId: string,
+    @Query("limit") limit?: string,
+  ) {
+    if (!actorUserId?.trim()) {
+      throw new BadRequestException("actorUserId is required");
+    }
     if (!userId?.trim()) {
       throw new BadRequestException("userId is required");
     }
     const parsedLimit = limit != null && limit !== "" ? Number(limit) : 10;
     const effectiveLimit = Number.isFinite(parsedLimit) ? parsedLimit : 10;
-    return this.budgetExpensesService.listPending(userId.trim(), effectiveLimit);
+    return this.budgetExpensesService.listPending(
+      actorUserId.trim(),
+      userId.trim(),
+      effectiveLimit,
+    );
   }
 
   @Post(":expenseId/receipt")

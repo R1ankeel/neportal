@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withActorQuery } from "@/lib/actor-user";
 import {
   budgetStatusLabel,
   budgetTotalsOrFallback,
@@ -11,10 +12,12 @@ import { ArchiveBudgetButton } from "./ArchiveBudgetButton";
 export function BudgetCard({
   budget,
   projectId,
+  actorUserId,
   showArchive,
 }: {
   budget: ApiBudget;
   projectId: string;
+  actorUserId?: string;
   showArchive: boolean;
 }) {
   const totals = budgetTotalsOrFallback(budget);
@@ -24,7 +27,14 @@ export function BudgetCard({
     <li>
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <Link href={`/budgets/${budget.id}`} className="text-xl font-semibold hover:underline">
+          <Link
+            href={
+              actorUserId
+                ? withActorQuery(`/budgets/${budget.id}`, actorUserId)
+                : `/budgets/${budget.id}`
+            }
+            className="text-xl font-semibold hover:underline"
+          >
             {budget.title}
           </Link>
           <div className="flex flex-wrap gap-2">

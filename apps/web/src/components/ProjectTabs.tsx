@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 const tabDefs = [
   { suffix: "", label: "Обзор" },
@@ -11,14 +11,28 @@ const tabDefs = [
   { suffix: "/absences", label: "Отсутствия" },
 ] as const;
 
-export function ProjectTabs({ projectId }: { projectId: string }) {
+export function ProjectTabs({
+  projectId,
+  actorUserId,
+}: {
+  projectId: string;
+  actorUserId: string;
+}) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const base = `/projects/${projectId}`;
+
+  function tabHref(suffix: string): string {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("actorUserId", actorUserId);
+    const q = params.toString();
+    return q ? `${base}${suffix}?${q}` : `${base}${suffix}`;
+  }
 
   return (
     <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-200 pb-2 dark:border-zinc-800" role="tablist">
       {tabDefs.map((tab) => {
-        const href = `${base}${tab.suffix}`;
+        const href = tabHref(tab.suffix);
         const isOverview = tab.suffix === "";
         const active = isOverview
           ? pathname === base || pathname === `${base}/`

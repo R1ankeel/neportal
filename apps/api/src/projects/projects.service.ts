@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@neportal/database";
 import { AbsenceStatus, TaskStatus } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { ProjectAccessService } from "./project-access.service";
 import { CreateProjectDto } from "./dto/create-project.dto";
 
 export type ProjectSummaryDto = {
@@ -20,23 +21,35 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private orgId() {
     return this.organization.getOrganizationId();
   }
 
-  findAll() {
+  async findAll(actorUserId?: string) {
+    const accessible = await this.projectAccess.listActiveProjectsForActor(
+      this.projectAccess.requireActorId(actorUserId),
+    );
+    const ids = accessible.map((p) => p.id);
+    if (ids.length === 0) {
+      return [];
+    }
     return this.prisma.project.findMany({
-      where: { organizationId: this.orgId() },
+      where: { organizationId: this.orgId(), id: { in: ids } },
       orderBy: { updatedAt: "desc" },
       include: { createdBy: { select: { id: true, fullName: true, email: true } } },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actorUserId?: string) {
+    await this.projectAccess.assertActorCanAccessActiveProject(
+      this.projectAccess.requireActorId(actorUserId),
+      id,
+    );
     const project = await this.prisma.project.findFirst({
-      where: { id, organizationId: this.orgId() },
+      where: { id, organizationId: this.orgId(), status: "ACTIVE" },
       include: {
         createdBy: { select: { id: true, fullName: true, email: true, role: true } },
         members: { include: { user: { select: { id: true, fullName: true, email: true } } } },
@@ -48,9 +61,13 @@ export class ProjectsService {
     return project;
   }
 
-  async getSummary(projectId: string): Promise<ProjectSummaryDto> {
+  async getSummary(projectId: string, actorUserId?: string): Promise<ProjectSummaryDto> {
+    await this.projectAccess.assertActorCanAccessActiveProject(
+      this.projectAccess.requireActorId(actorUserId),
+      projectId,
+    );
     const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId: this.orgId() },
+      where: { id: projectId, organizationId: this.orgId(), status: "ACTIVE" },
     });
     if (!project) {
       throw new NotFoundException(`Project with id "${projectId}" not found`);

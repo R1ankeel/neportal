@@ -8,6 +8,7 @@ import {
   UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { ProjectAccessService } from "../projects/project-access.service";
 import { NotificationBindingsService } from "../notification-bindings/notification-bindings.service";
 import { CreateTaskCommentDto, UpdateTaskCommentDto } from "./dto/task-comment.dto";
 import { CreateTaskCommentMentionDto } from "./dto/task-comment-mention.dto";
@@ -53,6 +54,7 @@ export class TasksService {
     private readonly organization: OrganizationContextService,
     private readonly telegramNotify: TelegramNotifyService,
     private readonly notificationBindings: NotificationBindingsService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private orgId() {
@@ -183,7 +185,11 @@ export class TasksService {
     return task;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actorUserId?: string) {
+    await this.projectAccess.assertActorCanAccessTask(
+      this.projectAccess.requireActorId(actorUserId),
+      id,
+    );
     const task = await this.prisma.task.findFirst({
       where: { id, organizationId: this.orgId() },
       include: this.taskDetailInclude,
@@ -579,20 +585,23 @@ export class TasksService {
     return result;
   }
 
-  async findAll(projectId?: string) {
+  async findAll(actorUserId?: string, projectId?: string) {
+    const actorId = this.projectAccess.requireActorId(actorUserId);
     if (projectId) {
-      const project = await this.prisma.project.findFirst({
-        where: { id: projectId, organizationId: this.orgId() },
-      });
-      if (!project) {
-        throw new NotFoundException(`Project with id "${projectId}" not found`);
-      }
+      await this.projectAccess.assertActorCanAccessActiveProject(actorId, projectId);
+    }
+
+    const accessibleIds = projectId
+      ? [projectId]
+      : await this.projectAccess.getAccessibleActiveProjectIds(actorId);
+    if (accessibleIds.length === 0) {
+      return [];
     }
 
     return this.prisma.task.findMany({
       where: {
         organizationId: this.orgId(),
-        ...(projectId ? { projectId } : {}),
+        projectId: { in: accessibleIds },
       },
       orderBy: { updatedAt: "desc" },
       include: {

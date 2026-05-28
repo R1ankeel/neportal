@@ -165,7 +165,7 @@ export async function resolveTaskByTitle(
     return { kind: "empty", message: emptyTitleMessage(purpose) };
   }
 
-  const tasks = await fetchTasks();
+  const tasks = await fetchTasks(user.id);
   const match = findTaskByTitle(tasks, trimmed);
 
   if (match.kind === "not_found") {

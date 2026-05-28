@@ -62,7 +62,7 @@ export async function handleReplyToNotification(
 
   let task;
   try {
-    task = await fetchTaskById(binding.taskId);
+    task = await fetchTaskById(binding.taskId, linked.id);
   } catch {
     await ctx.reply("Не удалось добавить комментарий. Попробуйте ещё раз.");
     return true;

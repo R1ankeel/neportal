@@ -31,10 +31,14 @@ export function clearBudgetContextCache(): void {
   cache.clear();
 }
 
-async function fetchBudgetRows(projects: ApiProject[]): Promise<PromptBudgetRow[]> {
+async function fetchBudgetRows(
+  projects: ApiProject[],
+  actorUserId: string,
+  linkedUserId?: string,
+): Promise<PromptBudgetRow[]> {
   const budgets: PromptBudgetRow[] = [];
   for (const project of projects) {
-    const projectBudgets = await fetchBudgets(project.id);
+    const projectBudgets = await fetchBudgets(project.id, actorUserId, linkedUserId);
     for (const budget of projectBudgets) {
       budgets.push({ title: budget.title, projectName: project.name });
     }
@@ -58,7 +62,11 @@ export async function loadPromptBudgetContext(
     return { rows: hit.rows, cacheHit: true };
   }
 
-  const rows = await fetchBudgetRows(projects);
+  const actorUserId = options?.linkedUserId?.trim();
+  if (!actorUserId) {
+    return { rows: [], cacheHit: false };
+  }
+  const rows = await fetchBudgetRows(projects, actorUserId, actorUserId);
   cache.set(key, { rows, expiresAt: now + ttlMs() });
   devLog("budget-context cache miss", { key, rows: rows.length, ttlMs: ttlMs() });
   return { rows, cacheHit: false };

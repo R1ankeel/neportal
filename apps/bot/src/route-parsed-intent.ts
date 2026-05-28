@@ -208,7 +208,7 @@ export async function routeParsedAiIntent(
     activeIntent.intent === "create_task" &&
     createTaskAssigneeNeedsClarification(activeIntent.payload)
   ) {
-    const projects = await fetchProjects();
+    const projects = await fetchProjects(linked.id);
     const project = findProjectByHint(projects, activeIntent.payload.projectHint);
     if (!project) {
       await ctx.reply("Нет проектов. Сначала создайте проект в Web.");

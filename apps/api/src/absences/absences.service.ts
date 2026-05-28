@@ -13,6 +13,7 @@ import {
   UserRole,
 } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
+import { ProjectAccessService } from "../projects/project-access.service";
 import { CancelAbsenceDto, CreateAbsenceDto, UpdateAbsenceStatusDto } from "./dto/absence.dto";
 import { RecordAbsenceNotificationDto } from "./dto/absence-notification.dto";
 
@@ -59,6 +60,7 @@ export class AbsencesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly organization: OrganizationContextService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private orgId() {
@@ -83,14 +85,11 @@ export class AbsencesService {
     );
   }
 
-  private async assertProjectInOrg(projectId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId: this.orgId() },
-    });
-    if (!project) {
-      throw new NotFoundException(`Project with id "${projectId}" not found`);
+  private async assertProjectAccessForActor(actorUserId: string | undefined, projectId: string) {
+    if (!actorUserId?.trim()) {
+      throw new BadRequestException("actorUserId is required when projectId is set");
     }
-    return project;
+    await this.projectAccess.assertActorCanAccessActiveProject(actorUserId.trim(), projectId);
   }
 
   private async getAffectedTasks(
@@ -174,6 +173,7 @@ export class AbsencesService {
   }
 
   async findAll(filters: {
+    actorUserId?: string;
     projectId?: string;
     userId?: string;
     type?: AbsenceType;
@@ -184,7 +184,7 @@ export class AbsencesService {
     let memberUserIds: string[] | undefined;
 
     if (filters.projectId) {
-      await this.assertProjectInOrg(filters.projectId);
+      await this.assertProjectAccessForActor(filters.actorUserId, filters.projectId);
 
       // Include both formal project members and users who have tasks assigned in
       // the project — employees can be task assignees without being ProjectMembers.
@@ -240,7 +240,7 @@ export class AbsencesService {
     );
   }
 
-  async findOne(id: string, projectId?: string) {
+  async findOne(id: string, projectId?: string, actorUserId?: string) {
     const absence = await this.prisma.absence.findFirst({
       where: { id, organizationId: this.orgId() },
       include: {
@@ -253,13 +253,13 @@ export class AbsencesService {
     }
 
     if (projectId) {
-      await this.assertProjectInOrg(projectId);
+      await this.assertProjectAccessForActor(actorUserId, projectId);
     }
 
     return this.mapListItem(absence, projectId);
   }
 
-  async findAffectedTasks(id: string, projectId?: string) {
+  async findAffectedTasks(id: string, projectId?: string, actorUserId?: string) {
     const absence = await this.prisma.absence.findFirst({
       where: { id, organizationId: this.orgId() },
       include: { user: { select: { id: true } } },
@@ -269,7 +269,7 @@ export class AbsencesService {
     }
 
     if (projectId) {
-      await this.assertProjectInOrg(projectId);
+      await this.assertProjectAccessForActor(actorUserId, projectId);
     }
 
     return this.getAffectedTasks(

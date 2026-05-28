@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
 import { apiGet } from "@/lib/api";
+import {
+  pickDefaultActorUserId,
+  readActorUserIdFromSearchParams,
+  withActorQuery,
+} from "@/lib/actor-user";
+import { redirect } from "next/navigation";
 import {
   budgetStatusLabel,
   budgetTotalsOrFallback,
@@ -18,17 +25,33 @@ import { UploadReceiptForm } from "./UploadReceiptForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function BudgetDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BudgetDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const users = await apiGet<ApiUser[]>("/users");
+  const defaultActor = pickDefaultActorUserId(users);
+  if (!defaultActor) {
+    return (
+      <div className="mx-auto max-w-3xl p-6 text-lg text-amber-900 dark:text-amber-100">
+        Нет пользователей.
+      </div>
+    );
+  }
+  const actorUserId = readActorUserIdFromSearchParams(sp);
+  if (!actorUserId) {
+    redirect(`/budgets/${id}?actorUserId=${encodeURIComponent(defaultActor)}`);
+  }
 
   let budget: ApiBudget;
-  let users: ApiUser[];
 
   try {
-    [budget, users] = await Promise.all([
-      apiGet<ApiBudget>(`/budgets/${id}`),
-      apiGet<ApiUser[]>("/users"),
-    ]);
+    budget = await apiGet<ApiBudget>(`/budgets/${id}`, { actorUserId });
   } catch {
     notFound();
   }
@@ -40,14 +63,21 @@ export default async function BudgetDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
+      <ActorUserSelector users={users} actorUserId={actorUserId} />
       <nav className="flex flex-wrap gap-x-2 gap-y-1 text-base text-zinc-500 dark:text-zinc-400">
         {budget.project ? (
           <>
-            <Link href={`/projects/${budget.project.id}`} className="hover:underline">
+            <Link
+              href={withActorQuery(`/projects/${budget.project.id}`, actorUserId)}
+              className="hover:underline"
+            >
               ← {budget.project.name}
             </Link>
             <span aria-hidden="true">·</span>
-            <Link href={`/projects/${budget.project.id}/budgets`} className="hover:underline">
+            <Link
+              href={withActorQuery(`/projects/${budget.project.id}/budgets`, actorUserId)}
+              className="hover:underline"
+            >
               Бюджеты проекта
             </Link>
           </>
