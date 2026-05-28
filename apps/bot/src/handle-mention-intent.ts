@@ -19,6 +19,7 @@ import {
   resolveTaskByTitle,
 } from "./resolve-task-by-title";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 
 /** AI intent mention_in_task с выбором задачи и уточнением текста. */
 export async function handleMentionInTaskIntent(
@@ -85,6 +86,18 @@ export async function handleMentionInTaskIntent(
       mentionedUser,
       taskSelectionPayload.mentionText,
     );
+    const canProceed = await gateMentionProjectMembership(
+      ctx,
+      telegramUserId,
+      linked,
+      task,
+      mentionedUser,
+      resolved,
+      "mention_in_task",
+      "preview",
+    );
+    if (!canProceed) return;
+
     setPendingConfirmation(telegramUserId, {
       type: "ai_intent",
       intent,
@@ -93,6 +106,19 @@ export async function handleMentionInTaskIntent(
     await replyWithIntentPreview(ctx, telegramUserId, resolved);
     return;
   }
+
+  const resolvedWithoutText = buildResolvedMentionInTask(task, mentionedUser, "");
+  const canProceed = await gateMentionProjectMembership(
+    ctx,
+    telegramUserId,
+    linked,
+    task,
+    mentionedUser,
+    resolvedWithoutText,
+    "mention_in_task",
+    "awaiting_text",
+  );
+  if (!canProceed) return;
 
   const question = startPendingTaskMentionDetails(telegramUserId, task, mentionedUser);
   await ctx.reply(question);

@@ -26,7 +26,8 @@ import {
 } from "./pending-task-comment-details";
 import { validateAddTaskCommentPayload } from "./validate-add-task-comment-payload";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
-import { resolveMentionedUser } from "./task-mention-flow";
+import { resolveUserFromAiPayload } from "./resolve-user-from-ai-payload";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 import {
   apiUserToCandidate,
   startPendingUserSelection,
@@ -75,35 +76,36 @@ export async function handleAddTaskCommentIntent(
 
   if (mentionId || (mentionHints && mentionHints.length > 0)) {
     const users = await fetchUsers();
-
-    if (mentionId) {
-      mentionedUser = users.find((u) => u.id === mentionId);
-    } else if (mentionHints && mentionHints.length > 0) {
-      const hint = mentionHints[0]!;
-      const match = resolveMentionedUser(users, hint, linked);
-      if (match.kind === "none") {
-        await ctx.reply(
-          match.message ?? `Не нашёл сотрудника «${hint}». Уточните, кого нужно упомянуть.`,
-        );
-        return;
-      }
-      if (match.kind === "many") {
-        const taskHint = taskQuery;
-        startPendingUserSelection(
-          telegramUserId,
-          "select_user_for_comment_mention",
-          match.users.map(apiUserToCandidate),
-          { intent: "comment_mention", taskHint, commentText: comment ?? "" },
-        );
-        await replyWithActiveChoiceKeyboard(
-          ctx,
-          telegramUserId,
-          formatUserCandidates(match.users.map(apiUserToCandidate)),
-        );
-        return;
-      }
-      mentionedUser = match.user;
+    const hint = mentionHints?.[0] ?? "";
+    const match = resolveUserFromAiPayload({
+      users,
+      userId: mentionId,
+      hint: hint || undefined,
+      currentUser: linked,
+    });
+    if (match.kind === "none") {
+      await ctx.reply(
+        hint
+          ? `Не нашёл сотрудника «${hint}». Уточните, кого нужно упомянуть.`
+          : "Не удалось определить, кого упомянуть.",
+      );
+      return;
     }
+    if (match.kind === "many") {
+      startPendingUserSelection(
+        telegramUserId,
+        "select_user_for_comment_mention",
+        match.users.map(apiUserToCandidate),
+        { intent: "comment_mention", taskHint: taskQuery, commentText: comment ?? "" },
+      );
+      await replyWithActiveChoiceKeyboard(
+        ctx,
+        telegramUserId,
+        formatUserCandidates(match.users.map(apiUserToCandidate)),
+      );
+      return;
+    }
+    mentionedUser = match.user;
   }
 
   const selectionPayload: TaskSelectionPayload = {};
@@ -137,6 +139,20 @@ export async function handleAddTaskCommentIntent(
     const resolved = mentionedUser
       ? buildResolvedAddTaskCommentWithMention(task, selectionPayload.commentText, mentionedUser)
       : buildResolvedAddTaskComment(task, selectionPayload.commentText);
+
+    if (mentionedUser && resolved.mentionedUserId) {
+      const canProceed = await gateMentionProjectMembership(
+        ctx,
+        telegramUserId,
+        linked,
+        task,
+        mentionedUser,
+        resolved,
+        "add_task_comment",
+        "preview",
+      );
+      if (!canProceed) return;
+    }
 
     setPendingConfirmation(telegramUserId, {
       type: "ai_intent",

@@ -77,6 +77,7 @@ import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import { handleConfirmationCallback } from "./confirmation-callback";
 import { handleChoiceCallback } from "./choice-callback";
+import { handleMentionAddToProjectCallback } from "./handle-mention-add-to-project-callback";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
 import { logBotMiddlewareError } from "./telegram-error-log";
 import { devLogSafeCallbackChecks } from "./telegram/safe-callback.dev";
@@ -658,6 +659,10 @@ bot.command("mention", async (ctx) => {
       payload,
       ctx,
     );
+    if (result.kind === "handled") {
+      return;
+    }
+
     if (
       result.kind === "reply" ||
       result.kind === "awaiting_text" ||
@@ -946,6 +951,7 @@ bot.on("callback_query:data", async (ctx) => {
   if (await handleMainMenuCallback(ctx)) return;
   if (await handleTaskNotificationCallback(ctx)) return;
   if (await handleTaskStatusDetailsCancelCallback(ctx)) return;
+  if (await handleMentionAddToProjectCallback(ctx)) return;
   await handleChoiceCallback(ctx);
   await handleConfirmationCallback(ctx);
 });

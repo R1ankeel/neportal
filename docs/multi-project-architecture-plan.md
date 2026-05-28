@@ -210,21 +210,21 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Confirmation edit**: поле «Проект» для `create_task` / `create_expense` — кнопочный выбор или strict текст; `actorUserId` = linked user; cancel project selection → «Ок, изменение проекта отменено.» без зависшего pending; `create_expense` после смены проекта → budget selection через `reconfirmAfterEdit`.
 - **Не делали**: completed tasks, поле «Проект» для `create_budget`, API/Web/Prisma.
 
-### Этап 7 — Mention membership + add-to-project flow
+### Этап 7 — Mention membership + add-to-project flow ✅ (реализован, Bot-only policy)
 - **Цель**: mentions только внутри проекта задачи + add-to-project override для MANAGER/OWNER.
-- **Модули/файлы**:
-  - API: mention endpoint + ProjectMember add
-  - Bot: mention flows
-- **Изменения**:
-  - если mentioned user не в проекте:
-    - EMPLOYEE → ошибка
-    - MANAGER/OWNER → prompt “добавить?”; “Да” → добавить и продолжить
-- **Проверки**:
-  - нельзя добавить user из другой org
-- **Риски**:
-  - необходимость re-check “безопасно и однозначно продолжить”
-- **Готовность**:
-  - mention policy соблюдается
+- **Scope (что сделано)**:
+  - **Bot-only**: `gateMentionProjectMembership` перед preview/execute; pending `mention_add:yes|no`; add через существующий `POST /projects/:id/members` (`ProjectRole.MEMBER`).
+  - **API/Web не менялись**: `POST /tasks/:id/comments/mention` по-прежнему не проверяет `ProjectMember` — Web может mention без membership до отдельного этапа.
+  - `addProjectMember` в боте — **только** mention add-to-project flow (не общий Telegram ProjectMember management).
+- **Поведение**:
+  - mentioned user уже в проекте → обычный mention-flow;
+  - не в проекте + EMPLOYEE/ACCOUNTANT → `{Имя} не добавлен в проект «{Проект}».` без кнопок;
+  - не в проекте + OWNER или MANAGER (сам member проекта) → вопрос + «Добавить в проект» / «Отмена» → add → продолжение с той же точки (preview / execute / awaiting text);
+  - после add: re-fetch задачи (`fetchTaskById`), idempotent duplicate member, re-check перед comment.
+- **Smoke**: `apps/bot/scripts/smoke-stage7-mention-membership.mts` (live API + mock ctx).
+- **Follow-up (отдельные будущие этапы, не Stage 7)**:
+  1. **API-level mention membership enforcement (Web + Bot)** — проверка `ProjectMember` в `POST /tasks/:id/comments/mention` (и при необходимости согласованные read/check endpoints), единая политика для Web и Telegram; отдельный этап после стабилизации Bot-only flow.
+  2. **UX: ACCOUNTANT / actor без доступа к проекту задачи** — сейчас gate может получить `GET /projects/:id/members → 404` и показать «Ошибка API…» вместо дружелюбного «не добавлен в проект» / «нет доступа к проекту»; улучшить обработку в bot (и позже в API), без изменения общей project-selection UX.
 
 ### Этап 8 — Budgets/expenses project UX
 - **Цель**: проектный UX для бюджетов и расходов (Telegram + Web).

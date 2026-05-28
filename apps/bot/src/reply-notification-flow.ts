@@ -1,17 +1,19 @@
 import type { Context } from "grammy";
 import {
   createTaskComment,
-  createTaskCommentMention,
   fetchTaskById,
   fetchUsers,
   findNotificationBinding,
 } from "./api";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
+import { notifyTaskCommentAdded } from "./task-notifications";
+import type { ResolvedAddTaskComment, ResolvedMentionInTask } from "./intent-resolver";
 import {
-  notifyTaskCommentAdded,
-  notifyTaskMentionRequested,
-} from "./task-notifications";
-import type { ResolvedAddTaskComment } from "./intent-resolver";
+  executeMentionResolved,
+  gateMentionProjectMembership,
+  mentionDisplayName,
+} from "./mention-project-membership";
+import { getPendingMentionAddToProject } from "./pending-mention-add-to-project";
 
 /**
  * Intercepts replies to task notification messages and converts them
@@ -85,34 +87,44 @@ export async function handleReplyToNotification(
     ) {
       const users = await fetchUsers();
       const mentionedUser = users.find((u) => u.id === binding.sourceCommentAuthorId);
-
-      const result = await createTaskCommentMention(binding.taskId, {
-        authorId: linked.id,
-        mentionedUserId: binding.sourceCommentAuthorId,
-        text,
-        source: "TELEGRAM_TEXT",
-      });
-
-      const commentId = result.comment.id;
-
-      try {
-        await notifyTaskMentionRequested(ctx.api, {
-          taskId: binding.taskId,
-          taskTitle: task.title,
-          projectName: task.project?.name ?? null,
-          text,
-          author: linked,
-          mentionedUser: {
-            id: binding.sourceCommentAuthorId,
-            fullName: mentionedUser?.fullName ?? result.mentionedUser.fullName,
-            telegramId: mentionedUser?.telegramId ?? result.mentionedUser.telegramId ?? null,
-          },
-          commentId,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[reply-notification] mention notify error: ${msg}`);
+      if (!mentionedUser) {
+        await ctx.reply("Сотрудник не найден. Повторите команду.");
+        return true;
       }
+
+      const resolved: ResolvedMentionInTask = {
+        intent: "mention_in_task",
+        taskId: binding.taskId,
+        taskTitle: task.title,
+        text,
+        mentionedUserId: mentionedUser.id,
+        mentionedUserName: mentionDisplayName(mentionedUser),
+        mentionedUserTelegramId: mentionedUser.telegramId ?? null,
+        creatorId: task.creatorId,
+        assigneeId: task.assigneeId,
+        projectName: task.project?.name,
+      };
+
+      const canProceed = await gateMentionProjectMembership(
+        ctx,
+        telegramUserId,
+        linked,
+        task,
+        mentionedUser,
+        resolved,
+        "mention_in_task",
+        "execute",
+      );
+      if (!canProceed) {
+        if (!getPendingMentionAddToProject(telegramUserId)) {
+          return true;
+        }
+        return true;
+      }
+
+      const reply = await executeMentionResolved(ctx.api, linked, resolved);
+      await ctx.reply(reply);
+      return true;
     } else {
       const result = await createTaskComment(binding.taskId, {
         authorId: linked.id,

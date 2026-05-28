@@ -151,6 +151,55 @@ export async function fetchProjects(actorUserId: string): Promise<ApiProject[]> 
   return res.json() as Promise<ApiProject[]>;
 }
 
+export type ApiProjectMember = {
+  id: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+  user: { id: string; fullName: string; email: string | null; role: string };
+  alreadyMember?: boolean;
+};
+
+export async function fetchProjectMembers(
+  projectId: string,
+  actorUserId: string,
+): Promise<ApiProjectMember[]> {
+  const url = new URL(
+    `${getApiBaseUrl()}/projects/${encodeURIComponent(projectId)}/members`,
+  );
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /projects/${projectId}/members → ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<ApiProjectMember[]>;
+}
+
+export async function addProjectMember(
+  projectId: string,
+  actorUserId: string,
+  userId: string,
+): Promise<ApiProjectMember> {
+  devLog("POST /projects/:id/members payload", { projectId, actorUserId, userId });
+
+  const url = new URL(
+    `${getApiBaseUrl()}/projects/${encodeURIComponent(projectId)}/members`,
+  );
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    devLogApiError(`POST /projects/${projectId}/members`, res.status, text);
+    throw new Error(`Не удалось добавить в проект (${res.status}). ${text}`.trim());
+  }
+  return res.json() as Promise<ApiProjectMember>;
+}
+
 export async function fetchBudgets(
   projectId: string,
   actorUserId: string,

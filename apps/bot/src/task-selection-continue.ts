@@ -19,6 +19,7 @@ import {
   buildResolvedMentionInTask,
   startPendingTaskMentionDetails,
 } from "./task-mention-flow";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 import {
   buildResolvedTransferTask,
   startPendingTaskTransferComment,
@@ -30,7 +31,7 @@ import {
 } from "./task-reassign-flow";
 import { isManagerOrOwner } from "./task-transfer-flow";
 import { fetchUsers } from "./api";
-import { getLinkedUserByTelegramId } from "./current-user";
+import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { buildResolvedStartTask } from "./task-start-flow";
 import {
   buildResolvedCancelTask,
@@ -165,10 +166,26 @@ export async function continueAfterTaskSelection(
     if (payload.commentText?.trim()) {
       let resolved;
       if (payload.mentionedUserId) {
+        const linked = await getLinkedUserByTelegramId(telegramUserId);
+        if (!linked) {
+          await ctx.reply(NOT_LINKED_MESSAGE);
+          return;
+        }
         const users = await fetchUsers();
         const mentionedUser = users.find((u) => u.id === payload.mentionedUserId);
         if (mentionedUser) {
           resolved = buildResolvedAddTaskCommentWithMention(task, payload.commentText, mentionedUser);
+          const canProceed = await gateMentionProjectMembership(
+            ctx,
+            telegramUserId,
+            linked,
+            task,
+            mentionedUser,
+            resolved,
+            "add_task_comment",
+            "preview",
+          );
+          if (!canProceed) return;
         }
       }
       if (!resolved) {
@@ -198,6 +215,12 @@ export async function continueAfterTaskSelection(
   }
 
   if (selectionType === "select_task_for_mention" && payload.mentionedUserId) {
+    const linked = await getLinkedUserByTelegramId(telegramUserId);
+    if (!linked) {
+      await ctx.reply(NOT_LINKED_MESSAGE);
+      return;
+    }
+
     const users = await fetchUsers();
     const mentionedUser = users.find((u) => u.id === payload.mentionedUserId);
     if (!mentionedUser) {
@@ -211,6 +234,18 @@ export async function continueAfterTaskSelection(
         mentionedUser,
         payload.mentionText,
       );
+      const canProceed = await gateMentionProjectMembership(
+        ctx,
+        telegramUserId,
+        linked,
+        task,
+        mentionedUser,
+        resolved,
+        "mention_in_task",
+        "preview",
+      );
+      if (!canProceed) return;
+
       setPendingConfirmation(telegramUserId, {
         type: "ai_intent",
         intent: {
@@ -228,6 +263,19 @@ export async function continueAfterTaskSelection(
       await replyWithIntentPreview(ctx, telegramUserId, resolved);
       return;
     }
+
+    const resolvedWithoutText = buildResolvedMentionInTask(task, mentionedUser, "");
+    const canProceed = await gateMentionProjectMembership(
+      ctx,
+      telegramUserId,
+      linked,
+      task,
+      mentionedUser,
+      resolvedWithoutText,
+      "mention_in_task",
+      "awaiting_text",
+    );
+    if (!canProceed) return;
 
     const question = startPendingTaskMentionDetails(telegramUserId, task, mentionedUser);
     await ctx.reply(question);

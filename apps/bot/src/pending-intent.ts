@@ -51,6 +51,8 @@ export function setPendingConfirmation(
   telegramUserId: number,
   pending: PendingConfirmation,
 ): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("./pending-mention-add-to-project").clearPendingMentionAddToProject(telegramUserId);
   const confirmationId = createCallbackId();
   pendingByTelegramUserId.set(telegramUserId, { ...pending, confirmationId });
   return confirmationId;

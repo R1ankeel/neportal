@@ -14,6 +14,8 @@ import {
 } from "./pending-task-mention-details";
 import { isPendingDetailsCancel } from "./pending-task-status-details";
 import { questionForMentionText } from "./task-mention-flow";
+import { fetchTaskById, fetchUsers } from "./api";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 
 function syntheticMentionIntent(
   userHint: string,
@@ -63,17 +65,48 @@ export async function handlePendingTaskMentionDetailsMessage(
     return true;
   }
 
+  const users = await fetchUsers();
+  const mentionedUser = users.find((u) => u.id === pending.mentionedUserId);
+  if (!mentionedUser) {
+    clearPendingTaskMentionDetails(telegramUserId);
+    await ctx.reply("Сотрудник не найден. Повторите команду.");
+    return true;
+  }
+
+  const task = await fetchTaskById(pending.taskId, linked.id);
+  if (!task) {
+    clearPendingTaskMentionDetails(telegramUserId);
+    await ctx.reply("Задача не найдена или больше недоступна.");
+    return true;
+  }
+
   const resolved: ResolvedMentionInTask = {
     intent: "mention_in_task",
     taskId: pending.taskId,
-    taskTitle: pending.taskTitle,
+    taskTitle: task.title,
     text: mentionText,
     mentionedUserId: pending.mentionedUserId,
     mentionedUserName: pending.mentionedUserName,
-    mentionedUserTelegramId: null,
-    creatorId: pending.creatorId,
-    assigneeId: pending.assigneeId,
+    mentionedUserTelegramId: mentionedUser.telegramId ?? null,
+    creatorId: task.creatorId,
+    assigneeId: task.assigneeId,
+    projectName: task.project?.name,
   };
+
+  const canProceed = await gateMentionProjectMembership(
+    ctx,
+    telegramUserId,
+    linked,
+    task,
+    mentionedUser,
+    resolved,
+    "mention_in_task",
+    "preview",
+  );
+  if (!canProceed) {
+    clearPendingTaskMentionDetails(telegramUserId);
+    return true;
+  }
 
   clearPendingTaskMentionDetails(telegramUserId);
   clearPendingConfirmation(telegramUserId);

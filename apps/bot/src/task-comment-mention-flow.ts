@@ -17,6 +17,7 @@ import { resolveMentionedUser } from "./task-mention-flow";
 import { resolveTaskByTitle, resolveResultToMessage } from "./resolve-task-by-title";
 import { formatUserCandidates } from "./user-selection-format";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 import type { TaskCommentWithMentionResult } from "./parse-task-comment-with-mention-query";
 
 /**
@@ -87,6 +88,18 @@ export async function replyWithCommentWithMentionQuery(
 
   const task = resolution.task;
   const resolved = buildResolvedAddTaskCommentWithMention(task, commentText, mentionedUser);
+
+  const canProceed = await gateMentionProjectMembership(
+    ctx,
+    telegramUserId,
+    linked,
+    task,
+    mentionedUser,
+    resolved,
+    "add_task_comment",
+    "preview",
+  );
+  if (!canProceed) return;
 
   const intentForPending = {
     intent: "add_task_comment" as const,

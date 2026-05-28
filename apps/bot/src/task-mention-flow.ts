@@ -23,6 +23,7 @@ import {
   clearPendingTaskMentionDetails,
   setPendingTaskMentionDetails,
 } from "./pending-task-mention-details";
+import { clearPendingMentionAddToProject } from "./pending-mention-add-to-project";
 import { clearPendingTaskSelection } from "./pending-task-selection";
 import { clearPendingTaskStatusDetails } from "./pending-task-status-details";
 import {
@@ -32,6 +33,7 @@ import {
 import type { TaskSelectionPayload } from "./pending-task-selection";
 import { canModifyTask } from "./task-status-flow";
 import { notifyTaskMentionRequested } from "./task-notifications";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 
 const MENTION_PARTS_RE = /\s*(?:\||—|–|-)\s*/u;
 
@@ -100,6 +102,7 @@ export function startPendingTaskMentionDetails(
   clearPendingTaskSelection(telegramUserId);
   clearPendingTaskStatusDetails(telegramUserId);
   clearPendingTaskCommentDetails(telegramUserId);
+  clearPendingMentionAddToProject(telegramUserId);
   setPendingTaskMentionDetails(telegramUserId, {
     type: "awaiting_task_mention_text",
     taskId: task.id,
@@ -151,7 +154,8 @@ export type SlashMentionResult =
   | { kind: "reply"; message: string }
   | { kind: "confirmation"; resolved: ResolvedMentionInTask }
   | { kind: "awaiting_text"; message: string }
-  | { kind: "user_selection_started" };
+  | { kind: "user_selection_started" }
+  | { kind: "handled" };
 
 export async function handleMentionSlashCommand(
   currentUser: ApiUser,
@@ -217,6 +221,25 @@ export async function handleMentionSlashCommand(
   }
 
   if (!parsed.text?.trim()) {
+    if (ctx) {
+      const resolvedWithoutText = buildResolvedMentionInTask(
+        lookup.task,
+        mentionedUser,
+        "",
+      );
+      const canProceed = await gateMentionProjectMembership(
+        ctx,
+        telegramUserId,
+        currentUser,
+        lookup.task,
+        mentionedUser,
+        resolvedWithoutText,
+        "mention_in_task",
+        "awaiting_text",
+      );
+      if (!canProceed) return { kind: "handled" };
+    }
+
     const message = startPendingTaskMentionDetails(
       telegramUserId,
       lookup.task,
@@ -225,10 +248,25 @@ export async function handleMentionSlashCommand(
     return { kind: "awaiting_text", message };
   }
 
+  const resolved = buildResolvedMentionInTask(lookup.task, mentionedUser, parsed.text);
+  if (ctx) {
+    const canProceed = await gateMentionProjectMembership(
+      ctx,
+      telegramUserId,
+      currentUser,
+      lookup.task,
+      mentionedUser,
+      resolved,
+      "mention_in_task",
+      "preview",
+    );
+    if (!canProceed) return { kind: "handled" };
+  }
+
   clearPendingTaskMentionDetails(telegramUserId);
   return {
     kind: "confirmation",
-    resolved: buildResolvedMentionInTask(lookup.task, mentionedUser, parsed.text),
+    resolved,
   };
 }
 

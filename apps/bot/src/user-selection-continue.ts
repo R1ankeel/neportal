@@ -45,6 +45,7 @@ import { buildResolvedAddTaskCommentWithMention } from "./task-comment-flow";
 import { resolveTaskByTitle, resolveResultToMessage } from "./resolve-task-by-title";
 import { buildAddTaskCommentPayload } from "./add-task-comment-payload";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { gateMentionProjectMembership } from "./mention-project-membership";
 
 /** После выбора номера сотрудника — продолжить исходный сценарий. */
 export async function continueAfterUserSelection(
@@ -383,6 +384,18 @@ export async function continueAfterUserSelection(
 
     const task = resolution.task;
     const resolved = buildResolvedAddTaskCommentWithMention(task, commentText, selectedUser);
+
+    const canProceed = await gateMentionProjectMembership(
+      ctx,
+      telegramUserId,
+      linked,
+      task,
+      selectedUser,
+      resolved,
+      "add_task_comment",
+      "preview",
+    );
+    if (!canProceed) return;
 
     const intentForPending = {
       intent: "add_task_comment" as const,

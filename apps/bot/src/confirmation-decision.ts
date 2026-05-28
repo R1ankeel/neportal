@@ -7,6 +7,10 @@ import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { executeResolvedIntent } from "./intent-executor";
 import type { ResolvedCreateExpense } from "./intent-resolver";
 import {
+  resolvedHasMention,
+  tryExecuteMentionWithMembershipGate,
+} from "./mention-project-membership";
+import {
   clearPendingConfirmation,
   getPendingConfirmation,
   type PendingConfirmation,
@@ -61,6 +65,16 @@ async function confirmAiIntent(
   if (!linked) {
     clearPendingConfirmation(telegramUserId);
     await ctx.reply(NOT_LINKED_MESSAGE);
+    return;
+  }
+
+  if (resolvedHasMention(pending.resolved)) {
+    await tryExecuteMentionWithMembershipGate(
+      ctx,
+      telegramUserId,
+      linked,
+      pending.resolved,
+    );
     return;
   }
 
