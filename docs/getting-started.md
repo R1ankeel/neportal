@@ -76,7 +76,7 @@ pnpm --filter @neportal/bot dev
 2. Swagger: http://localhost:4000/docs
 3. Web: http://localhost:3000 → редирект в приложение, раздел «Проекты»
 4. Бот: `/start` в Telegram после задания `TELEGRAM_BOT_TOKEN`
-5. AI (если настроен Yandex): фраза «Запиши заметку: …» → preview → ответ `да` → заметка в Web на вкладке проекта
+5. AI (если настроен Yandex): фраза «Запиши заметку: …» → preview → ответ `да` → заметка в Web на `/notes` (выберите актора в селекторе, по умолчанию OWNER из сида)
 6. Голос (опционально): `YANDEX_SPEECHKIT_ENABLED=true` + ключи SpeechKit → voice-сообщение → preview распознанного текста → тот же flow, что для текста
 
 Локальные URL: Web `http://localhost:3000`, API `http://localhost:4000`, бот - polling (без публичного URL).

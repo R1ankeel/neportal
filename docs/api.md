@@ -10,6 +10,7 @@
 - Валидация: `ValidationPipe` (whitelist, лишние поля → 400).
 - **Авторизация отсутствует** - подходит только для локальной разработки и демо.
 - Все сущности привязаны к организации из `NEPORTAL_ORG_SLUG` / `NEPORTAL_ORGANIZATION_ID`.
+- **`actorUserId` (MVP):** на части эндпоинтов (проекты, задачи, бюджеты, отсутствия) обязателен query-параметр `actorUserId` - id сотрудника org, от имени которого выполняется действие. Web передаёт его через `?actorUserId=` и селектор `ActorUserSelector`; бот - через привязанного пользователя. OWNER видит все активные проекты org; остальные - только проекты, где состоят в `ProjectMember`. Бот по-прежнему использует `userId` / `telegramId` там, где это задокументировано отдельно (`GET /tasks/my`, привязка Telegram).
 
 ## Health
 
@@ -35,20 +36,31 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/projects` | - | Все проекты org |
-| POST | `/projects` | - | Создать проект |
-| GET | `/projects/:id` | - | Проект с участниками |
-| GET | `/projects/:id/summary` | - | Сводка: задачи, бюджеты, счётчики |
+| GET | `/projects` | `actorUserId` (обяз.) | Проекты, доступные актору |
+| POST | `/projects` | `actorUserId` (обяз.) | Создать проект |
+| GET | `/projects/:id` | `actorUserId` (обяз.) | Проект с участниками |
+| GET | `/projects/:id/summary` | `actorUserId` (обяз.) | Сводка: задачи, бюджеты, счётчики |
 
-**POST /projects** (основные поля): `name`, `createdById`, опционально `description`.
+**POST /projects** (основные поля): `name`, опционально `description`. Поле `createdById` в body устарело: автор = `actorUserId` из query (несовпадение → 400).
+
+### Project members
+
+| Метод | Путь | Query | Описание |
+|-------|------|-------|----------|
+| GET | `/projects/:projectId/members` | `actorUserId` (обяз.) | Участники проекта |
+| POST | `/projects/:projectId/members` | `actorUserId` (обяз.) | Добавить участника (`userId`, `role`) |
+| DELETE | `/projects/:projectId/members/:userId` | `actorUserId` (обяз.) | Удалить участника (OWNER проекта удалить нельзя) |
+
+Добавление/удаление: OWNER org или MANAGER в проекте.
 
 ## Tasks
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/tasks` | `projectId?` | Список задач |
-| GET | `/tasks/my` | `userId`, `limit?` (1-20, default 5) | Активные задачи исполнителя по дедлайну |
-| GET | `/tasks/:id` | - | Карточка задачи с комментариями |
+| GET | `/tasks` | `actorUserId` (обяз.), `projectId?` | Список задач в доступных проектах актора |
+| GET | `/tasks/my` | `userId`, `limit?` (1-20, default 5) | Активные задачи исполнителя по дедлайну (бот) |
+| GET | `/tasks/completed` | `userId`, `limit?` (1-20, default 5) | Выполненные задачи исполнителя (`DONE`, по `completedAt` desc) |
+| GET | `/tasks/:id` | `actorUserId` (обяз.) | Карточка задачи с комментариями |
 | POST | `/tasks` | - | Создать задачу |
 | GET | `/tasks/:id/comments` | - | Комментарии задачи (по `createdAt` asc) |
 | POST | `/tasks/:id/comments` | - | Добавить комментарий |
@@ -71,7 +83,7 @@
 }
 ```
 
-`projectId` опционален - без него задача «глобальная» в рамках org.
+`projectId` **обязателен** - задачи создаются только внутри проекта (без `projectId` → 400).
 
 **GET /tasks/my** (`MyTasksQueryDto`):
 
@@ -80,6 +92,14 @@
 - Фильтр: `status` ∈ `NEW`, `IN_PROGRESS`; `assigneeId = userId`.
 - Сортировка: `deadlineAt` asc (без дедлайна - в конце), затем `createdAt` asc.
 - Include: `project { id, name }`, `creator { id, fullName }`, `assignee { id, fullName }`.
+
+**GET /tasks/completed** (`CompletedTasksQueryDto`):
+
+- `userId` - исполнитель (должен быть в org).
+- `limit` - по умолчанию `5`, максимум `20`.
+- Фильтр: `status` = `DONE`, `assigneeId = userId`.
+- Сортировка: `completedAt` desc, затем `createdAt` desc.
+- Include: `project`, `creator`, `assignee` (как в `/tasks/my`).
 
 **PATCH /tasks/:id/deadline** (`UpdateTaskDeadlineDto`):
 
@@ -174,12 +194,12 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/budgets` | `projectId?`, `status?`, `includeArchived?`, `userId?` | Список бюджетов (по умолчанию только `ACTIVE`) |
-| POST | `/budgets` | - | Создать бюджет |
+| GET | `/budgets` | `actorUserId` (обяз.), `projectId?`, `status?`, `includeArchived?`, `userId?` | Список бюджетов в доступных проектах (по умолчанию только `ACTIVE`) |
+| POST | `/budgets` | `actorUserId` (обяз.) | Создать бюджет |
 | PATCH | `/budgets/:id` | - | Обновить бюджет (не для `ARCHIVED`) |
 | POST | `/budgets/:id/archive` | - | Архивировать бюджет |
-| GET | `/budgets/:id` | - | Бюджет, `accessUsers`, `expenses`, `totals` |
-| GET | `/budgets/:id/expenses` | - | Расходы бюджета |
+| GET | `/budgets/:id` | `actorUserId` (обяз.) | Бюджет, `accessUsers`, `expenses`, `totals` |
+| GET | `/budgets/:id/expenses` | `actorUserId` (обяз.) | Расходы бюджета |
 | POST | `/budgets/:id/expenses` | - | Добавить расход |
 
 **POST /budgets** (`CreateBudgetDto`): `projectId`, `name`, `description?`, `amount`, `requiresReceipt?`, `matchingKeywords?` (строка через запятую - для бота), `accessUserIds?`, `createdById`.
@@ -280,10 +300,10 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/absences` | `projectId?`, `userId?`, `type?`, `status?`, `includeCancelled?` | Список отсутствий (по умолчанию без `CANCELLED`) |
-| GET | `/absences/:id` | `projectId?` | Одно отсутствие; при `projectId` - `affectedTasks` по проекту |
-| GET | `/absences/:id/affected-tasks` | `projectId?` | Затронутые задачи (по org или по проекту) |
-| POST | `/absences` | - | Создать отсутствие (+ `affectedTasks` в ответе) |
+| GET | `/absences` | `actorUserId` (обяз.), `projectId?`, `userId?`, `type?`, `status?`, `includeCancelled?` | Список отсутствий (по умолчанию без `CANCELLED`) |
+| GET | `/absences/:id` | `actorUserId` (обяз.), `projectId?` | Одно отсутствие; при `projectId` - `affectedTasks` по проекту |
+| GET | `/absences/:id/affected-tasks` | `actorUserId` (обяз.), `projectId?` | Затронутые задачи (по org или по проекту) |
+| POST | `/absences` | `actorUserId` (обяз.) | Создать отсутствие (+ `affectedTasks` в ответе) |
 | POST | `/absences/:id/notifications` | - | Идемпотентная запись отправленного уведомления |
 | PATCH | `/absences/:id/status` | - | Сменить статус |
 | POST | `/absences/:id/cancel` | - | Отменить отсутствие (soft delete, `status` = `CANCELLED`) |

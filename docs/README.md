@@ -54,7 +54,9 @@ Neportal - монорепозиторий для внутреннего порт
 
 - **Нет аутентификации** в API: все запросы обслуживаются в контексте одной организации (`NEPORTAL_ORG_SLUG` или `NEPORTAL_ORGANIZATION_ID`).
 - **Web** не реализует логин; страницы доверяют API и демо-данным сида.
-- **Отсутствия** - бот `/sick`, `/vacation`, API `GET/POST /absences`, вкладка проекта в Web - см. [api.md](api.md), [bot.md](bot.md).
+- **Отсутствия** - бот `/sick`, `/vacation`, API `GET/POST /absences`, Web `/absences` и проекция по проекту - см. [api.md](api.md), [bot.md](bot.md), [web.md](web.md).
+- **Заметки** - личные, без проекта; Web `/notes`, бот `/note` и intent `create_note` - см. [database.md](database.md), [web.md](web.md).
+- **`actorUserId`** - на части REST-эндпоинтов обязателен query «текущего пользователя» (MVP без JWT); Web - селектор на страницах, бот - привязанный сотрудник.
 - **Разбор текста в боте** - детерминированные парсеры (в т.ч. дедлайны задач), опционально **двухэтапный LLM**; подтверждение и выбор - **inline-кнопки** с текстовым fallback; см. [bot.md](bot.md), [ai-intent.md](ai-intent.md).
 - **Бюджеты** - intent `create_budget`, поле `matchingKeywords` для выбора бюджета при расходах; чеки из Telegram (`telegramFileId`) и загрузка из Web (`UPLOAD_DIR`, `POST .../receipt`).
 - **SpeechKit** - код в боте есть, по умолчанию выключен; для длинного голоса нужен Yandex Object Storage (async STT). **S3** для постоянного хранения вложений не в MVP (чеки через `telegramFileId`).

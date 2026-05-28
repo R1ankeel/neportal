@@ -57,8 +57,9 @@ Zod-схемы для ответа **LLM intent parser** (YandexGPT или Qwen 
 | `reassign_task` | `projectHint?`, `taskTitle`, `toUserHint`, `fromUserHint?`, `comment?` |
 | `list_my_tasks` | `projectHint?` |
 | `list_user_tasks` | `projectHint?`, `userHint` |
-| `list_my_tasks` | `{}` |
-| `list_user_tasks` | `userHint` |
+| `list_my_completed_tasks` | `{}` |
+| `list_user_completed_tasks` | `userHint` |
+| `list_task_comments` | `projectHint?`, `taskQuery?`, `taskTitle?`, `taskId?` |
 | `list_pending_expenses` | `{}` |
 | `unknown` | `reason?` |
 

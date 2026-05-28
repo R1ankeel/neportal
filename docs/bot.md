@@ -634,23 +634,23 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 **Сопоставление hints** (`hint-matchers.ts`):
 
-- `projectHint` → проект по подстроке имени (без учёта регистра), иначе проект по умолчанию.
+- `projectHint` → strict resolve по подстроке имени среди доступных проектов; без hint - выбор или auto-select (см. [Проект и бюджет](#проект-и-бюджет-stage-6a-6b)).
 - `assigneeHint` / `userHint` → пользователь по `fullName`, `systemAliases`, уменьшительным формам (`resolve-users-by-hint.ts`).
 - `budgetHint` → сопоставление с названием бюджета и полем `matchingKeywords` (Web); при неуверенном совпадении - выбор из списка, без угадывания по товару.
 - `taskTitle` → точное совпадение `title` (без учёта регистра), иначе `includes`; несколько совпадений → просьба уточнить.
 
 Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход» и pending choice states в других модулях.
 
-### Проект и бюджет (Stage 6A–6B)
+### Проект и бюджет (Stage 6A-6B)
 
 Логика в `project-resolution.ts` / `project-selection-flow.ts` (не silent default по имени):
 
 1. **Create flows** (`create_task`, `create_budget`, `create_expense`, slash `/task`, `/expense`): без `projectHint` и при нескольких доступных проектах → кнопочный выбор; при одном проекте → auto-select; с `projectHint` → strict resolve среди `GET /projects?actorUserId=…`.
-2. **Списки задач** (`/tasks`, «Мои задачи», `list_my_tasks`): без `projectHint` проект **не спрашивается**; задачи группируются по `Проект: …` (до 20, footer при ровно 20); с `projectHint` — одна секция проекта.
+2. **Списки задач** (`/tasks`, «Мои задачи», `list_my_tasks`): без `projectHint` проект **не спрашивается**; задачи группируются по `Проект: …` (до 20, footer при ровно 20); с `projectHint` - одна секция проекта.
 3. **Task actions** (complete/comment/transfer/…): без `projectHint` поиск по всем доступным задачам (`GET /tasks` без `projectId`); при неоднозначности в списке кандидатов показывается проект.
-4. **Автор / расход / отсутствие:** только linked user (`requireLinkedUser`). **Исполнитель задачи (AI):** `create-task-assignee-resolve.ts`. Slash `/task` — `pickAssigneeId`.
+4. **Автор / расход / отсутствие:** только linked user (`requireLinkedUser`). **Исполнитель задачи (AI):** `create-task-assignee-resolve.ts`. Slash `/task` - `pickAssigneeId`.
 
-Если проектов нет — бот просит создать проект в Web.
+Если проектов нет - бот просит создать проект в Web.
 
 ### Подтверждение расхода (`create_expense`)
 

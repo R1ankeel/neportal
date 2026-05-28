@@ -56,7 +56,7 @@ neportal/
 2. Иначе ищется организация по `NEPORTAL_ORG_SLUG` (по умолчанию `neportal-demo`).
 3. Если не найдена - приложение падает с подсказкой запустить `pnpm db:seed`.
 
-Все сервисы (projects, tasks, budgets, notes, users) фильтруют данные по `organizationId` из этого контекста.
+Все сервисы (projects, tasks, budgets, notes, users) фильтруют данные по `organizationId` из этого контекста. Для проектов, задач, бюджетов и отсутствий дополнительно используется **`actorUserId`** (query): имитация текущего сотрудника без JWT - см. [api.md](api.md).
 
 ## Переменные окружения
 

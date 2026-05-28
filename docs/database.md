@@ -128,6 +128,14 @@ pnpm db:studio     # GUI
 
 **Не** вызывайте Prisma из `packages/database` без `dotenv -e .env` из корня - `DATABASE_URL` не подставится.
 
+### Служебные скрипты (корень)
+
+| Команда | Назначение |
+|---------|------------|
+| `pnpm users:aliases:backfill` | Заполнить `User.systemAliases` из ФИО |
+| `pnpm projectId:nulls` / `projectId:backfill` | Диагностика/миграция legacy `projectId` у задач |
+| `pnpm note:projectId:linked` / `note:projectId:nullify` | Экспорт и обнуление legacy `Note.projectId` (если колонка ещё есть в БД) |
+
 ## Демо-данные (seed)
 
 Команда: `pnpm db:seed`  
@@ -145,4 +153,4 @@ pnpm db:studio     # GUI
 | Бюджет | 50 000 RUB, название «Реклама VK» |
 | Задачи | «Подготовить отчет» (Вася); «Подписать договор с подрядчиком» (Иван, deadline конец 22.05.2026 UTC - `ensureDemoContractTask`, без дублей) |
 
-Проект **«Реклама VK»** в seed — демо-данные для локальной разработки; бот **не** использует его как проект по умолчанию (Stage 6A, см. [bot.md](bot.md#проект-и-бюджет-stage-6a6b)).
+Проект **«Реклама VK»** в seed - демо-данные для локальной разработки; бот **не** использует его как проект по умолчанию (Stage 6A, см. [bot.md](bot.md#проект-и-бюджет-stage-6a-6b)).

@@ -165,7 +165,7 @@ Intents с `requiresConfirmation: true` → preview в Telegram с кнопка�
 
 ```typescript
 {
-  intent: "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "list_pending_expenses" | "unknown",
+  intent: "create_task" | "create_note" | "create_expense" | "create_budget" | "create_absence" | "cancel_absence" | "set_task_deadline" | "complete_task" | "cancel_task" | "start_task" | "add_task_comment" | "list_task_comments" | "mention_in_task" | "transfer_task" | "reassign_task" | "list_my_tasks" | "list_user_tasks" | "list_my_completed_tasks" | "list_user_completed_tasks" | "list_pending_expenses" | "unknown",
   confidence: number,        // 0..1
   requiresConfirmation: boolean,
   payload: object            // зависит от intent
@@ -179,7 +179,7 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | intent | payload |
 |--------|---------|
 | `create_task` | `projectHint?`, `assigneeHint?`, `assigneeUserId?` (в т.ч. `__self__`), `title`, `description?`, `deadlineDate?` (ISO) |
-| `create_note` | `text` (глобальная заметка; даты в тексте — **DD.MM.YYYY**; `projectHint` игнорируется preprocess) |
+| `create_note` | `text` (глобальная заметка; даты в тексте - **DD.MM.YYYY**; `projectHint` игнорируется preprocess) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_budget` | `projectHint?`, `name`, `amount`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
@@ -195,6 +195,8 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | `reassign_task` | `projectHint?`, `taskTitle`, `fromUserHint?`, `toUserHint`, `comment?` |
 | `list_my_tasks` | `projectHint?` (если пользователь назвал проект) |
 | `list_user_tasks` | `projectHint?`, `userHint` |
+| `list_my_completed_tasks` | `{}` |
+| `list_user_completed_tasks` | `userHint` |
 | `list_pending_expenses` | `{}` (пустой) |
 | `unknown` | `reason?` |
 
