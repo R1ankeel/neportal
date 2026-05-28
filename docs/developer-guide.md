@@ -108,7 +108,7 @@ apps/web/src/
 | Файл | Ответственность |
 |------|-----------------|
 | `main.ts` | `bot.command`, `callback_query:data`, `message:text`, `message:voice`, фото/документы, `bot.catch` |
-| `api.ts` | HTTP-клиент к REST, выбор проекта/бюджета по умолчанию |
+| `api.ts` | HTTP-клиент к REST; резолв проекта/бюджета по hints и project-selection (без silent default) |
 | `start-binding.ts` | `/start`, привязка по username (кнопки **Да**/**Нет** + text fallback) |
 | `ai-message.ts` | `handleTextSemanticMessage`: pending → deterministic → `parseTextIntent` → preview (текст и голос) |
 | `speech/telegram-voice-handler.ts` | STT (sync/async SpeechKit) → тот же semantic pipeline |
@@ -136,7 +136,7 @@ apps/web/src/
 | **telegramUsername** | Для **первой** привязки через `/start` (до появления `telegramId`) |
 | **telegramId** | Постоянная связь с Telegram после подтверждения «да» |
 
-Демо-проект **«Реклама VK»** - проект и бюджет по умолчанию в боте; без него slash-команды просят создать проект в Web.
+Демо-проект **«Реклама VK»** в seed (`pnpm db:seed`) — пример данных для локальной разработки; в боте **нет** проекта/бюджета по умолчанию (Stage 6A). Без доступных проектов slash/AI просят создать проект в Web.
 
 ## Сквозные сценарии (проверка понимания)
 
@@ -160,7 +160,7 @@ apps/web/src/
 1. В `.env`: `AI_PROVIDER=yandex` (или `qwen` + `QWEN_*`) и ключи Yandex/Qwen.
 2. Фраза: «Запиши заметку: тест AI» или «Создай мне задачу …».
 3. Preview → **Подтвердить** (кнопка) или `да`.
-4. Web: вкладка «Заметки» / задачи проекта по умолчанию.
+4. Web: глобальная вкладка «Заметки» и/или задачи в проекте, который выбрал бот (один доступный проект — auto-select, несколько — выбор или `projectHint`).
 
 Контракт JSON: [ai-intent.md](ai-intent.md).
 
