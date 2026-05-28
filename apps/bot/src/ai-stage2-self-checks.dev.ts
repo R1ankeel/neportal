@@ -3,6 +3,7 @@ import { resolveCompletionMaxTokens } from "./ai/completion-max-tokens";
 import { measureSystemPrompt } from "./ai/build-system-prompt";
 import { resolvePromptGroup } from "./ai/prompt-group-router";
 import { budgetContextCacheKey, clearBudgetContextCache } from "./budget-context-cache";
+import { devLogBudgetResolverChecks } from "./budget-resolver.dev";
 import { resolveBudgetForExpense } from "./budget-resolver";
 import { devLog } from "./dev-log";
 import { applyCreateAbsenceDateFix } from "./fix-ai-intent-absence-dates";
@@ -246,5 +247,6 @@ export function devLogAiStage2SelfChecks(): void {
   devCheckAbsenceDates();
   devCheckPromptSizes();
   devCheckBudgetScoring();
+  devLogBudgetResolverChecks();
   devCheckBudgetCacheKey();
 }

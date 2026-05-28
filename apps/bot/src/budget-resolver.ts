@@ -108,6 +108,44 @@ function scoreKeywordMatches(budget: ApiBudget, text: string): number {
   return matched ? SCORE_KEYWORD : 0;
 }
 
+function findExactTitleMatches(budgets: ApiBudget[], hint: string): ApiBudget[] {
+  const normalizedHint = normalizeBudgetText(hint);
+  if (!normalizedHint) return [];
+  return budgets.filter((b) => normalizeBudgetText(b.title) === normalizedHint);
+}
+
+/** Full-string equality: normalize(hint) === normalize(one keyword). */
+function findExactKeywordMatches(budgets: ApiBudget[], hint: string): ApiBudget[] {
+  const normalizedHint = normalizeBudgetText(hint);
+  if (!normalizedHint) return [];
+  return budgets.filter((b) =>
+    parseMatchingKeywords(b.matchingKeywords).some((kw) => kw === normalizedHint),
+  );
+}
+
+function resolveExactBudgetHintPreCheck(
+  accessible: ApiBudget[],
+  hint: string,
+): BudgetResolveResult | null {
+  const byTitle = findExactTitleMatches(accessible, hint);
+  if (byTitle.length === 1) {
+    return { kind: "resolved", budget: byTitle[0] };
+  }
+  if (byTitle.length > 1) {
+    return { kind: "selection", candidates: byTitle, ambiguous: true };
+  }
+
+  const byKeyword = findExactKeywordMatches(accessible, hint);
+  if (byKeyword.length === 1) {
+    return { kind: "resolved", budget: byKeyword[0] };
+  }
+  if (byKeyword.length > 1) {
+    return { kind: "selection", candidates: byKeyword, ambiguous: true };
+  }
+
+  return null;
+}
+
 function scoreBudgetForExpense(
   budget: ApiBudget,
   budgetHint?: string,
@@ -152,6 +190,10 @@ function pickConfidentBudget(scored: ScoredBudget[]): ApiBudget | null {
   const second = strong[1]?.score ?? 0;
   const leaders = strong.filter((x) => x.score === top);
 
+  if (top === SCORE_EXACT_NAME && leaders.length === 1) {
+    return leaders[0].budget;
+  }
+
   if (leaders.length === 1 && top - second >= AUTO_PICK_MIN_GAP) {
     return leaders[0].budget;
   }
@@ -192,6 +234,13 @@ export function resolveBudgetForExpense(input: BudgetResolveInput): BudgetResolv
 
   if (!hasTargetingText) {
     return { kind: "selection", candidates: accessible };
+  }
+
+  if (hint) {
+    const exactHint = resolveExactBudgetHintPreCheck(accessible, hint);
+    if (exactHint) {
+      return exactHint;
+    }
   }
 
   const scored: ScoredBudget[] = accessible
