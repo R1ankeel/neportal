@@ -10,16 +10,17 @@ export class NotesController {
 
   @Get()
   @ApiOperation({ summary: "Список заметок" })
-  @ApiQuery({ name: "projectId", required: false, description: "Фильтр по проекту" })
-  findAll(@Query("projectId") projectId?: string) {
-    return this.notesService.findAll(projectId);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (заметки личные)" })
+  findAll(@Query("actorUserId") actorUserId?: string) {
+    return this.notesService.findAll(actorUserId);
   }
 
   @Get(":id")
   @ApiOperation({ summary: "Заметка по id" })
   @ApiParam({ name: "id" })
-  findOne(@Param("id") id: string) {
-    return this.notesService.findOne(id);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (заметки личные)" })
+  findOne(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.notesService.findOne(id, actorUserId);
   }
 
   @Post()

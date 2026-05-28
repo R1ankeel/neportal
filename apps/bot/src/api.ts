@@ -748,9 +748,8 @@ export async function rejectTaskTransfer(
 }
 
 export async function createNote(body: {
+  actorUserId: string;
   text: string;
-  creatorId: string;
-  projectId?: string;
   source?: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
 }): Promise<{ id: string; text: string; project?: { id: string; name: string } | null }> {
   const res = await fetch(`${getApiBaseUrl()}/notes`, {

@@ -19,25 +19,20 @@ export class NotesService {
     return this.organization.getOrganizationId();
   }
 
-  private async assertProjectInOrg(projectId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId: this.orgId() },
-    });
-    if (!project) {
-      throw new NotFoundException(`Project with id "${projectId}" not found`);
+  private assertActor(actorUserId: string | undefined): string {
+    const trimmed = actorUserId?.trim();
+    if (!trimmed) {
+      throw new BadRequestException("actorUserId is required");
     }
-    return project;
+    return trimmed;
   }
 
-  async findAll(projectId?: string) {
-    if (projectId) {
-      await this.assertProjectInOrg(projectId);
-    }
-
+  async findAll(actorUserId?: string) {
+    const actor = this.assertActor(actorUserId);
     return this.prisma.note.findMany({
       where: {
         organizationId: this.orgId(),
-        ...(projectId ? { projectId } : {}),
+        creatorId: actor,
       },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -45,12 +40,14 @@ export class NotesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actorUserId?: string) {
+    const actor = this.assertActor(actorUserId);
     const note = await this.prisma.note.findFirst({
-      where: { id, organizationId: this.orgId() },
+      where: { id, organizationId: this.orgId(), creatorId: actor },
       include: noteInclude,
     });
     if (!note) {
+      // 404 both for missing and чужая заметка
       throw new NotFoundException(`Note with id "${id}" not found`);
     }
     return note;
@@ -58,24 +55,33 @@ export class NotesService {
 
   async create(dto: CreateNoteDto) {
     const org = this.orgId();
+    const actorUserId = this.assertActor(dto.actorUserId);
 
-    const creator = await this.prisma.user.findFirst({
-      where: { id: dto.creatorId, organizationId: org },
-    });
-    if (!creator) {
-      throw new NotFoundException(`User with id "${dto.creatorId}" not found in this organization`);
+    const legacyCreatorId = dto.creatorId?.trim();
+    if (legacyCreatorId && legacyCreatorId !== actorUserId) {
+      throw new BadRequestException("creatorId must match actorUserId");
     }
 
-    if (dto.projectId) {
-      await this.assertProjectInOrg(dto.projectId);
+    const creator = await this.prisma.user.findFirst({
+      where: { id: actorUserId, organizationId: org },
+    });
+    if (!creator) {
+      throw new NotFoundException(
+        `User with id "${actorUserId}" not found in this organization`,
+      );
+    }
+
+    const text = dto.text.trim();
+    if (!text) {
+      throw new BadRequestException("Note text must not be empty");
     }
 
     return this.prisma.note.create({
       data: {
         organizationId: org,
-        projectId: dto.projectId,
-        creatorId: dto.creatorId,
-        text: dto.text,
+        projectId: null,
+        creatorId: actorUserId,
+        text,
         source: dto.source ?? NoteSource.WEB,
       },
       include: noteInclude,
@@ -83,10 +89,12 @@ export class NotesService {
   }
 
   async update(id: string, dto: UpdateNoteDto) {
+    const actorUserId = this.assertActor(dto.actorUserId);
     const existing = await this.prisma.note.findFirst({
-      where: { id, organizationId: this.orgId() },
+      where: { id, organizationId: this.orgId(), creatorId: actorUserId },
     });
     if (!existing) {
+      // 404 both for missing and чужая заметка
       throw new NotFoundException(`Note with id "${id}" not found`);
     }
 
@@ -96,7 +104,7 @@ export class NotesService {
     }
 
     if (text === existing.text.trim()) {
-      return this.findOne(id);
+      return this.findOne(id, actorUserId);
     }
 
     return this.prisma.note.update({

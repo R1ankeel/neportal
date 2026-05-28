@@ -2,8 +2,7 @@ import Link from "next/link";
 import { TaskTitleCell } from "@/components/TaskTitleCell";
 import { apiGet } from "@/lib/api";
 import { budgetRemainder, formatMoney, taskStatusLabel } from "@/lib/format";
-import { NoteTextEditor } from "./notes/NoteTextEditor";
-import type { ApiBudget, ApiNote, ApiTask } from "@/lib/types";
+import type { ApiBudget, ApiTask } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +11,12 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
 
   let tasks: ApiTask[] = [];
   let budgets: ApiBudget[] = [];
-  let notes: ApiNote[] = [];
   let error: string | null = null;
 
   try {
-    [tasks, budgets, notes] = await Promise.all([
+    [tasks, budgets] = await Promise.all([
       apiGet<ApiTask[]>("/tasks", { projectId: id }),
       apiGet<ApiBudget[]>("/budgets", { projectId: id }),
-      apiGet<ApiNote[]>("/notes", { projectId: id }),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
@@ -27,7 +24,6 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
 
   const recentTasks = tasks.slice(0, 5);
   const activeBudgets = budgets.filter((b) => b.status === "ACTIVE").slice(0, 5);
-  const recentNotes = notes.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -83,17 +79,13 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="text-xl font-semibold">Последние заметки</h2>
-        {recentNotes.length === 0 ? (
-          <p className="mt-4 text-lg text-zinc-500">Заметок пока нет</p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {recentNotes.map((n) => (
-              <li key={n.id} className="border-b border-zinc-100 pb-3 last:border-0 dark:border-zinc-800">
-                <NoteTextEditor note={n} projectId={id} compactMeta />
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="mt-3 text-base text-zinc-600 dark:text-zinc-400">
+          Заметки теперь личные и не привязаны к проекту. Откройте вкладку «Заметки» или{" "}
+          <Link href="/notes" className="font-medium hover:underline">
+            глобальный раздел
+          </Link>
+          .
+        </p>
       </section>
     </div>
   );

@@ -1,9 +1,8 @@
+import { redirect } from "next/navigation";
 import { apiGet } from "@/lib/api";
 import type { ApiNote, ApiUser } from "@/lib/types";
 import { ActorUserSelector } from "@/components/notes/ActorUserSelector";
 import { NoteTextEditor } from "@/components/notes/NoteTextEditor";
-import Link from "next/link";
-import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +10,11 @@ function pickDefaultActorUserId(users: ApiUser[]): string | null {
   return users.find((u) => u.role === "OWNER")?.id ?? users[0]?.id ?? null;
 }
 
-export default async function ProjectNotesPage({
-  params,
+export default async function NotesPage({
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
   const sp = await searchParams;
   const actorUserIdRaw = Array.isArray(sp.actorUserId) ? sp.actorUserId[0] : sp.actorUserId;
 
@@ -26,8 +22,8 @@ export default async function ProjectNotesPage({
   const defaultActor = pickDefaultActorUserId(users);
   if (!defaultActor) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-2xl font-semibold">Заметки</h2>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <h1 className="text-3xl font-semibold md:text-4xl">Заметки</h1>
         <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
           Нет пользователей. Сначала создайте сотрудника.
         </p>
@@ -37,7 +33,7 @@ export default async function ProjectNotesPage({
 
   const actorUserId = actorUserIdRaw?.trim() || "";
   if (!actorUserId) {
-    redirect(`/projects/${id}/notes?actorUserId=${encodeURIComponent(defaultActor)}`);
+    redirect(`/notes?actorUserId=${encodeURIComponent(defaultActor)}`);
   }
 
   let notes: ApiNote[] = [];
@@ -49,21 +45,19 @@ export default async function ProjectNotesPage({
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-semibold">Заметки</h2>
-      <p className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-base text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
-        Заметки личные и не привязаны к проекту. Это legacy-вкладка. Полная версия:{" "}
-        <Link
-          href={`/notes?actorUserId=${encodeURIComponent(actorUserId)}`}
-          className="font-medium hover:underline"
-        >
-          /notes
-        </Link>
-        .
-      </p>
-      <ActorUserSelector users={users} actorUserId={actorUserId} />
+    <div className="mx-auto max-w-4xl space-y-6">
+      <header className="space-y-3">
+        <h1 className="text-3xl font-semibold md:text-4xl">Заметки</h1>
+        <p className="text-lg text-zinc-600 dark:text-zinc-400">
+          Заметки личные и не привязаны к проекту.
+        </p>
+        <ActorUserSelector users={users} actorUserId={actorUserId} />
+      </header>
+
       {error ? (
-        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">{error}</p>
+        <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+          {error}
+        </p>
       ) : null}
 
       {notes.length === 0 && !error ? (
@@ -73,8 +67,11 @@ export default async function ProjectNotesPage({
       ) : (
         <ul className="space-y-3">
           {notes.map((n) => (
-            <li key={n.id} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <NoteTextEditor note={n} actorUserId={actorUserId} projectId={id} />
+            <li
+              key={n.id}
+              className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <NoteTextEditor note={n} actorUserId={actorUserId} />
             </li>
           ))}
         </ul>
@@ -82,3 +79,4 @@ export default async function ProjectNotesPage({
     </div>
   );
 }
+

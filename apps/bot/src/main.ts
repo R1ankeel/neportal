@@ -160,7 +160,7 @@ bot.command("demo", async (ctx) => {
       "/start — приветствие",
       "/demo — эта справка",
       "/task <текст> — создать задачу в Neportal (через API)",
-      "/note <текст> — создать заметку в проекте по умолчанию",
+      "/note <текст> — создать личную заметку",
       "/expense <сумма> <описание> — добавить расход в бюджет проекта",
       "/sick до 25.05.2026 номер 123456 — больничный",
       "/vacation с 01.06.2026 по 10.06.2026 — отпуск",
@@ -371,24 +371,13 @@ bot.hears(/^\/note(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
     const currentUser = await requireLinkedUser(ctx);
     if (!currentUser) return;
 
-    const projects = await fetchProjects();
-    const creatorId = currentUser.id;
-
-    const projectId = pickDefaultProjectId(projects);
-    if (!projectId) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
-      return;
-    }
-
     const note = await createNote({
       text,
-      creatorId,
-      projectId,
+      actorUserId: currentUser.id,
       source: "TELEGRAM_TEXT",
     });
 
-    const projectName = note.project?.name ?? projects.find((p) => p.id === projectId)?.name ?? "проект";
-    await ctx.reply(`Заметка создана в проекте «${projectName}»: ${note.text}`);
+    await ctx.reply(`Заметка создана: ${note.text}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(msg);

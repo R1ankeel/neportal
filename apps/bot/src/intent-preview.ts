@@ -27,7 +27,7 @@ export function buildIntentPreview(resolved: ResolvedIntent): string {
 
     case "create_note":
       return [
-        `Создать заметку в проекте «${resolved.project.name}»?`,
+        "Создать заметку?",
         `Текст: ${resolved.text}`,
       ].join("\n") + CONFIRM_FOOTER;
 

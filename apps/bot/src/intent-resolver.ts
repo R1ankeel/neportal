@@ -34,7 +34,6 @@ export type ResolvedCreateTask = {
 
 export type ResolvedCreateNote = {
   intent: "create_note";
-  project: ApiProject;
   creatorId: string;
   text: string;
 };
@@ -251,16 +250,10 @@ export async function resolveIntent(
     case "create_note": {
       const creatorId = currentUser.id;
 
-      const project = findProjectByHint(projects, intent.payload.projectHint);
-      if (!project) {
-        return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
-      }
-
       return {
         ok: true,
         resolved: {
           intent: "create_note",
-          project,
           creatorId,
           text: replaceIsoDatesInText(intent.payload.text),
         },

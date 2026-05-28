@@ -3,19 +3,20 @@ import { NoteSource } from "@neportal/database";
 import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateNoteDto {
-  @ApiPropertyOptional({
-    description: "Проект той же организации",
-    example: "clxxxxxxxxxxxxxxxxxxxxxxxx",
-  })
+  @ApiProperty({ description: "Актор (текущий пользователь) — заметки личные" })
+  @IsString()
+  @IsNotEmpty()
+  actorUserId!: string;
+
+  /**
+   * Legacy field (compat): some older clients may still send creatorId.
+   * It must match actorUserId (otherwise 400) and does not override it.
+   */
+  @ApiPropertyOptional({ description: "Legacy: автор заметки (должен совпадать с actorUserId)" })
   @IsOptional()
   @IsString()
   @MinLength(1)
-  projectId?: string;
-
-  @ApiProperty({ description: "Автор заметки" })
-  @IsString()
-  @IsNotEmpty()
-  creatorId!: string;
+  creatorId?: string;
 
   @ApiProperty({ example: "Клиент попросил проверить статистику VK" })
   @IsString()
@@ -29,6 +30,11 @@ export class CreateNoteDto {
 }
 
 export class UpdateNoteDto {
+  @ApiPropertyOptional({ description: "Актор (текущий пользователь) — заметки личные" })
+  @IsString()
+  @IsNotEmpty()
+  actorUserId!: string;
+
   @ApiProperty({ example: "Обновлённый текст заметки" })
   @IsString()
   @IsNotEmpty()

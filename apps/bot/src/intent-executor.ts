@@ -59,11 +59,10 @@ export async function executeResolvedIntent(
     case "create_note": {
       const note = await createNote({
         text: resolved.text,
-        creatorId: resolved.creatorId,
-        projectId: resolved.project.id,
+        actorUserId: resolved.creatorId,
         source: "TELEGRAM_TEXT",
       });
-      return `Заметка создана в проекте «${resolved.project.name}»: ${note.text}`;
+      return `Заметка создана: ${note.text}`;
     }
 
     case "create_budget": {
