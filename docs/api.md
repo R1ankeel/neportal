@@ -163,11 +163,12 @@
 
 | Метод | Путь | Query | Описание |
 |-------|------|-------|----------|
-| GET | `/notes` | `projectId?` | Список заметок |
-| GET | `/notes/:id` | - | Одна заметка |
+| GET | `/notes` | `actorUserId` (обяз.) | Список личных заметок актора |
+| GET | `/notes/:id` | `actorUserId` (обяз.) | Одна заметка (только своя) |
 | POST | `/notes` | - | Создать заметку |
+| PATCH | `/notes/:id` | - | Обновить текст (только своя) |
 
-**POST /notes**: `text`, `creatorId`, `source` (`WEB` | `TELEGRAM_TEXT` | `TELEGRAM_VOICE`), опционально `projectId`.
+**POST /notes**: `actorUserId`, `text`, `source` (`WEB` | `TELEGRAM_TEXT` | `TELEGRAM_VOICE`); опционально legacy `creatorId` (должен совпадать с `actorUserId`). Проект не используется.
 
 ## Budgets
 

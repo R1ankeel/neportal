@@ -5,7 +5,6 @@ import { CreateNoteDto, UpdateNoteDto } from "./dto/note.dto";
 
 const noteInclude = {
   creator: { select: { id: true, fullName: true } },
-  project: { select: { id: true, name: true } },
 } as const;
 
 @Injectable()
@@ -79,7 +78,6 @@ export class NotesService {
     return this.prisma.note.create({
       data: {
         organizationId: org,
-        projectId: null,
         creatorId: actorUserId,
         text,
         source: dto.source ?? NoteSource.WEB,

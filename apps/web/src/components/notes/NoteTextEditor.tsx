@@ -19,12 +19,12 @@ const textareaClassName =
 export function NoteTextEditor({
   note,
   actorUserId,
-  projectId,
+  revalidateProjectPathId,
   compactMeta = false,
 }: {
   note: ApiNote;
   actorUserId: string;
-  projectId?: string;
+  revalidateProjectPathId?: string;
   compactMeta?: boolean;
 }) {
   const [text, setText] = useState(note.text);
@@ -65,7 +65,7 @@ export function NoteTextEditor({
       <form action={formAction} className="space-y-2">
         <input type="hidden" name="noteId" value={note.id} />
         <input type="hidden" name="actorUserId" value={actorUserId} />
-        <input type="hidden" name="projectId" value={projectId ?? ""} />
+        <input type="hidden" name="revalidateProjectPathId" value={revalidateProjectPathId ?? ""} />
         <textarea
           name="text"
           value={inputValue}

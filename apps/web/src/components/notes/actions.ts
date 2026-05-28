@@ -16,7 +16,7 @@ export async function updateNoteText(
 ): Promise<UpdateNoteTextState> {
   const noteId = String(formData.get("noteId") ?? "");
   const actorUserId = String(formData.get("actorUserId") ?? "").trim();
-  const projectId = String(formData.get("projectId") ?? "").trim();
+  const revalidateProjectPathId = String(formData.get("revalidateProjectPathId") ?? "").trim();
   const text = String(formData.get("text") ?? "").trim();
 
   if (!noteId) return { ok: false, message: "Не указана заметка" };
@@ -36,9 +36,9 @@ export async function updateNoteText(
 
   const note = (await res.json()) as { text: string };
 
-  if (projectId) {
-    revalidatePath(`/projects/${projectId}/notes`);
-    revalidatePath(`/projects/${projectId}`);
+  if (revalidateProjectPathId) {
+    revalidatePath(`/projects/${revalidateProjectPathId}/notes`);
+    revalidatePath(`/projects/${revalidateProjectPathId}`);
   }
   revalidatePath(`/notes?actorUserId=${encodeURIComponent(actorUserId)}`);
   revalidatePath("/notes");

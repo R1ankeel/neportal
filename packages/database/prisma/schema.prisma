@@ -204,7 +204,6 @@ model Project {
 
   members ProjectMember[]
   tasks   Task[]
-  notes   Note[]
   budgets Budget[]
 
   @@index([organizationId])
@@ -368,9 +367,6 @@ model Note {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
   creatorId String
   creator   User       @relation(fields: [creatorId], references: [id], onDelete: Restrict)
 
@@ -381,7 +377,6 @@ model Note {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
-  @@index([projectId])
   @@index([creatorId])
 }
 

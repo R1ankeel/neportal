@@ -74,7 +74,7 @@ export default async function ProjectNotesPage({
         <ul className="space-y-3">
           {notes.map((n) => (
             <li key={n.id} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <NoteTextEditor note={n} actorUserId={actorUserId} projectId={id} />
+              <NoteTextEditor note={n} actorUserId={actorUserId} revalidateProjectPathId={id} />
             </li>
           ))}
         </ul>

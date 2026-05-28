@@ -20,7 +20,9 @@
     "db:studio": "prisma studio",
     "aliases:backfill": "tsx scripts/backfill-user-aliases.ts",
     "projectId:nulls": "tsx scripts/check-null-project-id.ts",
-    "projectId:backfill": "tsx scripts/backfill-task-budget-project-id.ts"
+    "projectId:backfill": "tsx scripts/backfill-task-budget-project-id.ts",
+    "note:projectId:linked": "tsx scripts/check-note-project-id.ts",
+    "note:projectId:nullify": "tsx scripts/export-and-nullify-note-project-id.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

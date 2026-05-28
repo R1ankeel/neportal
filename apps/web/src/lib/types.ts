@@ -154,7 +154,6 @@ export type ApiNote = {
   source: string;
   createdAt: string;
   creator?: { id: string; fullName: string };
-  project?: { id: string; name: string } | null;
 };
 
 export type ApiAbsenceAffectedTask = {

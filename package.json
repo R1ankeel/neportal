@@ -14,7 +14,9 @@
     "db:studio": "node scripts/prisma-with-root-env.mjs studio",
     "users:aliases:backfill": "pnpm --filter @neportal/shared build && dotenv -e .env -- pnpm --filter @neportal/database aliases:backfill",
     "projectId:nulls": "dotenv -e .env -- pnpm --filter @neportal/database projectId:nulls",
-    "projectId:backfill": "dotenv -e .env -- pnpm --filter @neportal/database projectId:backfill"
+    "projectId:backfill": "dotenv -e .env -- pnpm --filter @neportal/database projectId:backfill",
+    "note:projectId:linked": "dotenv -e .env -- pnpm --filter @neportal/database note:projectId:linked",
+    "note:projectId:nullify": "dotenv -e .env -- pnpm --filter @neportal/database note:projectId:nullify"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",

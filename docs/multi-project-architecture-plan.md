@@ -273,9 +273,10 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Проверки**: см. `reports/stage10-prisma-hardening-cleanup.md`
 - **Готовность**: schema + migration применены; create без projectId по-прежнему 400 на API
 
-### Этап 10B — Note.projectId drop (следующий PR)
-- Preflight: `SELECT COUNT(*) FROM "Note" WHERE "projectId" IS NOT NULL` → `reports/stage10b-note-project-cleanup.md`
-- Drop column + relations; API/Web cleanup
+### Этап 10B — Note.projectId drop ✅ (реализован)
+- Preflight: `pnpm note:projectId:linked`; legacy export → `reports/stage10b-legacy-notes-export.json`; nullify перед migrate
+- Migration `20260528191004_note_drop_project_id`; API/Web/Bot без `project` в Note
+- Отчёт: `reports/stage10b-note-project-cleanup.md`
 
 ### Этап 10C — Deprecated DTO removal (после аудита клиентов)
 - `createdById`, `creatorId` и прочие legacy body fields

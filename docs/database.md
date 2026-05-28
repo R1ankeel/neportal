@@ -18,9 +18,9 @@ erDiagram
 
   Project ||--o{ ProjectMember : has
   Project ||--o{ Task : contains
-  Project ||--o{ Note : contains
   Project ||--o{ Budget : contains
 
+  User ||--o{ Note : creates
   User ||--o{ Task : creates
   User ||--o{ Task : assigned
   Budget ||--o{ BudgetExpense : has
@@ -47,7 +47,7 @@ erDiagram
 ### Project
 
 - `createdBy`, участники через `ProjectMember` с ролями `MANAGER`, `MEMBER`, `VIEWER`.
-- Дочерние: tasks, notes, budgets.
+- Дочерние: tasks, budgets.
 
 ### Task
 
@@ -56,7 +56,7 @@ erDiagram
 
 ### Note
 
-Источник: `WEB`, `TELEGRAM_TEXT`, `TELEGRAM_VOICE`. Текст + привязка к проекту.
+Личная заметка пользователя (`creatorId`), без привязки к проекту. Источник: `WEB`, `TELEGRAM_TEXT`, `TELEGRAM_VOICE`. Доступ через API только с `actorUserId` (автор).
 
 ### Budget
 

@@ -806,7 +806,7 @@ export async function createNote(body: {
   actorUserId: string;
   text: string;
   source?: "WEB" | "TELEGRAM_TEXT" | "TELEGRAM_VOICE";
-}): Promise<{ id: string; text: string; project?: { id: string; name: string } | null }> {
+}): Promise<{ id: string; text: string }> {
   const res = await fetch(`${getApiBaseUrl()}/notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -816,7 +816,7 @@ export async function createNote(body: {
     const text = await res.text().catch(() => "");
     throw new Error(`POST /notes → ${res.status} ${text}`.trim());
   }
-  return res.json() as Promise<{ id: string; text: string; project?: { id: string; name: string } | null }>;
+  return res.json() as Promise<{ id: string; text: string }>;
 }
 
 /** Иван (OWNER) — автор в сиде; иначе первый OWNER / первый пользователь. */
