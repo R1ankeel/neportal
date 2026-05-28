@@ -258,17 +258,25 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Готовность**:
   - absence корректно “опускается” в проекты
 
-### Этап 10 — Prisma hardening: Task.projectId/Budget.projectId required
-- **Цель**: финально зафиксировать инварианты схемы после стабилизации.
+### Этап 10A — Prisma hardening: Task/Budget.projectId required ✅ (реализован)
+- **Цель**: зафиксировать инварианты схемы: задачи и бюджеты всегда в проекте.
 - **Модули/файлы**:
   - `packages/database/prisma/schema.prisma`
-  - миграции
+  - migration `20260528185916_task_budget_project_id_required`
+  - типы API/Bot/Web (Task/Budget `project` non-null)
+  - `project-access.service.ts` (guards)
 - **Изменения**:
-  - сделать `Task.projectId` и `Budget.projectId` required
-- **Проверки**:
-  - миграции применяются; нет null-значений
-- **Риски**:
-  - всё ещё могут оставаться legacy null
-- **Готовность**:
-  - schema enforced на уровне БД/ORM
+  - `Task.projectId`, `Budget.projectId` — `NOT NULL`
+  - FK `ON DELETE RESTRICT` (не Cascade)
+  - Preflight: `pnpm projectId:nulls` перед migrate
+- **Не входит в 10A**: `Note.projectId` drop (→ **10B**), deprecated DTO (→ **10C**)
+- **Проверки**: см. `reports/stage10-prisma-hardening-cleanup.md`
+- **Готовность**: schema + migration применены; create без projectId по-прежнему 400 на API
+
+### Этап 10B — Note.projectId drop (следующий PR)
+- Preflight: `SELECT COUNT(*) FROM "Note" WHERE "projectId" IS NOT NULL` → `reports/stage10b-note-project-cleanup.md`
+- Drop column + relations; API/Web cleanup
+
+### Этап 10C — Deprecated DTO removal (после аудита клиентов)
+- `createdById`, `creatorId` и прочие legacy body fields
 

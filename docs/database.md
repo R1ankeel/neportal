@@ -52,7 +52,7 @@ erDiagram
 ### Task
 
 Статусы: `NEW`, `IN_PROGRESS`, `DONE`, `CANCELLED`.  
-Опционально `projectId`, `assigneeId`, `deadlineAt`, `completedAt`, `cancelledAt`.
+Обязательно `projectId` (FK `ON DELETE RESTRICT`). Опционально `assigneeId`, `deadlineAt`, `completedAt`, `cancelledAt`.
 
 ### Note
 
@@ -60,6 +60,7 @@ erDiagram
 
 ### Budget
 
+- Обязательно `projectId` (FK `ON DELETE RESTRICT`).
 - `initialAmount`, `spentAmount` (подтверждённые расходы), `currency` (по умолчанию RUB).
 - Статус: `ACTIVE`, `ARCHIVED`.
 - `requiresReceipt` - обязательность чека для подтверждения расхода.

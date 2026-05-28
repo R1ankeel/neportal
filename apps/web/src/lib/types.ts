@@ -80,7 +80,7 @@ export type ApiTask = {
   updatedAt: string;
   creator?: ApiTaskUser;
   assignee?: ApiTaskUser | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
   comments?: ApiTaskComment[];
   transfers?: ApiTaskTransfer[];
 };
@@ -111,7 +111,7 @@ export type ApiBudget = {
   updatedAt: string;
   createdBy?: { id: string; fullName: string };
   archivedBy?: { id: string; fullName: string } | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
   accessUsers?: ApiUser[];
   totals?: ApiBudgetTotals;
   expenses?: ApiBudgetExpense[];

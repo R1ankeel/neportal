@@ -48,7 +48,7 @@ export type TaskCandidate = {
   deadlineAt: string | null;
   creatorId: string;
   assigneeId: string | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
   assignee?: { id: string; fullName: string } | null;
   creator?: { id: string; fullName: string } | null;
 };
@@ -73,7 +73,7 @@ export function apiTaskToCandidate(task: ApiTask): TaskCandidate {
     deadlineAt: task.deadlineAt,
     creatorId: task.creatorId,
     assigneeId: task.assigneeId,
-    project: task.project ?? null,
+    project: task.project,
     assignee: task.assignee ?? null,
     creator: task.creator ?? null,
   };

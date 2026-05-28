@@ -42,6 +42,8 @@ const USER_HINT_TEST_USERS: ApiUser[] = [
   withAliases("Сабир Махмудов", "5"),
 ];
 
+const DEV_PROJECT = { id: "p-dev", name: "Demo" };
+
 const TASK_MATCH_FIXTURES: ApiTask[] = [
   {
     id: "t1",
@@ -50,6 +52,7 @@ const TASK_MATCH_FIXTURES: ApiTask[] = [
     status: "IN_PROGRESS",
     creatorId: "c1",
     assigneeId: "1",
+    project: DEV_PROJECT,
   },
   {
     id: "t2",
@@ -58,6 +61,7 @@ const TASK_MATCH_FIXTURES: ApiTask[] = [
     status: "NEW",
     creatorId: "c1",
     assigneeId: "1",
+    project: DEV_PROJECT,
   },
   {
     id: "t3",
@@ -66,6 +70,7 @@ const TASK_MATCH_FIXTURES: ApiTask[] = [
     status: "IN_PROGRESS",
     creatorId: "c1",
     assigneeId: "2",
+    project: DEV_PROJECT,
   },
 ];
 

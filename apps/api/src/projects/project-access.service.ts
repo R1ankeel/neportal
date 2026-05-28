@@ -127,7 +127,7 @@ export class ProjectAccessService {
       where: { id: tid, organizationId: this.orgId() },
       select: { id: true, projectId: true },
     });
-    if (!task?.projectId) {
+    if (!task) {
       throw new NotFoundException(`Task with id "${tid}" not found`);
     }
     await this.assertActorCanAccessActiveProject(actorUserId, task.projectId);
@@ -143,7 +143,7 @@ export class ProjectAccessService {
       where: { id: bid, organizationId: this.orgId() },
       select: { id: true, projectId: true },
     });
-    if (!budget?.projectId) {
+    if (!budget) {
       throw new NotFoundException(`Budget with id "${bid}" not found`);
     }
     await this.assertActorCanAccessActiveProject(actorUserId, budget.projectId);

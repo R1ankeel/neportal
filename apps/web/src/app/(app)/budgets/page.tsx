@@ -20,8 +20,8 @@ function groupBudgetsByProject(budgets: ApiBudget[]): Array<{
   const byProject = new Map<string, { projectName: string; budgets: ApiBudget[] }>();
 
   for (const budget of budgets) {
-    const projectId = budget.project?.id ?? "";
-    const projectName = budget.project?.name?.trim() || "Без проекта";
+    const projectId = budget.project.id;
+    const projectName = budget.project.name.trim() || "—";
     const existing = byProject.get(projectId);
     if (existing) {
       existing.budgets.push(budget);

@@ -250,9 +250,15 @@ export function apiBudgetToCandidate(budget: ApiBudget): BudgetCandidate {
 
 export function candidateToApiBudget(
   candidate: BudgetCandidate,
-  project?: { id: string; name: string } | null,
+  project?: { id: string; name: string },
   matchingKeywords?: string | null,
 ): ApiBudget {
+  const resolvedProject =
+    project ??
+    (candidate.projectId
+      ? { id: candidate.projectId, name: candidate.projectName }
+      : { id: "", name: candidate.projectName !== "—" ? candidate.projectName : "—" });
+
   return {
     id: candidate.id,
     title: candidate.name,
@@ -262,13 +268,7 @@ export function candidateToApiBudget(
     status: candidate.status,
     requiresReceipt: candidate.requiresReceipt,
     matchingKeywords: matchingKeywords ?? null,
-    project:
-      project ??
-      (candidate.projectId
-        ? { id: candidate.projectId, name: candidate.projectName }
-        : candidate.projectName !== "—"
-          ? { id: "", name: candidate.projectName }
-          : null),
+    project: resolvedProject,
     totals: {
       amount: candidate.amount,
       confirmedSpent: candidate.confirmedSpent,

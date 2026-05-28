@@ -56,7 +56,7 @@ export type ApiBudget = {
   status: string;
   requiresReceipt: boolean;
   matchingKeywords?: string | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
   totals?: ApiBudgetTotals;
 };
 
@@ -394,7 +394,7 @@ export type ApiTask = {
   assigneeId: string | null;
   creator?: { id: string; fullName: string } | null;
   assignee?: { id: string; fullName: string } | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
 };
 
 /** Задача с полями карточки (GET /tasks/:id). */
@@ -438,7 +438,7 @@ export type ApiTaskCreated = {
   assigneeId: string | null;
   creator: ApiTaskUserNotify;
   assignee: ApiTaskUserNotify | null;
-  project?: { id: string; name: string } | null;
+  project: { id: string; name: string };
 };
 
 export type DeadlineTomorrowNotificationItem = {
