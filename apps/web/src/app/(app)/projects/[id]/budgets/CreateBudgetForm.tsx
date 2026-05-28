@@ -4,7 +4,15 @@ import { useActionState } from "react";
 import { createProjectBudget, type BudgetFormState } from "./actions";
 import type { ApiUser } from "@/lib/types";
 
-export function CreateBudgetForm({ projectId, users }: { projectId: string; users: ApiUser[] }) {
+export function CreateBudgetForm({
+  projectId,
+  actorUserId,
+  users,
+}: {
+  projectId: string;
+  actorUserId: string;
+  users: ApiUser[];
+}) {
   const [state, formAction, pending] = useActionState<BudgetFormState | undefined, FormData>(
     createProjectBudget,
     undefined,
@@ -15,6 +23,7 @@ export function CreateBudgetForm({ projectId, users }: { projectId: string; user
       <summary className="cursor-pointer px-6 py-4 text-lg font-semibold">Создать бюджет</summary>
       <form action={formAction} className="space-y-4 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
         <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="actorUserId" value={actorUserId} />
 
         {state?.ok === false && state.message ? (
           <p className="rounded-lg bg-red-50 p-3 text-base text-red-800 dark:bg-red-950/40 dark:text-red-200" role="alert">

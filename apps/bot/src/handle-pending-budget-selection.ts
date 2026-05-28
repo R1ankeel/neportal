@@ -4,6 +4,14 @@ import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
 import { replyWithIntentPreview } from "./intent-preview";
 import type { ApiProject } from "./api";
 import { isConfirmationCancel } from "./confirmation";
+import { applyFieldEdit } from "./confirmation/apply-field-edit";
+import {
+  applyConfirmationEditAndReconfirm,
+} from "./confirmation-edit";
+import {
+  getPendingConfirmationEdit,
+  setConfirmationEditStep,
+} from "./pending-confirmation-edit";
 import {
   clearPendingBudgetSelection,
   getPendingBudgetSelection,
@@ -33,7 +41,13 @@ export async function handlePendingBudgetSelectionMessage(
   }
 
   if (isConfirmationCancel(text)) {
+    const mode = pending.mode;
     clearPendingBudgetSelection(telegramUserId);
+    if (mode === "confirmation_edit") {
+      setConfirmationEditStep(telegramUserId, "select_field");
+      await ctx.reply("Ок, изменение бюджета отменено.");
+      return true;
+    }
     await ctx.reply("Ок, расход отменён.");
     return true;
   }
@@ -53,7 +67,33 @@ export async function handlePendingBudgetSelectionMessage(
 
   const selected = pending.candidates[num - 1];
   const payload = pending.payload;
+  const mode = pending.mode;
   clearPendingBudgetSelection(telegramUserId);
+
+  if (mode === "confirmation_edit") {
+    const editPending = getPendingConfirmationEdit(telegramUserId);
+    if (!editPending || editPending.originalConfirmation.intent.intent !== "create_expense") {
+      await ctx.reply("Сессия редактирования истекла. Повторите команду.");
+      return true;
+    }
+    const applyResult = await applyFieldEdit(
+      editPending.originalConfirmation.intent,
+      "budget",
+      selected.name,
+      linked.id,
+    );
+    if (!applyResult.ok) {
+      await ctx.reply(applyResult.message);
+      return true;
+    }
+    await applyConfirmationEditAndReconfirm(
+      ctx,
+      telegramUserId,
+      editPending,
+      applyResult.intent,
+    );
+    return true;
+  }
 
   const project: ApiProject = {
     id: selected.projectId || payload.projectId,

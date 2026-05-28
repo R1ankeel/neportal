@@ -154,8 +154,14 @@ export class BudgetsService {
     };
   }
 
-  async create(dto: CreateBudgetDto) {
+  async create(dto: CreateBudgetDto, actorUserId?: string) {
     const org = this.orgId();
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+
+    const legacyCreatedById = dto.createdById?.trim();
+    if (legacyCreatedById && legacyCreatedById !== actorId) {
+      throw new BadRequestException("createdById must match actorUserId");
+    }
 
     const projectId = dto.projectId?.trim();
     if (!projectId) {
@@ -164,11 +170,13 @@ export class BudgetsService {
       );
     }
 
+    await this.projectAccess.assertActorCanAccessActiveProject(actorId, projectId);
+
     const creator = await this.prisma.user.findFirst({
-      where: { id: dto.createdById, organizationId: org },
+      where: { id: actorId, organizationId: org },
     });
     if (!creator) {
-      throw new NotFoundException(`User with id "${dto.createdById}" not found in this organization`);
+      throw new NotFoundException(`User with id "${actorId}" not found in this organization`);
     }
 
     const project = await this.prisma.project.findFirst({
@@ -199,7 +207,7 @@ export class BudgetsService {
           projectId,
           initialAmount: dto.amount,
           currency: dto.currency ?? "RUB",
-          createdById: dto.createdById,
+          createdById: actorId,
           requiresReceipt: dto.requiresReceipt ?? false,
           status: BudgetStatus.ACTIVE,
         },
@@ -211,7 +219,7 @@ export class BudgetsService {
             organizationId: org,
             budgetId: created.id,
             userId,
-            createdById: dto.createdById,
+            createdById: actorId,
           })),
         });
       }

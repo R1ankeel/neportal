@@ -77,7 +77,9 @@ export default async function ProjectBudgetsPage({
           </p>
         ) : null}
 
-        {!isArchivedTab ? <CreateBudgetForm projectId={id} users={users} /> : null}
+        {!isArchivedTab ? (
+          <CreateBudgetForm projectId={id} actorUserId={actorUserId} users={users} />
+        ) : null}
 
         <ul className="space-y-4">
           {budgets.length === 0 && !error ? (

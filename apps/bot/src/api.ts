@@ -233,16 +233,20 @@ export function formatMoney(amount: number, currency = "RUB"): string {
   }).format(amount);
 }
 
-export async function createBudget(body: {
-  projectId: string;
-  name: string;
-  amount: number;
-  createdById: string;
-  requiresReceipt?: boolean;
-  matchingKeywords?: string;
-  currency?: string;
-}): Promise<ApiBudget> {
-  const res = await fetch(`${getApiBaseUrl()}/budgets`, {
+export async function createBudget(
+  actorUserId: string,
+  body: {
+    projectId: string;
+    name: string;
+    amount: number;
+    requiresReceipt?: boolean;
+    matchingKeywords?: string;
+    currency?: string;
+  },
+): Promise<ApiBudget> {
+  const url = new URL(`${getApiBaseUrl()}/budgets`);
+  url.searchParams.set("actorUserId", actorUserId);
+  const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
@@ -250,7 +254,6 @@ export async function createBudget(body: {
       name: body.name,
       amount: body.amount,
       currency: body.currency ?? "RUB",
-      createdById: body.createdById,
       requiresReceipt: body.requiresReceipt ?? false,
       matchingKeywords: body.matchingKeywords,
     }),

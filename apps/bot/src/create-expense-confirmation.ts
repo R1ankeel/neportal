@@ -34,6 +34,7 @@ export async function startBudgetSelectionFromExpenseConfirmation(
       : undefined;
 
   startPendingBudgetSelection(telegramUserId, {
+    mode: "expense_flow",
     candidates: accessible.map(apiBudgetToCandidate),
     payload: {
       amount: resolved.amount,

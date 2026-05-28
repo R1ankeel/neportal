@@ -20,6 +20,8 @@ import { createChoiceId } from "./choice-id";
 export type PendingBudgetSelection = {
   choiceId: string;
   type: "select_budget_for_expense";
+  /** expense create flow or confirmation edit «Бюджет» */
+  mode: "expense_flow" | "confirmation_edit";
   candidates: BudgetCandidate[];
   payload: ExpenseSelectionPayload;
   createdAt: number;
@@ -44,8 +46,11 @@ export function isPendingBudgetSelectionExpired(pending: PendingBudgetSelection)
 export function startPendingBudgetSelection(
   telegramUserId: number,
   pending: Omit<PendingBudgetSelection, "choiceId" | "type" | "createdAt">,
+  options?: { preserveConfirmationSession?: boolean },
 ): void {
-  clearPendingConfirmation(telegramUserId);
+  if (!options?.preserveConfirmationSession) {
+    clearPendingConfirmation(telegramUserId);
+  }
   clearPendingTaskStatusDetails(telegramUserId);
   clearPendingTaskCommentDetails(telegramUserId);
   clearPendingTaskMentionDetails(telegramUserId);

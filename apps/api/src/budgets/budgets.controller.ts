@@ -37,8 +37,9 @@ export class BudgetsController {
 
   @Post()
   @ApiOperation({ summary: "Создать бюджет" })
-  create(@Body() dto: CreateBudgetDto) {
-    return this.budgetsService.create(dto);
+  @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
+  create(@Query("actorUserId") actorUserId: string, @Body() dto: CreateBudgetDto) {
+    return this.budgetsService.create(dto, actorUserId);
   }
 
   @Patch(":id")

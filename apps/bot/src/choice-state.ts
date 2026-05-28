@@ -7,7 +7,14 @@ import { getPendingUserSelection } from "./pending-user-selection";
 import { getPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { getPendingProjectSelection } from "./pending-project-selection";
 import { formatIsoDateRu } from "./parse-ru-date";
-import { formatMoney } from "./api";
+import {
+  budgetCandidatesSpanMultipleProjects,
+  formatBudgetCandidateLabel,
+} from "./budget-selection-format";
+import {
+  formatPendingExpenseButtonLabel,
+  pendingExpensesSpanMultipleProjects,
+} from "./pending-expenses-flow";
 
 export type ActiveChoiceKind =
   | "confirmation_edit_field"
@@ -47,8 +54,8 @@ export function getActiveChoice(telegramUserId: number): ActiveChoice | null {
       kind: "expense_receipt",
       choiceId: expense.choiceId,
       optionCount: expense.expenses.length,
-      labels: expense.expenses.map(
-        (item) => `${formatMoney(item.amount)} — ${item.description?.trim() || "без описания"}`,
+      labels: expense.expenses.map((item) =>
+        formatPendingExpenseButtonLabel(item, pendingExpensesSpanMultipleProjects(expense.expenses)),
       ),
     };
   }
@@ -69,7 +76,9 @@ export function getActiveChoice(telegramUserId: number): ActiveChoice | null {
       kind: "budget",
       choiceId: budget.choiceId,
       optionCount: budget.candidates.length,
-      labels: budget.candidates.map((candidate) => candidate.name),
+      labels: budget.candidates.map((candidate) =>
+        formatBudgetCandidateLabel(candidate, budgetCandidatesSpanMultipleProjects(budget.candidates)),
+      ),
     };
   }
 

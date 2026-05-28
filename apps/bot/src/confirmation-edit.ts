@@ -15,7 +15,10 @@ import { handleTaskActionIntent } from "./handle-task-intent";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { formatBudgetSelectionMessage } from "./budget-selection-format";
-import { resolveCreateExpense } from "./create-expense-flow";
+import {
+  resolveCreateExpense,
+  startExpenseBudgetSelectionForConfirmationEdit,
+} from "./create-expense-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { resolveIntent } from "./intent-resolver";
 import { startPendingBudgetSelection } from "./pending-budget-selection";
@@ -130,18 +133,23 @@ async function reconfirmAfterEdit(
 
       if (expenseResult.kind === "selection") {
         const first = expenseResult.candidates[0];
-        startPendingBudgetSelection(telegramUserId, {
-          candidates: expenseResult.candidates,
-          payload: {
-            amount: intent.payload.amount,
-            description: intent.payload.description,
-            projectId: expenseResult.project?.id ?? first?.projectId ?? "",
-            projectName: expenseResult.project?.name ?? first?.projectName ?? "",
-            userId: linked.id,
-            budgetHint: intent.payload.budgetHint,
-            source: "TELEGRAM_TEXT",
+        startPendingBudgetSelection(
+          telegramUserId,
+          {
+            mode: "expense_flow",
+            candidates: expenseResult.candidates,
+            payload: {
+              amount: intent.payload.amount,
+              description: intent.payload.description,
+              projectId: expenseResult.project?.id ?? first?.projectId ?? "",
+              projectName: expenseResult.project?.name ?? first?.projectName ?? "",
+              userId: linked.id,
+              budgetHint: intent.payload.budgetHint,
+              source: "TELEGRAM_TEXT",
+            },
           },
-        });
+          { preserveConfirmationSession: true },
+        );
         await replyWithActiveChoiceKeyboard(
           ctx,
           telegramUserId,
@@ -363,6 +371,25 @@ async function handleFieldSelection(
       }
       await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
     }
+    return true;
+  }
+
+  if (field.key === "budget") {
+    if (editPending.originalConfirmation.intent.intent !== "create_expense") {
+      await ctx.reply("Редактирование бюджета доступно только для расхода.");
+      return true;
+    }
+    const linked = await getLinkedUserByTelegramId(telegramUserId);
+    if (!linked) {
+      await ctx.reply(NOT_LINKED_MESSAGE);
+      return true;
+    }
+    await startExpenseBudgetSelectionForConfirmationEdit(
+      ctx,
+      telegramUserId,
+      linked,
+      editPending.originalConfirmation.intent,
+    );
     return true;
   }
 

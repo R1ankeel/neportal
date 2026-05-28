@@ -66,11 +66,10 @@ export async function executeResolvedIntent(
     }
 
     case "create_budget": {
-      const budget = await createBudget({
+      const budget = await createBudget(resolved.creatorId, {
         projectId: resolved.project.id,
         name: resolved.name,
         amount: resolved.amount,
-        createdById: resolved.creatorId,
         requiresReceipt: resolved.requiresReceipt,
         matchingKeywords: resolved.matchingKeywords,
       });

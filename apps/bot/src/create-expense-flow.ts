@@ -3,6 +3,7 @@ import type { AiIntent } from "./ai-contracts";
 import type { CreateExpensePayload } from "@neportal/ai-contracts";
 import {
   apiBudgetToCandidate,
+  filterActiveAccessibleBudgets,
   type BudgetCandidate,
   resolveBudgetForExpense,
 } from "./budget-resolver";
@@ -142,7 +143,10 @@ export async function resolveCreateExpense(
     });
 
     if (budgetResult.kind === "none") {
-      return { kind: "error", message: budgetResult.message };
+      return {
+        kind: "error",
+        message: `В проекте «${project.name}» нет доступных активных бюджетов.`,
+      };
     }
     if (budgetResult.kind === "selection") {
       return {
@@ -233,7 +237,10 @@ export async function resolveCreateExpense(
   });
 
   if (budgetResult.kind === "none") {
-    return { kind: "error", message: budgetResult.message };
+    return {
+      kind: "error",
+      message: `В проекте «${project.name}» нет доступных активных бюджетов.`,
+    };
   }
   if (budgetResult.kind === "selection") {
     return {
@@ -355,6 +362,7 @@ export async function beginCreateExpenseFlow(
   if (result.kind === "selection") {
     const project = result.project;
     startPendingBudgetSelection(telegramUserId, {
+      mode: "expense_flow",
       candidates: result.candidates,
       payload: {
         amount: params.amount,
@@ -458,6 +466,60 @@ export function confirmCreateExpenseAfterBudgetSelection(
   });
 
   return resolved;
+}
+
+export async function startExpenseBudgetSelectionForConfirmationEdit(
+  ctx: Context,
+  telegramUserId: number,
+  linked: ApiUser,
+  intent: Extract<AiIntent, { intent: "create_expense" }>,
+): Promise<boolean> {
+  const projectHint = intent.payload.projectHint?.trim();
+  if (!projectHint) {
+    await ctx.reply("Сначала укажите проект.");
+    return false;
+  }
+
+  const projects = await fetchProjects(linked.id);
+  const projectResult = resolveProjectFromHint(projects, projectHint);
+  if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+    await ctx.reply(projectResult.message);
+    return false;
+  }
+
+  const project = projectResult.project;
+  const budgets = await fetchBudgets(project.id, linked.id, linked.id);
+  const accessible = filterActiveAccessibleBudgets(budgets);
+  if (accessible.length === 0) {
+    await ctx.reply(`В проекте «${project.name}» нет доступных активных бюджетов.`);
+    return false;
+  }
+
+  const candidates = accessible.map(apiBudgetToCandidate);
+  startPendingBudgetSelection(
+    telegramUserId,
+    {
+      mode: "confirmation_edit",
+      candidates,
+      payload: {
+        amount: intent.payload.amount,
+        description: intent.payload.description,
+        projectId: project.id,
+        projectName: project.name,
+        userId: linked.id,
+        budgetHint: intent.payload.budgetHint,
+        source: "TELEGRAM_TEXT",
+      },
+    },
+    { preserveConfirmationSession: true },
+  );
+
+  await replyWithActiveChoiceKeyboard(
+    ctx,
+    telegramUserId,
+    formatBudgetSelectionMessage(candidates, { fromConfirmation: true }),
+  );
+  return true;
 }
 
 export async function beginCreateExpenseFromAiIntent(

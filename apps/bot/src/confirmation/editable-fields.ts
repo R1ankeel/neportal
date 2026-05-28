@@ -55,6 +55,7 @@ export function getEditableFields(intent: AiIntent): EditableField[] {
 
     case "create_budget":
       return withActions([
+        { key: "project", label: "Проект" },
         { key: "name", label: "Название бюджета" },
         { key: "amount", label: "Сумму" },
         { key: "requiresReceipt", label: "Обязательность чека" },

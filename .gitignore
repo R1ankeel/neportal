@@ -41,3 +41,7 @@ coverage
 #Planning
 plan/
 reports/
+
+# Local smoke/debug scripts
+apps/bot/scripts/smoke-*.mts
+apps/bot/scripts/tmp-*.mts

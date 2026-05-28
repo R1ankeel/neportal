@@ -15,6 +15,7 @@ export async function createProjectBudget(
   formData: FormData,
 ): Promise<BudgetFormState> {
   const projectId = String(formData.get("projectId") ?? "");
+  const actorUserId = String(formData.get("actorUserId") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || undefined;
   const matchingKeywords = String(formData.get("matchingKeywords") ?? "").trim() || undefined;
@@ -24,21 +25,12 @@ export async function createProjectBudget(
   const accessUserIds = formData.getAll("accessUserIds").map(String).filter(Boolean);
 
   if (!projectId) return { ok: false, message: "Не указан проект" };
+  if (!actorUserId) return { ok: false, message: "Не указан actorUserId" };
   if (!name) return { ok: false, message: "Укажите название" };
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Укажите сумму" };
 
-  let users: ApiUser[];
   try {
-    users = await apiGet<ApiUser[]>("/users");
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : "Ошибка загрузки сотрудников" };
-  }
-
-  const createdById = pickOwnerId(users);
-  if (!createdById) return { ok: false, message: "Нет сотрудников для createdById" };
-
-  try {
-    await apiPostJson("/budgets", {
+    await apiPostJson(`/budgets?actorUserId=${encodeURIComponent(actorUserId)}`, {
       projectId,
       name,
       description,
@@ -46,7 +38,6 @@ export async function createProjectBudget(
       amount,
       requiresReceipt,
       accessUserIds,
-      createdById,
     });
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Ошибка создания бюджета" };

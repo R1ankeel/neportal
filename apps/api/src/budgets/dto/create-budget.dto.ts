@@ -58,8 +58,10 @@ export class CreateBudgetDto {
   @IsString({ each: true })
   accessUserIds?: string[];
 
-  @ApiProperty({ description: "Кто создал бюджет" })
+  @ApiPropertyOptional({
+    description: "Deprecated: если передан, должен совпадать с actorUserId query",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  createdById!: string;
+  createdById?: string;
 }

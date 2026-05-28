@@ -12,6 +12,7 @@ import {
   type PendingExpenseCandidate,
 } from "./pending-expense-receipt-selection";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { truncateTelegramInlineLabel } from "./budget-selection-format";
 
 export function formatExpenseDescription(description: string | null | undefined): string {
   const trimmed = description?.trim();
@@ -24,6 +25,28 @@ export function formatExpenseCreatedDate(createdAt: string): string {
     return formatIsoDateRu(iso);
   }
   return createdAt;
+}
+
+export function pendingExpensesSpanMultipleProjects(candidates: PendingExpenseCandidate[]): boolean {
+  const names = new Set(
+    candidates.map((e) => e.projectName).filter((name) => name.trim().length > 0 && name !== "—"),
+  );
+  return names.size > 1;
+}
+
+export function formatPendingExpenseButtonLabel(
+  expense: PendingExpenseCandidate,
+  showProject: boolean,
+): string {
+  const base = `${formatMoney(expense.amount)} — ${formatExpenseDescription(expense.description)}`;
+  if (!showProject) {
+    return truncateTelegramInlineLabel(base);
+  }
+  const projectName = expense.projectName?.trim();
+  if (!projectName || projectName === "—") {
+    return truncateTelegramInlineLabel(base);
+  }
+  return truncateTelegramInlineLabel(`${base} · ${projectName}`);
 }
 
 function toCandidate(expense: ApiPendingExpense): PendingExpenseCandidate {

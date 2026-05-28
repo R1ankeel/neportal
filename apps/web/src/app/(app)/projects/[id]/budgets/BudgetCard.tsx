@@ -17,7 +17,7 @@ export function BudgetCard({
 }: {
   budget: ApiBudget;
   projectId: string;
-  actorUserId?: string;
+  actorUserId: string;
   showArchive: boolean;
 }) {
   const totals = budgetTotalsOrFallback(budget);
@@ -28,11 +28,7 @@ export function BudgetCard({
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <Link
-            href={
-              actorUserId
-                ? withActorQuery(`/budgets/${budget.id}`, actorUserId)
-                : `/budgets/${budget.id}`
-            }
+            href={withActorQuery(`/budgets/${budget.id}`, actorUserId)}
             className="text-xl font-semibold hover:underline"
           >
             {budget.title}
