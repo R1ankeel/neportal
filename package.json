@@ -12,7 +12,9 @@
     "db:migrate:deploy": "node scripts/prisma-with-root-env.mjs migrate deploy",
     "db:seed": "node scripts/prisma-with-root-env.mjs db seed",
     "db:studio": "node scripts/prisma-with-root-env.mjs studio",
-    "users:aliases:backfill": "pnpm --filter @neportal/shared build && dotenv -e .env -- pnpm --filter @neportal/database aliases:backfill"
+    "users:aliases:backfill": "pnpm --filter @neportal/shared build && dotenv -e .env -- pnpm --filter @neportal/database aliases:backfill",
+    "projectId:nulls": "dotenv -e .env -- pnpm --filter @neportal/database projectId:nulls",
+    "projectId:backfill": "dotenv -e .env -- pnpm --filter @neportal/database projectId:backfill"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",

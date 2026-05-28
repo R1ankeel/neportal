@@ -22,14 +22,14 @@ export class CreateTaskDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({
-    description: "Проект той же организации; если не передан — задача без проекта (глобальная)",
+  @ApiProperty({
+    description: "Проект той же организации",
     example: "clxxxxxxxxxxxxxxxxxxxxxxxx",
   })
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MinLength(1)
-  projectId?: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Кто создал задачу" })
   @IsString()

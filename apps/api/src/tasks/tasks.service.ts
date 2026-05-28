@@ -652,6 +652,13 @@ export class TasksService {
   async create(dto: CreateTaskDto) {
     const org = this.orgId();
 
+    const projectId = dto.projectId?.trim();
+    if (!projectId) {
+      throw new BadRequestException(
+        "projectId is required: задачи создаются только внутри проекта",
+      );
+    }
+
     const creator = await this.prisma.user.findFirst({
       where: { id: dto.creatorId, organizationId: org },
     });
@@ -668,13 +675,11 @@ export class TasksService {
       }
     }
 
-    if (dto.projectId) {
-      const project = await this.prisma.project.findFirst({
-        where: { id: dto.projectId, organizationId: org },
-      });
-      if (!project) {
-        throw new NotFoundException(`Project with id "${dto.projectId}" not found`);
-      }
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId: org },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with id "${projectId}" not found`);
     }
 
     let deadlineAt: Date | undefined;
@@ -687,7 +692,7 @@ export class TasksService {
         organizationId: org,
         title: dto.title,
         description: dto.description,
-        projectId: dto.projectId,
+        projectId,
         creatorId: dto.creatorId,
         assigneeId: dto.assigneeId,
         status: dto.status ?? TaskStatus.NEW,

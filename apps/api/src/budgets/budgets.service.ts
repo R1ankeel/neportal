@@ -147,6 +147,13 @@ export class BudgetsService {
   async create(dto: CreateBudgetDto) {
     const org = this.orgId();
 
+    const projectId = dto.projectId?.trim();
+    if (!projectId) {
+      throw new BadRequestException(
+        "projectId is required: бюджеты создаются только внутри проекта",
+      );
+    }
+
     const creator = await this.prisma.user.findFirst({
       where: { id: dto.createdById, organizationId: org },
     });
@@ -155,10 +162,10 @@ export class BudgetsService {
     }
 
     const project = await this.prisma.project.findFirst({
-      where: { id: dto.projectId, organizationId: org },
+      where: { id: projectId, organizationId: org },
     });
     if (!project) {
-      throw new NotFoundException(`Project with id "${dto.projectId}" not found`);
+      throw new NotFoundException(`Project with id "${projectId}" not found`);
     }
 
     const accessUserIds = [...new Set(dto.accessUserIds ?? [])];
@@ -179,7 +186,7 @@ export class BudgetsService {
           title: dto.name,
           description: dto.description,
           matchingKeywords: dto.matchingKeywords?.trim() || null,
-          projectId: dto.projectId,
+          projectId,
           initialAmount: dto.amount,
           currency: dto.currency ?? "RUB",
           createdById: dto.createdById,
