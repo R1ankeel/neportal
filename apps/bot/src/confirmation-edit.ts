@@ -39,8 +39,10 @@ import {
   tryHandleAmbiguousUserHintBeforeResolve,
 } from "./user-hint-resolution";
 import { handleCancelAbsenceIntent } from "./absence-cancel-flow";
-import { fetchUsers } from "./api";
+import { fetchProjects, fetchUsers } from "./api";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { startProjectSelectionIfNeeded } from "./project-selection-flow";
+import type { PendingConfirmationEdit } from "./pending-confirmation-edit";
 import {
   isVoiceMenuSelectionLike,
   parseEditVoiceCommand,
@@ -241,7 +243,7 @@ async function reconfirmAfterEdit(
 async function applyEditAndReconfirm(
   ctx: Context,
   telegramUserId: number,
-  editPending: NonNullable<ReturnType<typeof getPendingConfirmationEdit>>,
+  editPending: PendingConfirmationEdit,
   updatedIntent: AiIntent,
 ): Promise<boolean> {
   editPending.originalConfirmation.intent = updatedIntent;
@@ -250,6 +252,21 @@ async function applyEditAndReconfirm(
     clearPendingConfirmationEdit(telegramUserId);
   }
   return ok;
+}
+
+/** Used after confirmation edit project selection (continue-after-project-selection). */
+export async function applyConfirmationEditAndReconfirm(
+  ctx: Context,
+  telegramUserId: number,
+  editPending: PendingConfirmationEdit,
+  updatedIntent: AiIntent,
+): Promise<boolean> {
+  return applyEditAndReconfirm(ctx, telegramUserId, editPending, updatedIntent);
+}
+
+async function getLinkedActorUserId(telegramUserId: number): Promise<string | null> {
+  const linked = await getLinkedUserByTelegramId(telegramUserId);
+  return linked?.id ?? null;
 }
 
 async function tryLegacyKeyValueEdit(
@@ -269,10 +286,17 @@ async function tryLegacyKeyValueEdit(
     return true;
   }
 
+  const actorUserId = await getLinkedActorUserId(telegramUserId);
+  if (!actorUserId) {
+    await ctx.reply(NOT_LINKED_MESSAGE);
+    return true;
+  }
+
   const applyResult = await applyFieldEdit(
     editPending.originalConfirmation.intent,
     fieldKey,
     parsed.value,
+    actorUserId,
   );
   if (!applyResult.ok) {
     await ctx.reply(applyResult.message);
@@ -311,6 +335,37 @@ async function handleFieldSelection(
     return true;
   }
 
+  if (field.key === "project") {
+    setConfirmationEditStep(telegramUserId, "await_value", field.key);
+    const linked = await getLinkedUserByTelegramId(telegramUserId);
+    if (!linked) {
+      await ctx.reply(NOT_LINKED_MESSAGE);
+      return true;
+    }
+    const projects = await fetchProjects(linked.id);
+    const selected = await startProjectSelectionIfNeeded(
+      ctx,
+      telegramUserId,
+      projects,
+      undefined,
+      { kind: "confirmation_edit" },
+    );
+    if (selected) {
+      const applyResult = await applyFieldEdit(
+        editPending.originalConfirmation.intent,
+        "project",
+        selected.name,
+        linked.id,
+      );
+      if (!applyResult.ok) {
+        await ctx.reply(applyResult.message);
+        return true;
+      }
+      await applyEditAndReconfirm(ctx, telegramUserId, editPending, applyResult.intent);
+    }
+    return true;
+  }
+
   setConfirmationEditStep(telegramUserId, "await_value", field.key);
   const prompt = getFieldValuePrompt(field.key, editPending.originalConfirmation.intent);
   await ctx.reply(prompt);
@@ -334,10 +389,17 @@ async function handleAwaitValue(
     return true;
   }
 
+  const actorUserId = await getLinkedActorUserId(telegramUserId);
+  if (!actorUserId) {
+    await ctx.reply(NOT_LINKED_MESSAGE);
+    return true;
+  }
+
   const applyResult = await applyFieldEdit(
     editPending.originalConfirmation.intent,
     fieldKey,
     text,
+    actorUserId,
   );
   if (!applyResult.ok) {
     await ctx.reply(applyResult.message);
@@ -396,10 +458,17 @@ export async function handlePendingConfirmationEditMessage(
         return true;
       }
 
+      const actorUserId = await getLinkedActorUserId(telegramUserId);
+      if (!actorUserId) {
+        await ctx.reply(NOT_LINKED_MESSAGE);
+        return true;
+      }
+
       const applyResult = await applyFieldEdit(
         editPending.originalConfirmation.intent,
         parsedVoiceEdit.field,
         parsedVoiceEdit.valueText,
+        actorUserId,
       );
       if (!applyResult.ok) {
         await ctx.reply(applyResult.message);

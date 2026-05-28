@@ -641,16 +641,16 @@ Pending confirmation хранится **в памяти** процесса (`pen
 
 Pending confirmation хранится **в памяти** процесса (`pending-intent.ts`), как «последний расход» и pending choice states в других модулях.
 
-### Проект и бюджет по умолчанию
+### Проект и бюджет (Stage 6A–6B)
 
-Логика в `apps/bot/src/api.ts`:
+Логика в `project-resolution.ts` / `project-selection-flow.ts` (не silent default по имени):
 
-1. **Проект:** из `GET /projects` предпочитается **«Реклама VK»**, иначе первый в списке.
-2. **Бюджет:** из `GET /budgets?projectId=…&status=ACTIVE&userId=…` (фильтр доступа) предпочитается заголовок с «Реклама VK», иначе первый.
-3. **Автор / расход / отсутствие:** только пользователь, привязанный по `telegramId` (`requireLinkedUser`).
-4. **Исполнитель задачи (AI):** `assigneeHint` / `assigneeUserId` / `__self__` → резолв в `create-task-assignee-resolve.ts`; уточнение только при полном отсутствии исполнителя (см. выше). Slash `/task` - `pickAssigneeId` (Вася или первый `EMPLOYEE`).
+1. **Create flows** (`create_task`, `create_budget`, `create_expense`, slash `/task`, `/expense`): без `projectHint` и при нескольких доступных проектах → кнопочный выбор; при одном проекте → auto-select; с `projectHint` → strict resolve среди `GET /projects?actorUserId=…`.
+2. **Списки задач** (`/tasks`, «Мои задачи», `list_my_tasks`): без `projectHint` проект **не спрашивается**; задачи группируются по `Проект: …` (до 20, footer при ровно 20); с `projectHint` — одна секция проекта.
+3. **Task actions** (complete/comment/transfer/…): без `projectHint` поиск по всем доступным задачам (`GET /tasks` без `projectId`); при неоднозначности в списке кандидатов показывается проект.
+4. **Автор / расход / отсутствие:** только linked user (`requireLinkedUser`). **Исполнитель задачи (AI):** `create-task-assignee-resolve.ts`. Slash `/task` — `pickAssigneeId`.
 
-Если проектов или бюджетов нет - бот просит создать их в Web.
+Если проектов нет — бот просит создать проект в Web.
 
 ### Подтверждение расхода (`create_expense`)
 
@@ -846,7 +846,7 @@ REST для scheduler (вызывает бот):
 - `updateTaskDeadline` (alias `setTaskDeadline`)
 - `updateTaskStatus`
 - `fetchDeadlineTomorrowNotifications`, `fetchOverdueNotifications`, `recordTaskNotification`
-- `pickAssigneeId`, `pickDefaultProjectId`, `pickDefaultBudget`, `findUserByNameHint`
+- `pickAssigneeId`, `findUserByNameHint` (демо `pickDefaultProject*` / `pickDefaultBudget` удалены из бота)
 
 При ошибке `POST /absences` бот пишет в консоль `status` и body и отвечает пользователю понятным текстом.
 

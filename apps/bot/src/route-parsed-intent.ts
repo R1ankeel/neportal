@@ -23,7 +23,11 @@ import {
   formatMyCompletedTasksReply,
   replyWithCompletedTasksForHint,
 } from "./completed-tasks-flow";
-import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import {
+  formatMyTasksReply,
+  replyWithTasksForHint,
+  TASK_LIST_DISPLAY_LIMIT,
+} from "./my-tasks-flow";
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { startPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { setPendingConfirmation } from "./pending-intent";
@@ -118,7 +122,11 @@ export async function routeParsedAiIntent(
 
   if (intent.intent === "list_my_tasks") {
     try {
-      const reply = await formatMyTasksReply(linked.id, 5, intent.payload.projectHint);
+      const reply = await formatMyTasksReply(
+        linked.id,
+        TASK_LIST_DISPLAY_LIMIT,
+        intent.payload.projectHint,
+      );
       await ctx.reply(reply);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -135,7 +143,7 @@ export async function routeParsedAiIntent(
         linked,
         telegramUserId,
         intent.payload.userHint,
-        5,
+        TASK_LIST_DISPLAY_LIMIT,
         intent.payload.userId,
         intent.payload.projectHint,
       );

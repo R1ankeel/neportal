@@ -105,6 +105,7 @@ export type LinkUserSelectionPayload = {
 export type TaskListUserSelectionPayload = {
   intent: "task_list";
   limit?: number;
+  projectHint?: string;
 };
 
 export type CompletedTaskListUserSelectionPayload = {

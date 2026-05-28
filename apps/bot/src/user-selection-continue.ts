@@ -38,6 +38,7 @@ import {
   canViewOtherUsersTasks,
   ONLY_OWN_TASKS_MESSAGE,
   replyWithTasksForUser,
+  TASK_LIST_DISPLAY_LIMIT,
 } from "./my-tasks-flow";
 import { continueCancelAbsenceForUser } from "./absence-cancel-flow";
 import { buildResolvedAddTaskCommentWithMention } from "./task-comment-flow";
@@ -336,7 +337,14 @@ export async function continueAfterUserSelection(
       await ctx.reply(ONLY_OWN_TASKS_MESSAGE);
       return;
     }
-    await replyWithTasksForUser(ctx, selectedUser, false, payload.limit ?? 5);
+    await replyWithTasksForUser(
+      ctx,
+      selectedUser,
+      false,
+      payload.limit ?? TASK_LIST_DISPLAY_LIMIT,
+      payload.projectHint,
+      linked.id,
+    );
     return;
   }
 

@@ -160,7 +160,7 @@ export function getFieldValuePrompt(fieldKey: string, _intent: AiIntent): string
     case "budget":
       return "Укажите название бюджета.";
     case "project":
-      return "Укажите название проекта.";
+      return "Выберите проект кнопкой ниже или введите название проекта.";
     case "completionResult":
       return "Введите результат выполнения задачи.";
     case "cancellationReason":

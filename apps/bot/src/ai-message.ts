@@ -50,7 +50,11 @@ import {
   replyWithCompletedTasksForHint,
 } from "./completed-tasks-flow";
 import { replyWithTaskCommentsForHint } from "./task-comments-list-flow";
-import { formatMyTasksReply, replyWithTasksForHint } from "./my-tasks-flow";
+import {
+  formatMyTasksReply,
+  replyWithTasksForHint,
+  TASK_LIST_DISPLAY_LIMIT,
+} from "./my-tasks-flow";
 import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-expense-receipt-selection";
 import { handlePendingExpenseReceiptUploadMessage } from "./handle-pending-expense-receipt-upload";
 import { parsePendingExpensesQuery } from "./parse-pending-expenses-query";
@@ -290,7 +294,7 @@ export async function handleTextSemanticMessage(
   const taskListQuery = parseTaskListQuery(inputText);
   if (taskListQuery?.type === "my") {
     try {
-      const reply = await formatMyTasksReply(linked.id, 5);
+      const reply = await formatMyTasksReply(linked.id, TASK_LIST_DISPLAY_LIMIT);
       await ctx.reply(reply);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -301,7 +305,13 @@ export async function handleTextSemanticMessage(
   }
   if (taskListQuery?.type === "user") {
     try {
-      await replyWithTasksForHint(ctx, linked, telegramUserId, taskListQuery.userHint, 5);
+      await replyWithTasksForHint(
+        ctx,
+        linked,
+        telegramUserId,
+        taskListQuery.userHint,
+        TASK_LIST_DISPLAY_LIMIT,
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[bot] list_user_tasks (deterministic) error: ${msg}`);

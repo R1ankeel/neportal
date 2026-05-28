@@ -22,6 +22,11 @@ import { canViewOtherMemberTasks } from "./task-read-access";
 
 export const ONLY_OWN_TASKS_MESSAGE = "Вы можете смотреть только свои задачи.";
 
+/** Default limit for /tasks, list_my_tasks, and related flows (matches API cap). */
+export const TASK_LIST_DISPLAY_LIMIT = MY_TASKS_LIST_MAX_LIMIT;
+
+export const TASK_LIST_TRUNCATED_FOOTER = "Показаны ближайшие 20 задач.";
+
 /**
  * @deprecated Используйте canViewOtherMemberTasks из task-read-access.ts.
  * Оставлено для совместимости с существующими импортами.
@@ -71,9 +76,33 @@ export function taskStatusLabel(status: string): string {
   }
 }
 
-export function formatTasksList(
+type TaskListFormatOptions = {
+  forSelf: boolean;
+  employeeName: string;
+  /** When set, render a single project section (strict projectHint). */
+  sectionProjectName?: string;
+};
+
+function groupTasksByProject(tasks: ApiMyTask[]): { name: string; tasks: ApiMyTask[] }[] {
+  const byKey = new Map<string, { name: string; tasks: ApiMyTask[] }>();
+  for (const task of tasks) {
+    const key = task.project?.id ?? "";
+    const name = task.project?.name ?? "—";
+    const bucket = byKey.get(key);
+    if (bucket) {
+      bucket.tasks.push(task);
+    } else {
+      byKey.set(key, { name, tasks: [task] });
+    }
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, "ru", { sensitivity: "base" }),
+  );
+}
+
+export function formatGroupedTasksList(
   tasks: ApiMyTask[],
-  options: { forSelf: boolean; employeeName: string },
+  options: TaskListFormatOptions,
 ): string {
   if (tasks.length === 0) {
     return options.forSelf
@@ -85,30 +114,53 @@ export function formatTasksList(
     ? "Ваши ближайшие задачи:"
     : `Ближайшие задачи сотрудника ${options.employeeName}:`;
 
-  const lines = [header, ""];
-  tasks.forEach((task, index) => {
-    const projectName = task.project?.name ?? "—";
-    lines.push(
-      `${index + 1}. ${task.title}`,
-      `   Проект: ${projectName}`,
-      `   Дедлайн: ${formatTaskDeadlineForList(task.deadlineAt)}`,
-      `   Статус: ${taskStatusLabel(task.status)}`,
-    );
-    if (index < tasks.length - 1) {
-      lines.push("");
+  const lines: string[] = [header, ""];
+  const sections = options.sectionProjectName
+    ? [{ name: options.sectionProjectName, tasks }]
+    : groupTasksByProject(tasks);
+
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    const section = sections[sectionIndex]!;
+    lines.push(`Проект: ${section.name}`, "");
+    section.tasks.forEach((task, index) => {
+      lines.push(
+        `${index + 1}. ${task.title}`,
+        `   Дедлайн: ${formatTaskDeadlineForList(task.deadlineAt)}`,
+        `   Статус: ${taskStatusLabel(task.status)}`,
+      );
+      if (index < section.tasks.length - 1) {
+        lines.push("");
+      }
+    });
+    if (sectionIndex < sections.length - 1) {
+      lines.push("", "");
     }
-  });
+  }
+
+  if (tasks.length === TASK_LIST_DISPLAY_LIMIT) {
+    lines.push("", TASK_LIST_TRUNCATED_FOOTER);
+  }
+
   return lines.join("\n");
+}
+
+/** @deprecated Use formatGroupedTasksList */
+export function formatTasksList(
+  tasks: ApiMyTask[],
+  options: { forSelf: boolean; employeeName: string },
+): string {
+  return formatGroupedTasksList(tasks, options);
 }
 
 export async function formatTasksReply(
   userId: string,
   employeeName: string,
   forSelf: boolean,
-  limit = 5,
+  limit = TASK_LIST_DISPLAY_LIMIT,
   projectResolverActorId?: string,
   projectHint?: string,
 ): Promise<string> {
+  const cappedLimit = Math.min(Math.max(limit, 1), TASK_LIST_DISPLAY_LIMIT);
   const hintTrimmed = projectHint?.trim();
   if (hintTrimmed) {
     const actorId = projectResolverActorId ?? userId;
@@ -117,23 +169,27 @@ export async function formatTasksReply(
     if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
       return projectResult.message;
     }
-    const tasks = await fetchMyTasks(userId, MY_TASKS_LIST_MAX_LIMIT);
+    const tasks = await fetchMyTasks(userId, TASK_LIST_DISPLAY_LIMIT);
     const filtered = tasks.filter((t) => t.project?.id === projectResult.project.id);
-    return formatTasksList(filtered.slice(0, limit), { forSelf, employeeName });
+    return formatGroupedTasksList(filtered, {
+      forSelf,
+      employeeName,
+      sectionProjectName: projectResult.project.name,
+    });
   }
 
-  const tasks = await fetchMyTasks(userId, limit);
-  return formatTasksList(tasks, { forSelf, employeeName });
+  const tasks = await fetchMyTasks(userId, cappedLimit);
+  return formatGroupedTasksList(tasks, { forSelf, employeeName });
 }
 
 /** @deprecated Use formatTasksReply with forSelf: true */
 export function formatMyTasksList(tasks: ApiMyTask[]): string {
-  return formatTasksList(tasks, { forSelf: true, employeeName: "" });
+  return formatGroupedTasksList(tasks, { forSelf: true, employeeName: "" });
 }
 
 export async function formatMyTasksReply(
   userId: string,
-  limit = 5,
+  limit = TASK_LIST_DISPLAY_LIMIT,
   projectHint?: string,
 ): Promise<string> {
   return formatTasksReply(userId, "", true, limit, userId, projectHint);
@@ -143,13 +199,17 @@ export async function replyWithTasksForUser(
   ctx: Context,
   targetUser: ApiUser,
   forSelf: boolean,
-  limit = 5,
+  limit = TASK_LIST_DISPLAY_LIMIT,
+  projectHint?: string,
+  projectResolverActorId?: string,
 ): Promise<void> {
   const reply = await formatTasksReply(
     targetUser.id,
     targetUser.fullName,
     forSelf,
     limit,
+    projectResolverActorId,
+    projectHint,
   );
   await ctx.reply(reply);
 }
@@ -160,7 +220,7 @@ export async function replyWithTasksForHint(
   currentUser: ApiUser,
   telegramUserId: number,
   hint: string,
-  limit = 5,
+  limit = TASK_LIST_DISPLAY_LIMIT,
   userId?: string,
   projectHint?: string,
 ): Promise<void> {
@@ -194,7 +254,11 @@ export async function replyWithTasksForHint(
     return;
   }
   if (match.kind === "many") {
-    const payload: TaskListUserSelectionPayload = { intent: "task_list", limit };
+    const payload: TaskListUserSelectionPayload = {
+      intent: "task_list",
+      limit,
+      projectHint,
+    };
     startPendingUserSelection(
       telegramUserId,
       "select_user_for_task_list",

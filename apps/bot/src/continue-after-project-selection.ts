@@ -19,7 +19,10 @@ import type { ProjectSelectionContinue } from "./pending-project-selection";
 import { tryHandleAmbiguousUserHintBeforeResolve } from "./user-hint-resolution";
 import { fetchUsers } from "./api";
 import { replyWithActiveChoiceKeyboard } from "./choice-reply";
+import { applyConfirmationEditAndReconfirm } from "./confirmation-edit";
+import { applyFieldEdit } from "./confirmation/apply-field-edit";
 import { getLinkedUserByTelegramId, NOT_LINKED_MESSAGE } from "./current-user";
+import { getPendingConfirmationEdit } from "./pending-confirmation-edit";
 
 const CREATE_TASK_ASSIGNEE_LIST_LIMIT = 7;
 
@@ -218,6 +221,31 @@ export async function continueAfterProjectSelection(
         budgetHint: continuation.budgetHint,
         executeIfResolved: continuation.executeIfResolved,
       });
+      return;
+    }
+
+    case "confirmation_edit": {
+      const editPending = getPendingConfirmationEdit(telegramUserId);
+      if (!editPending) {
+        await ctx.reply("Сессия редактирования истекла. Повторите команду.");
+        return;
+      }
+      const applyResult = await applyFieldEdit(
+        editPending.originalConfirmation.intent,
+        "project",
+        project.name,
+        linked.id,
+      );
+      if (!applyResult.ok) {
+        await ctx.reply(applyResult.message);
+        return;
+      }
+      await applyConfirmationEditAndReconfirm(
+        ctx,
+        telegramUserId,
+        editPending,
+        applyResult.intent,
+      );
       return;
     }
   }

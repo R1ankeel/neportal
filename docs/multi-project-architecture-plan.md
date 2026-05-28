@@ -57,7 +57,7 @@ Notes делаем ранним **privacy/global-user fix**:
 ## Текущая реальность (коротко, для контекста)
 
 - В БД уже есть `Project` и `ProjectMember`, а в API/Web уже существуют `/projects/*` и project-scoped страницы.
-- В боте и частично в документации присутствует демо-эвристика “**Реклама VK**” (как preferred default project/budget). Её нужно удалить при внедрении project UX.
+- Демо-эвристика “**Реклама VK**” как default project/budget в боте **убрана** (Stage 6A); в seed/docs имя может оставаться как демо-данные.
 - В MVP нет полноценной auth; чтобы внедрять проверки доступа постепенно, потребуется вводить `actorUserId` в критичные API-вызовы.
 
 ## Целевая модель (в двух словах)
@@ -76,14 +76,11 @@ Notes делаем ранним **privacy/global-user fix**:
 
 Принцип: **всё, что зависит от роли/доступа/приватности, должно знать, кто актор**.
 
-## Где убирать fallback “Реклама VK” (точки изменений на этапе Bot UX)
+## Bot project UX (реализовано в Stage 6A–6B)
 
-Эвристика “Реклама VK” должна быть убрана (после появления project selection UX), минимум в:
-- `apps/bot/src/api.ts`: `pickDefaultProjectId()` / `pickDefaultProject()` / `pickDefaultBudget()`
-- `apps/bot/src/hint-matchers.ts`: `findProjectByHint()` (нельзя silently fallback)
-- slash handlers в `apps/bot/src/main.ts`: `/task`, `/note`, расходы/бюджеты (нельзя молча выбирать демо-проект)
+Было: `pickDefaultProjectId()` / `pickDefaultProject()` / `pickDefaultBudget()` и silent fallback на «Реклама VK» — **удалено**.
 
-Новая логика:
+Логика:
 - **1 доступный проект** → auto-select, но **preview всегда показывает проект**.
 - **>1 доступный проект** и проект не указан → **кнопочный выбор**.
 - `projectHint` указан → резолв **только среди доступных проектов**; если не найден или нет доступа → понятная ошибка.
@@ -199,22 +196,19 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Списки задач**: `list_my_tasks` / `list_user_tasks` фильтруют по project после strict resolve.
 - **Не делали**: completed tasks filter, deterministic parser, project selection UX, Web/API/Prisma.
 
-### Этап 6 — Bot project UX
-- **Цель**: проектный UX в Telegram: выбор проекта, удаление fallback “Реклама VK”, “Мои задачи” по проектам.
-- **Модули/файлы**:
-  - `apps/bot/src/api.ts`, `apps/bot/src/hint-matchers.ts`, `apps/bot/src/route-parsed-intent.ts`, `apps/bot/src/my-tasks-flow.ts`, `apps/bot/src/main.ts`
-- **Изменения**:
-  - убрать демо-эвристику “Реклама VK”
-  - внедрить выбор проекта кнопками
-  - “Мои задачи” → группировка по проектам
-- **Проверки**:
-  - 1 доступный проект → auto-select с preview
-  - несколько проектов → кнопочный выбор
-  - projectHint не найден/нет доступа → ошибка
-- **Риски**:
-  - регрессии pending/choice/confirmation
-- **Готовность**:
-  - Telegram работает только с доступными проектами
+### Этап 6A — Bot project selection для create flows ✅ (реализован)
+- **Цель**: выбор проекта для create_task / create_budget / create_expense, slash `/task` и `/expense`; без production fallback на «Реклама VK»; note/absence без выбора проекта.
+- **Модули**: `project-resolution.ts`, `project-selection-flow.ts`, `pending-project-selection.ts`, `continue-after-project-selection.ts`, create/slash flows.
+- **Проверки**: 1 проект → auto-select; 2+ → кнопки; strict `projectHint`; smoke create flows.
+
+### Этап 6B — Bot project UX continuation ✅ (реализован)
+- **Цель**: списки задач и edit project в confirmation без лишнего выбора проекта.
+- **Списки** (`my-tasks-flow.ts`, `/tasks`, `list_my_tasks`, `list_user_tasks`):
+  - без `projectHint`: все доступные проекты, группировка `Проект: …`, α-порядок, нумерация с 1 в секции, лимит 20, footer при ровно 20 задачах;
+  - с `projectHint`: strict resolve, одна секция `Проект: X`.
+- **Task actions** без `projectHint`: без выбора проекта (регрессия: `resolve-task-by-title.ts` → `GET /tasks` без `projectId`).
+- **Confirmation edit**: поле «Проект» для `create_task` / `create_expense` — кнопочный выбор или strict текст; `actorUserId` = linked user; cancel project selection → «Ок, изменение проекта отменено.» без зависшего pending; `create_expense` после смены проекта → budget selection через `reconfirmAfterEdit`.
+- **Не делали**: completed tasks, поле «Проект» для `create_budget`, API/Web/Prisma.
 
 ### Этап 7 — Mention membership + add-to-project flow
 - **Цель**: mentions только внутри проекта задачи + add-to-project override для MANAGER/OWNER.

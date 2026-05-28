@@ -1,6 +1,6 @@
 import type { Context } from "grammy";
 import { requireLinkedUser } from "./current-user";
-import { replyWithTasksForHint } from "./my-tasks-flow";
+import { replyWithTasksForHint, TASK_LIST_DISPLAY_LIMIT } from "./my-tasks-flow";
 import { showPendingExpenses } from "./pending-expenses-flow";
 import { replyWithMainMenu } from "./main-menu-reply";
 import {
@@ -43,7 +43,7 @@ export async function handleMainMenuCallback(ctx: Context): Promise<boolean> {
       const user = await requireLinkedUser(ctx);
       if (!user) return true;
       try {
-        await replyWithTasksForHint(ctx, user, telegramUserId, "", 5);
+        await replyWithTasksForHint(ctx, user, telegramUserId, "", TASK_LIST_DISPLAY_LIMIT);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[bot] main menu my-tasks error: ${msg}`);

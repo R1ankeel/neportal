@@ -40,7 +40,8 @@ export type ProjectSelectionContinue =
       description?: string;
       budgetHint?: string;
       executeIfResolved?: boolean;
-    };
+    }
+  | { kind: "confirmation_edit" };
 
 export type PendingProjectSelection = {
   choiceId: string;
@@ -69,11 +70,19 @@ export function isPendingProjectSelectionExpired(pending: PendingProjectSelectio
   return Date.now() - pending.createdAt > PENDING_PROJECT_SELECTION_TTL_MS;
 }
 
+function shouldPreserveConfirmationOnProjectSelection(
+  continuation: ProjectSelectionContinue,
+): boolean {
+  return continuation.kind === "confirmation_edit";
+}
+
 export function startPendingProjectSelection(
   telegramUserId: number,
   pending: Omit<PendingProjectSelection, "choiceId" | "type" | "createdAt">,
 ): void {
-  clearPendingConfirmation(telegramUserId);
+  if (!shouldPreserveConfirmationOnProjectSelection(pending.continue)) {
+    clearPendingConfirmation(telegramUserId);
+  }
   clearPendingTaskStatusDetails(telegramUserId);
   clearPendingTaskCommentDetails(telegramUserId);
   clearPendingTaskMentionDetails(telegramUserId);

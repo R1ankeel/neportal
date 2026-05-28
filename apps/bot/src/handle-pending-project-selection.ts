@@ -7,6 +7,8 @@ import {
   getPendingProjectSelection,
   isPendingProjectSelectionExpired,
 } from "./pending-project-selection";
+import { clearPendingConfirmation } from "./pending-intent";
+import { setConfirmationEditStep } from "./pending-confirmation-edit";
 
 function parseSelectionNumber(text: string): number | null {
   const trimmed = text.trim();
@@ -31,7 +33,14 @@ export async function handlePendingProjectSelectionMessage(
   }
 
   if (isConfirmationCancel(text)) {
+    const continuation = pending.continue;
     clearPendingProjectSelection(telegramUserId);
+    if (continuation.kind === "confirmation_edit") {
+      setConfirmationEditStep(telegramUserId, "await_value", "project");
+      await ctx.reply("Ок, изменение проекта отменено.");
+      return true;
+    }
+    clearPendingConfirmation(telegramUserId);
     await ctx.reply("Ок, действие отменено.");
     return true;
   }

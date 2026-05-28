@@ -23,6 +23,7 @@ import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import { devLogNaturalLanguageSelfChecks } from "./natural-language-self-checks.dev";
 import { devLogValidateAddTaskCommentChecks } from "./validate-add-task-comment-payload.dev";
 import { devLogProjectResolutionChecks } from "./project-resolution.dev";
+import { devLogMyTasksFlowChecks } from "./my-tasks-flow.dev";
 import { devLogAiStage2SelfChecks } from "./ai-stage2-self-checks.dev";
 import { devLogAiProviderRegistryChecks } from "./ai-provider-registry.dev";
 import { devLogAiProviderHardeningChecks } from "./ai-provider-hardening.dev";
@@ -71,7 +72,7 @@ import { handleTaskNotificationCallback } from "./handle-task-notification-callb
 import { devLogVoicePendingGuardChecks } from "./speech/voice-pending-guard.dev";
 import { devLogSpeechKitAsyncRoutingChecks } from "./speech/speechkit-async-routing.dev";
 import { devLogTaskStatusFlowChecks } from "./task-status-flow.dev";
-import { replyWithTasksForHint } from "./my-tasks-flow";
+import { replyWithTasksForHint, TASK_LIST_DISPLAY_LIMIT } from "./my-tasks-flow";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
 import { handleConfirmationCallback } from "./confirmation-callback";
@@ -302,7 +303,7 @@ bot.command("tasks", async (ctx) => {
   const hint = typeof ctx.match === "string" ? ctx.match.trim() : "";
 
   try {
-    await replyWithTasksForHint(ctx, user, telegramUserId, hint, 5);
+    await replyWithTasksForHint(ctx, user, telegramUserId, hint, TASK_LIST_DISPLAY_LIMIT);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[bot] tasks command error: ${msg}`);
@@ -1011,6 +1012,7 @@ async function main() {
     devLogNaturalLanguageSelfChecks();
     devLogValidateAddTaskCommentChecks();
     devLogProjectResolutionChecks();
+    devLogMyTasksFlowChecks();
     devLogAiStage2SelfChecks();
     devLogAiProviderRegistryChecks();
     devLogAiProviderHardeningChecks();

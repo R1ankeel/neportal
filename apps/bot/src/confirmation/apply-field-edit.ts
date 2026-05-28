@@ -11,7 +11,7 @@ import {
 } from "../parse-ru-date";
 import { parseBudgetReceiptEdit } from "../parse-budget-receipt-edit";
 import { isSelfHint, SELF_HINT_MARKER } from "../resolve-users-by-hint";
-import { fetchProjects, fetchUsers, pickDefaultActorUserId } from "../api";
+import { fetchProjects } from "../api";
 
 export type ApplyFieldEditResult =
   | { ok: true; intent: AiIntent }
@@ -49,6 +49,7 @@ export async function applyFieldEdit(
   intent: AiIntent,
   fieldKey: string,
   rawValue: string,
+  actorUserId?: string,
 ): Promise<ApplyFieldEditResult> {
   const value = rawValue.trim();
   if (!value) {
@@ -359,12 +360,10 @@ export async function applyFieldEdit(
     }
 
     case "project": {
-      const users = await fetchUsers();
-      const actorId = pickDefaultActorUserId(users);
-      if (!actorId) {
-        return { ok: false, message: "Нет пользователей в системе." };
+      if (!actorUserId?.trim()) {
+        return { ok: false, message: "Не удалось определить пользователя." };
       }
-      const projects = await fetchProjects(actorId);
+      const projects = await fetchProjects(actorUserId);
       const projectResult = resolveProjectFromHint(projects, value);
       if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
         return { ok: false, message: projectResult.message };
