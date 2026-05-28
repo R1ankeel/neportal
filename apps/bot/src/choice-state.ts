@@ -5,6 +5,7 @@ import { getPendingExpenseReceiptSelection } from "./pending-expense-receipt-sel
 import { getPendingTaskSelection } from "./pending-task-selection";
 import { getPendingUserSelection } from "./pending-user-selection";
 import { getPendingCreateTaskAssignee } from "./pending-create-task-assignee";
+import { getPendingProjectSelection } from "./pending-project-selection";
 import { formatIsoDateRu } from "./parse-ru-date";
 import { formatMoney } from "./api";
 
@@ -12,6 +13,7 @@ export type ActiveChoiceKind =
   | "confirmation_edit_field"
   | "expense_receipt"
   | "budget"
+  | "project"
   | "absence"
   | "task"
   | "user"
@@ -48,6 +50,16 @@ export function getActiveChoice(telegramUserId: number): ActiveChoice | null {
       labels: expense.expenses.map(
         (item) => `${formatMoney(item.amount)} — ${item.description?.trim() || "без описания"}`,
       ),
+    };
+  }
+
+  const project = getPendingProjectSelection(telegramUserId);
+  if (project) {
+    return {
+      kind: "project",
+      choiceId: project.choiceId,
+      optionCount: project.candidates.length,
+      labels: project.candidates.map((candidate) => candidate.name),
     };
   }
 

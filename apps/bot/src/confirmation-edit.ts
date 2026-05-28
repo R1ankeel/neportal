@@ -119,14 +119,22 @@ async function reconfirmAfterEdit(
         return false;
       }
 
+      if (expenseResult.kind === "project_selection") {
+        await ctx.reply(
+          "Уточните название проекта текстом или отмените редактирование и повторите команду.",
+        );
+        return false;
+      }
+
       if (expenseResult.kind === "selection") {
+        const first = expenseResult.candidates[0];
         startPendingBudgetSelection(telegramUserId, {
           candidates: expenseResult.candidates,
           payload: {
             amount: intent.payload.amount,
             description: intent.payload.description,
-            projectId: expenseResult.project.id,
-            projectName: expenseResult.project.name,
+            projectId: expenseResult.project?.id ?? first?.projectId ?? "",
+            projectName: expenseResult.project?.name ?? first?.projectName ?? "",
             userId: linked.id,
             budgetHint: intent.payload.budgetHint,
             source: "TELEGRAM_TEXT",

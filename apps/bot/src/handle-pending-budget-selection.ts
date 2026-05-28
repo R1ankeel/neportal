@@ -55,7 +55,10 @@ export async function handlePendingBudgetSelectionMessage(
   const payload = pending.payload;
   clearPendingBudgetSelection(telegramUserId);
 
-  const project: ApiProject = { id: payload.projectId, name: payload.projectName };
+  const project: ApiProject = {
+    id: selected.projectId || payload.projectId,
+    name: selected.projectName || payload.projectName,
+  };
   const resolved = confirmCreateExpenseAfterBudgetSelection(
     telegramUserId,
     project,

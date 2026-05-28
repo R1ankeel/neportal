@@ -18,7 +18,7 @@ import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
-import { resolveProjectFromHint } from "./hint-matchers";
+import { startProjectSelectionIfNeeded } from "./project-selection-flow";
 import {
   formatMyCompletedTasksReply,
   replyWithCompletedTasksForHint,
@@ -205,16 +205,37 @@ export async function routeParsedAiIntent(
     activeIntent = resolveCreateTaskAssigneeInIntent(activeIntent, linked);
   }
 
+  if (activeIntent.intent === "create_task" || activeIntent.intent === "create_budget") {
+    const projects = await fetchProjects(linked.id);
+    const projectHint =
+      activeIntent.intent === "create_task"
+        ? activeIntent.payload.projectHint
+        : activeIntent.payload.projectHint;
+    const project = await startProjectSelectionIfNeeded(ctx, telegramUserId, projects, projectHint, {
+      kind: "ai_intent",
+      intent: activeIntent,
+      userText: text,
+    });
+    if (!project) {
+      return;
+    }
+    if (activeIntent.intent === "create_task") {
+      activeIntent = {
+        ...activeIntent,
+        payload: { ...activeIntent.payload, projectHint: project.name },
+      };
+    } else {
+      activeIntent = {
+        ...activeIntent,
+        payload: { ...activeIntent.payload, projectHint: project.name },
+      };
+    }
+  }
+
   if (
     activeIntent.intent === "create_task" &&
     createTaskAssigneeNeedsClarification(activeIntent.payload)
   ) {
-    const projects = await fetchProjects(linked.id);
-    const projectResult = resolveProjectFromHint(projects, activeIntent.payload.projectHint);
-    if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-      await ctx.reply(projectResult.message);
-      return;
-    }
     const allUsers = await fetchUsers();
     const employeeCandidates = allUsers.filter((u) => u.id !== linked.id);
     const withEmployeeList = employeeCandidates.length > 0 && employeeCandidates.length <= CREATE_TASK_ASSIGNEE_LIST_LIMIT;
@@ -264,6 +285,19 @@ export async function routeParsedAiIntent(
 
   const resolvedResult = await resolveIntent(activeIntent, telegramUserId, text);
   if (!resolvedResult.ok) {
+    if (resolvedResult.message === "PROJECT_SELECTION_NEEDED") {
+      const projects = await fetchProjects(linked.id);
+      const projectHint =
+        activeIntent.intent === "create_task" || activeIntent.intent === "create_budget"
+          ? activeIntent.payload.projectHint
+          : undefined;
+      await startProjectSelectionIfNeeded(ctx, telegramUserId, projects, projectHint, {
+        kind: "ai_intent",
+        intent: activeIntent,
+        userText: text,
+      });
+      return;
+    }
     await ctx.reply(resolvedResult.message);
     return;
   }

@@ -151,19 +151,6 @@ export async function fetchProjects(actorUserId: string): Promise<ApiProject[]> 
   return res.json() as Promise<ApiProject[]>;
 }
 
-/** Нет проектов → null; иначе предпочтительно «Реклама VK», иначе id первого в списке. */
-export function pickDefaultProjectId(projects: ApiProject[]): string | null {
-  if (projects.length === 0) return null;
-  const preferred = projects.find((p) => p.name === "Реклама VK");
-  return preferred?.id ?? projects[0].id;
-}
-
-export function pickDefaultProject(projects: ApiProject[]): ApiProject | null {
-  if (projects.length === 0) return null;
-  const preferred = projects.find((p) => p.name === "Реклама VK");
-  return preferred ?? projects[0];
-}
-
 export async function fetchBudgets(
   projectId: string,
   actorUserId: string,
@@ -180,13 +167,6 @@ export async function fetchBudgets(
     throw new Error(`GET /budgets → ${res.status} ${text}`.trim());
   }
   return res.json() as Promise<ApiBudget[]>;
-}
-
-/** Нет бюджетов → null; иначе предпочтительно название с «Реклама VK», иначе первый. */
-export function pickDefaultBudget(budgets: ApiBudget[]): ApiBudget | null {
-  if (budgets.length === 0) return null;
-  const preferred = budgets.find((b) => b.title.includes("Реклама VK"));
-  return preferred ?? budgets[0];
 }
 
 export function parseAmount(value: string | number | undefined | null): number {

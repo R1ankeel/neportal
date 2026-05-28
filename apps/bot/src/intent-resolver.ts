@@ -12,7 +12,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { resolveBudgetForExpense } from "./budget-resolver";
-import { resolveProjectFromHint } from "./hint-matchers";
+import { resolveProjectForAction, resolveProjectForActionMessage } from "./project-resolution";
 import {
   isResolvableNamedUserHint,
   sanitizeAiUserHint,
@@ -218,9 +218,13 @@ export async function resolveIntent(
         userText,
       });
 
-      const projectResult = resolveProjectFromHint(projects, payload.projectHint);
-      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-        return { ok: false, message: projectResult.message };
+      const projectResult = resolveProjectForAction(projects, payload.projectHint);
+      const projectError = resolveProjectForActionMessage(projectResult);
+      if (projectError) {
+        return { ok: false, message: projectError };
+      }
+      if (projectResult.kind !== "resolved") {
+        return { ok: false, message: "PROJECT_SELECTION_NEEDED" };
       }
       const project = projectResult.project;
 
@@ -265,9 +269,13 @@ export async function resolveIntent(
     }
 
     case "create_budget": {
-      const projectResult = resolveProjectFromHint(projects, intent.payload.projectHint);
-      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-        return { ok: false, message: projectResult.message };
+      const projectResult = resolveProjectForAction(projects, intent.payload.projectHint);
+      const projectError = resolveProjectForActionMessage(projectResult);
+      if (projectError) {
+        return { ok: false, message: projectError };
+      }
+      if (projectResult.kind !== "resolved") {
+        return { ok: false, message: "PROJECT_SELECTION_NEEDED" };
       }
       const project = projectResult.project;
 
@@ -288,9 +296,13 @@ export async function resolveIntent(
     case "create_expense": {
       const userId = currentUser.id;
 
-      const projectResult = resolveProjectFromHint(projects, intent.payload.projectHint);
-      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-        return { ok: false, message: projectResult.message };
+      const projectResult = resolveProjectForAction(projects, intent.payload.projectHint);
+      const projectError = resolveProjectForActionMessage(projectResult);
+      if (projectError) {
+        return { ok: false, message: projectError };
+      }
+      if (projectResult.kind !== "resolved") {
+        return { ok: false, message: "PROJECT_SELECTION_NEEDED" };
       }
       const project = projectResult.project;
 

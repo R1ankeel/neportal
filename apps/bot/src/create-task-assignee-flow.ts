@@ -8,7 +8,7 @@ import {
 } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import type { PendingCreateTaskAssignee } from "./pending-create-task-assignee";
-import { resolveProjectFromHint } from "./hint-matchers";
+import { startProjectSelectionIfNeeded } from "./project-selection-flow";
 
 export function questionForCreateTaskAssignee(title: string): string {
   return `Кому назначить задачу «${title}»?\n\nНапишите имя сотрудника или «мне».`;
@@ -30,13 +30,28 @@ export const CREATE_TASK_ASSIGNEE_OPEN_REPLY =
 export async function confirmCreateTaskWithAssigneeId(
   ctx: Context,
   telegramUserId: number,
-  pending: PendingCreateTaskAssignee,
+  pending: Omit<PendingCreateTaskAssignee, "type" | "choiceId" | "createdAt">,
   assigneeId: string,
 ): Promise<void> {
   const projects = await fetchProjects(pending.creatorId);
-  const projectResult = resolveProjectFromHint(projects, pending.projectHint);
-  if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-    await ctx.reply(projectResult.message);
+  const project = await startProjectSelectionIfNeeded(
+    ctx,
+    telegramUserId,
+    projects,
+    pending.projectHint,
+    {
+      kind: "create_task_assignee",
+      data: {
+        candidates: pending.candidates,
+        projectHint: pending.projectHint,
+        title: pending.title,
+        description: pending.description,
+        deadlineDate: pending.deadlineDate,
+        creatorId: pending.creatorId,
+      },
+    },
+  );
+  if (!project) {
     return;
   }
 
@@ -49,7 +64,7 @@ export async function confirmCreateTaskWithAssigneeId(
       title: pending.title,
       description: pending.description,
       deadlineDate: pending.deadlineDate,
-      projectHint: pending.projectHint,
+      projectHint: project.name,
     },
   };
 
@@ -66,7 +81,7 @@ export async function confirmCreateTaskWithAssigneeId(
 
   setPendingConfirmation(telegramUserId, {
     type: "ai_intent",
-    intent: syntheticIntent,
+    intent: { ...syntheticIntent, payload: { ...syntheticIntent.payload, projectHint: project.name } },
     resolved: resolvedResult.resolved,
   });
   await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);

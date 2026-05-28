@@ -16,7 +16,7 @@ import type {
   UserSelectionPayload,
 } from "./pending-user-selection";
 import { getLinkedUserByTelegramId } from "./current-user";
-import { resolveProjectFromHint } from "./hint-matchers";
+import { startProjectSelectionIfNeeded } from "./project-selection-flow";
 import { todayIsoDate } from "./parse-ru-date";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
@@ -79,9 +79,28 @@ export async function continueAfterUserSelection(
 
   if (payload.intent === "create_task") {
     const projects = await fetchProjects(linked.id);
-    const projectResult = resolveProjectFromHint(projects, payload.projectHint);
-    if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
-      await ctx.reply(projectResult.message);
+    const project = await startProjectSelectionIfNeeded(
+      ctx,
+      telegramUserId,
+      projects,
+      payload.projectHint,
+      {
+        kind: "ai_intent",
+        intent: {
+          intent: "create_task",
+          confidence: 1,
+          requiresConfirmation: true,
+          payload: {
+            assigneeHint: selectedUser.fullName,
+            title: payload.title,
+            description: payload.description,
+            deadlineDate: payload.deadlineDate,
+            projectHint: payload.projectHint,
+          },
+        },
+      },
+    );
+    if (!project) {
       return;
     }
 
@@ -95,7 +114,7 @@ export async function continueAfterUserSelection(
         title: payload.title,
         description: payload.description,
         deadlineDate: payload.deadlineDate,
-        projectHint: payload.projectHint,
+        projectHint: project.name,
       },
     };
 

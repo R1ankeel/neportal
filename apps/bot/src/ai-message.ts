@@ -31,6 +31,7 @@ import { handlePendingTaskTransferDecisionMessage } from "./handle-pending-task-
 import { handlePendingTaskTransferRejectionMessage } from "./handle-pending-task-transfer-rejection";
 import { handlePendingAbsenceDelegationMessage } from "./handle-pending-absence-delegation";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
+import { handlePendingProjectSelectionMessage } from "./handle-pending-project-selection";
 import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
 import { parseCreateBudgetCommand } from "./parse-create-budget-command";
 import { parseTaskReassignQuery } from "./ai/deterministic/parse-task-reassign-query";
@@ -142,6 +143,10 @@ export async function handleTextSemanticMessage(
         ? CREATE_EXPENSE_CONFIRM_WAIT_MESSAGE
         : CONFIRM_WAIT_MESSAGE;
     await ctx.reply(waitMessage);
+    return;
+  }
+
+  if (await handlePendingProjectSelectionMessage(ctx, telegramUserId, inputText)) {
     return;
   }
 

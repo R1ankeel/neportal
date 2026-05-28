@@ -216,6 +216,7 @@ export function resolveBudgetForExpense(input: BudgetResolveInput): BudgetResolv
 export type BudgetCandidate = {
   id: string;
   name: string;
+  projectId: string;
   projectName: string;
   amount: number;
   confirmedSpent: number;
@@ -233,6 +234,7 @@ export function apiBudgetToCandidate(budget: ApiBudget): BudgetCandidate {
   return {
     id: budget.id,
     name: budget.title,
+    projectId: budget.project?.id ?? "",
     projectName: budget.project?.name ?? "—",
     amount: totals.amount,
     confirmedSpent: totals.confirmedSpent,
@@ -261,7 +263,12 @@ export function candidateToApiBudget(
     requiresReceipt: candidate.requiresReceipt,
     matchingKeywords: matchingKeywords ?? null,
     project:
-      project ?? (candidate.projectName !== "—" ? { id: "", name: candidate.projectName } : null),
+      project ??
+      (candidate.projectId
+        ? { id: candidate.projectId, name: candidate.projectName }
+        : candidate.projectName !== "—"
+          ? { id: "", name: candidate.projectName }
+          : null),
     totals: {
       amount: candidate.amount,
       confirmedSpent: candidate.confirmedSpent,

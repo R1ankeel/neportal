@@ -1,4 +1,4 @@
-import type { ExpenseSelectionPayload } from "./create-expense-flow";
+import type { AiIntent } from "./ai-contracts";
 import { clearPendingConfirmation } from "./pending-intent";
 import { clearPendingTaskCommentDetails } from "./pending-task-comment-details";
 import { clearPendingTaskMentionDetails } from "./pending-task-mention-details";
@@ -11,39 +11,67 @@ import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 import { clearPendingAbsenceDelegation } from "./pending-absence-delegation";
+import { clearPendingBudgetSelection } from "./pending-budget-selection";
 import { clearPendingExpenseReceiptSelection } from "./pending-expense-receipt-selection";
 import { clearPendingExpenseReceiptUpload } from "./pending-expense-receipt-upload";
-import { clearPendingProjectSelection } from "./pending-project-selection";
-import type { BudgetCandidate } from "./budget-resolver";
 import { createChoiceId } from "./choice-id";
+import type { PendingCreateTaskAssignee } from "./pending-create-task-assignee";
 
-export type PendingBudgetSelection = {
+export type ProjectCandidate = {
+  id: string;
+  name: string;
+};
+
+export type ProjectSelectionContinue =
+  | { kind: "ai_intent"; intent: AiIntent; userText?: string }
+  | {
+      kind: "create_task_assignee";
+      data: Omit<PendingCreateTaskAssignee, "type" | "choiceId" | "createdAt">;
+    }
+  | {
+      kind: "slash_task";
+      title: string;
+      creatorId: string;
+      assigneeId?: string;
+    }
+  | {
+      kind: "slash_expense";
+      amount: number;
+      description?: string;
+      budgetHint?: string;
+      executeIfResolved?: boolean;
+    };
+
+export type PendingProjectSelection = {
   choiceId: string;
-  type: "select_budget_for_expense";
-  candidates: BudgetCandidate[];
-  payload: ExpenseSelectionPayload;
+  type: "select_project";
+  candidates: ProjectCandidate[];
+  truncated: boolean;
+  continue: ProjectSelectionContinue;
   createdAt: number;
 };
 
-const pendingByTelegramUserId = new Map<number, PendingBudgetSelection>();
+const pendingByTelegramUserId = new Map<number, PendingProjectSelection>();
 
-export const PENDING_BUDGET_SELECTION_TTL_MS = 30 * 60 * 1000;
+export const PENDING_PROJECT_SELECTION_TTL_MS = 30 * 60 * 1000;
 
-export function getPendingBudgetSelection(telegramUserId: number): PendingBudgetSelection | undefined {
+export function getPendingProjectSelection(
+  telegramUserId: number,
+): PendingProjectSelection | undefined {
   return pendingByTelegramUserId.get(telegramUserId);
 }
 
-export function clearPendingBudgetSelection(telegramUserId: number): void {
+export function clearPendingProjectSelection(telegramUserId: number): void {
   pendingByTelegramUserId.delete(telegramUserId);
 }
 
-export function isPendingBudgetSelectionExpired(pending: PendingBudgetSelection): boolean {
-  return Date.now() - pending.createdAt > PENDING_BUDGET_SELECTION_TTL_MS;
+export function isPendingProjectSelectionExpired(pending: PendingProjectSelection): boolean {
+  return Date.now() - pending.createdAt > PENDING_PROJECT_SELECTION_TTL_MS;
 }
 
-export function startPendingBudgetSelection(
+export function startPendingProjectSelection(
   telegramUserId: number,
-  pending: Omit<PendingBudgetSelection, "choiceId" | "type" | "createdAt">,
+  pending: Omit<PendingProjectSelection, "choiceId" | "type" | "createdAt">,
 ): void {
   clearPendingConfirmation(telegramUserId);
   clearPendingTaskStatusDetails(telegramUserId);
@@ -57,18 +85,18 @@ export function startPendingBudgetSelection(
   clearPendingCreateTaskAssignee(telegramUserId);
   clearPendingAbsenceSelection(telegramUserId);
   clearPendingAbsenceDelegation(telegramUserId);
+  clearPendingBudgetSelection(telegramUserId);
   clearPendingExpenseReceiptSelection(telegramUserId);
   clearPendingExpenseReceiptUpload(telegramUserId);
-  clearPendingProjectSelection(telegramUserId);
 
   pendingByTelegramUserId.set(telegramUserId, {
-    type: "select_budget_for_expense",
+    type: "select_project",
     ...pending,
     choiceId: createChoiceId(),
     createdAt: Date.now(),
   });
 }
 
-export function hasPendingBudgetSelection(telegramUserId: number): boolean {
+export function hasPendingProjectSelection(telegramUserId: number): boolean {
   return pendingByTelegramUserId.has(telegramUserId);
 }

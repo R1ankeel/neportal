@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import { getActiveChoice } from "./choice-state";
 import { handlePendingConfirmationEditMessage } from "./confirmation-edit";
 import { handlePendingAbsenceSelectionMessage } from "./handle-pending-absence-selection";
+import { handlePendingProjectSelectionMessage } from "./handle-pending-project-selection";
 import { handlePendingBudgetSelectionMessage } from "./handle-pending-budget-selection";
 import { handlePendingExpenseReceiptSelectionMessage } from "./handle-pending-expense-receipt-selection";
 import { handlePendingTaskSelectionMessage } from "./handle-pending-task-selection";
@@ -22,6 +23,7 @@ async function dispatchChoiceText(
 ): Promise<boolean> {
   if (await handlePendingConfirmationEditMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingExpenseReceiptSelectionMessage(ctx, telegramUserId, text)) return true;
+  if (await handlePendingProjectSelectionMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingBudgetSelectionMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingAbsenceSelectionMessage(ctx, telegramUserId, text)) return true;
   if (await handlePendingTaskSelectionMessage(ctx, telegramUserId, text)) return true;

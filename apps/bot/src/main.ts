@@ -7,7 +7,6 @@ import {
 } from "./absence-slash-flow";
 import {
   createNote,
-  createTask,
   fetchProjects,
   fetchUserByTelegramId,
   fetchUsers,
@@ -15,8 +14,6 @@ import {
   linkTelegramUser,
   formatMoney,
   pickAssigneeId,
-  pickDefaultProject,
-  pickDefaultProjectId,
   getApiBaseUrl,
 } from "./api";
 import { requireLinkedUser } from "./current-user";
@@ -25,6 +22,7 @@ import { devLogCreateAbsenceUserSelfChecks } from "./fix-ai-intent-absence-user"
 import { devLogCreateTaskAssigneeSelfChecks } from "./fix-ai-intent-assignee";
 import { devLogNaturalLanguageSelfChecks } from "./natural-language-self-checks.dev";
 import { devLogValidateAddTaskCommentChecks } from "./validate-add-task-comment-payload.dev";
+import { devLogProjectResolutionChecks } from "./project-resolution.dev";
 import { devLogAiStage2SelfChecks } from "./ai-stage2-self-checks.dev";
 import { devLogAiProviderRegistryChecks } from "./ai-provider-registry.dev";
 import { devLogAiProviderHardeningChecks } from "./ai-provider-hardening.dev";
@@ -37,6 +35,7 @@ import { devLogChoiceKeyboardChecks } from "./choice-keyboard.dev";
 import { devLogResolveUsersByHintChecks } from "./resolve-users-by-hint.dev";
 import { devLogRelativeMonthDeadlineChecks } from "./parse-ru-date";
 import { beginCreateExpenseFlow } from "./create-expense-flow";
+import { startProjectSelectionIfNeeded } from "./project-selection-flow";
 import { getLastExpense } from "./last-expense";
 import {
   clearPendingExpenseReceiptUpload,
@@ -59,7 +58,6 @@ import { handleMainMenuCallback } from "./main-menu-callback";
 import { replyWithMainMenu, replyWithMainMenuAndPersistentButton } from "./main-menu-reply";
 import { isMainMenuTrigger } from "./telegram/keyboards/persistent-menu-keyboard";
 import { startTaskNotificationScheduler } from "./task-notification-scheduler";
-import { notifyTaskAssigned } from "./task-notifications";
 import { handleDeadlineSlashCommand } from "./handle-deadline-slash";
 import { handleCommentSlashCommand } from "./task-comment-flow";
 import { handleMentionSlashCommand } from "./task-mention-flow";
@@ -323,35 +321,58 @@ bot.hears(/^\/task(?:@\w+)?\s+(.+)$/ims, async (ctx) => {
     const currentUser = await requireLinkedUser(ctx);
     if (!currentUser) return;
 
+    const telegramUserId = ctx.from?.id;
+    if (!telegramUserId) {
+      await ctx.reply("Не удалось определить Telegram ID.");
+      return;
+    }
+
     const [users, projects] = await Promise.all([
       fetchUsers(),
       fetchProjects(currentUser.id),
     ]);
-    const creatorId = currentUser.id;
     const assigneeId = pickAssigneeId(users);
 
-    const projectId = pickDefaultProjectId(projects);
-    if (!projectId) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+    const project = await startProjectSelectionIfNeeded(
+      ctx,
+      telegramUserId,
+      projects,
+      undefined,
+      {
+        kind: "slash_task",
+        title,
+        creatorId: currentUser.id,
+        assigneeId,
+      },
+    );
+    if (!project) {
       return;
     }
 
-    const task = await createTask({
-      title,
-      creatorId,
-      assigneeId,
-      projectId,
-    });
-
-    try {
-      await notifyTaskAssigned(bot.api, task);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[task-notifications] assign notify error: ${msg}`);
+    const syntheticIntent = {
+      intent: "create_task" as const,
+      confidence: 1,
+      requiresConfirmation: true,
+      payload: { title, projectHint: project.name },
+    };
+    const { resolveIntent } = await import("./intent-resolver");
+    const resolvedResult = await resolveIntent(
+      syntheticIntent,
+      telegramUserId,
+      undefined,
+      assigneeId ? { assigneeId } : undefined,
+    );
+    if (!resolvedResult.ok) {
+      await ctx.reply(resolvedResult.message);
+      return;
     }
 
-    const projectName = task.project?.name ?? projects.find((p) => p.id === projectId)?.name ?? "проект";
-    await ctx.reply(`Задача создана в проекте «${projectName}»: ${task.title}`);
+    setPendingConfirmation(telegramUserId, {
+      type: "ai_intent",
+      intent: syntheticIntent,
+      resolved: resolvedResult.resolved,
+    });
+    await replyWithIntentPreview(ctx, telegramUserId, resolvedResult.resolved);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(msg);
@@ -406,14 +427,6 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
     const currentUser = await requireLinkedUser(ctx);
     if (!currentUser) return;
 
-    const projects = await fetchProjects(currentUser.id);
-
-    const project = pickDefaultProject(projects);
-    if (!project) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
-      return;
-    }
-
     const telegramUserId = ctx.from?.id;
     if (!telegramUserId) return;
 
@@ -421,6 +434,7 @@ bot.hears(/^\/expense(?:@\w+)?\s+([\d]+(?:[.,]\d+)?)\s*(.*)$/ims, async (ctx) =>
       amount,
       description,
       executeIfResolved: true,
+      fromAiIntent: false,
     });
 
     if (flow.kind === "error") {
@@ -996,6 +1010,7 @@ async function main() {
     devLogResolveUsersByHintChecks();
     devLogNaturalLanguageSelfChecks();
     devLogValidateAddTaskCommentChecks();
+    devLogProjectResolutionChecks();
     devLogAiStage2SelfChecks();
     devLogAiProviderRegistryChecks();
     devLogAiProviderHardeningChecks();

@@ -10,6 +10,7 @@ import { clearPendingUserSelection } from "./pending-user-selection";
 import { clearPendingCreateTaskAssignee } from "./pending-create-task-assignee";
 import { clearPendingAbsenceSelection } from "./pending-absence-selection";
 import { clearPendingBudgetSelection } from "./pending-budget-selection";
+import { clearPendingProjectSelection } from "./pending-project-selection";
 import { createChoiceId } from "./choice-id";
 
 export type PendingTaskSelectionType =
@@ -134,6 +135,7 @@ export function startPendingTaskSelection(
   clearPendingCreateTaskAssignee(telegramUserId);
   clearPendingAbsenceSelection(telegramUserId);
   clearPendingBudgetSelection(telegramUserId);
+  clearPendingProjectSelection(telegramUserId);
   setPendingTaskSelection(telegramUserId, {
     choiceId: createChoiceId(),
     type,
