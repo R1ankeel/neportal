@@ -85,6 +85,7 @@ export async function replyWithTaskCommentsForHint(
   telegramUserId: number,
   hint: string,
   taskId?: string,
+  projectHint?: string,
 ): Promise<void> {
   const trimmedHint = hint.trim();
 
@@ -111,7 +112,7 @@ export async function replyWithTaskCommentsForHint(
     currentUser,
     trimmedHint,
     "comments_list",
-    { telegramUserId },
+    { telegramUserId, projectHint },
   );
 
   if (resolution.kind !== "found") {

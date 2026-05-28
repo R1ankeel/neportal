@@ -28,5 +28,12 @@ export async function handleListTaskCommentsIntent(
     return;
   }
 
-  await replyWithTaskCommentsForHint(ctx, linked, telegramUserId, hint, taskId);
+  await replyWithTaskCommentsForHint(
+    ctx,
+    linked,
+    telegramUserId,
+    hint,
+    taskId,
+    intent.payload.projectHint,
+  );
 }

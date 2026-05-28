@@ -12,7 +12,7 @@ import {
   NOT_LINKED_MESSAGE,
 } from "./current-user";
 import { resolveBudgetForExpense } from "./budget-resolver";
-import { findProjectByHint } from "./hint-matchers";
+import { resolveProjectFromHint } from "./hint-matchers";
 import {
   isResolvableNamedUserHint,
   sanitizeAiUserHint,
@@ -218,10 +218,11 @@ export async function resolveIntent(
         userText,
       });
 
-      const project = findProjectByHint(projects, payload.projectHint);
-      if (!project) {
-        return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
+      const projectResult = resolveProjectFromHint(projects, payload.projectHint);
+      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+        return { ok: false, message: projectResult.message };
       }
+      const project = projectResult.project;
 
       let assignee: ApiUser | undefined;
       if (overrides?.assigneeId) {
@@ -264,10 +265,11 @@ export async function resolveIntent(
     }
 
     case "create_budget": {
-      const project = findProjectByHint(projects, intent.payload.projectHint);
-      if (!project) {
-        return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
+      const projectResult = resolveProjectFromHint(projects, intent.payload.projectHint);
+      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+        return { ok: false, message: projectResult.message };
       }
+      const project = projectResult.project;
 
       return {
         ok: true,
@@ -286,10 +288,11 @@ export async function resolveIntent(
     case "create_expense": {
       const userId = currentUser.id;
 
-      const project = findProjectByHint(projects, intent.payload.projectHint);
-      if (!project) {
-        return { ok: false, message: "Нет проектов. Сначала создайте проект в Web." };
+      const projectResult = resolveProjectFromHint(projects, intent.payload.projectHint);
+      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+        return { ok: false, message: projectResult.message };
       }
+      const project = projectResult.project;
 
       const budgets = await fetchBudgets(project.id, currentUser.id, userId);
       const budgetResult = resolveBudgetForExpense({

@@ -8,18 +8,84 @@ import {
   TASK_MATCH_SCORE_GAP,
 } from "./task-search-text";
 
-export function findProjectByHint(projects: ApiProject[], hint?: string): ApiProject | null {
-  if (projects.length === 0) return null;
+export type ResolveProjectResult =
+  | { kind: "found"; project: ApiProject }
+  | { kind: "default"; project: ApiProject }
+  | { kind: "not_found"; message: string }
+  | { kind: "ambiguous"; message: string };
+
+function projectMatchesHint(projects: ApiProject[], trimmed: string): ApiProject[] {
+  const q = trimmed.toLowerCase();
+  return projects.filter((p) => p.name.toLowerCase().includes(q));
+}
+
+/**
+ * Resolves a project from an optional hint among projects accessible to the actor.
+ * Empty hint → default project (TODO stage6: selection UX when multiple projects).
+ * Non-empty hint → strict match only; no fallback to default project.
+ */
+export function resolveProjectFromHint(
+  projects: ApiProject[],
+  hint?: string,
+): ResolveProjectResult {
+  if (projects.length === 0) {
+    return {
+      kind: "not_found",
+      message: "Нет проектов. Сначала создайте проект в Web.",
+    };
+  }
+
   const trimmed = hint?.trim();
-  if (!trimmed) return pickDefaultProject(projects);
+  if (!trimmed) {
+    const project = pickDefaultProject(projects);
+    if (!project) {
+      return {
+        kind: "not_found",
+        message: "Нет проектов. Сначала создайте проект в Web.",
+      };
+    }
+    // TODO(stage6): project selection UX when multiple projects and no hint
+    return { kind: "default", project };
+  }
+
+  const matches = projectMatchesHint(projects, trimmed);
+  if (matches.length === 0) {
+    return {
+      kind: "not_found",
+      message: `Не нашёл проект «${trimmed}». Проверьте название или доступ к проекту.`,
+    };
+  }
+  if (matches.length === 1) {
+    return { kind: "found", project: matches[0] };
+  }
 
   const q = trimmed.toLowerCase();
-  const matches = projects.filter((p) => p.name.toLowerCase().includes(q));
-  if (matches.length === 0) return pickDefaultProject(projects);
-  if (matches.length === 1) return matches[0];
+  const exact = matches.filter((p) => p.name.toLowerCase() === q);
+  if (exact.length === 1) {
+    return { kind: "found", project: exact[0] };
+  }
 
-  const exact = matches.find((p) => p.name.toLowerCase() === q);
-  return exact ?? matches[0];
+  const names = matches.map((p) => p.name).join(", ");
+  return {
+    kind: "ambiguous",
+    message: `Нашлось несколько проектов по запросу «${trimmed}»: ${names}. Уточните название проекта.`,
+  };
+}
+
+/** @deprecated Prefer resolveProjectFromHint for explicit error handling when hint is set. */
+export function findProjectByHint(projects: ApiProject[], hint?: string): ApiProject | null {
+  const result = resolveProjectFromHint(projects, hint);
+  if (result.kind === "found" || result.kind === "default") {
+    return result.project;
+  }
+  return null;
+}
+
+export function resolveProjectMessage(result: ResolveProjectResult): string | null {
+  if (result.kind === "not_found" || result.kind === "ambiguous") {
+    return result.message;
+  }
+  return null;
 }
 
 export function findUserByHint(

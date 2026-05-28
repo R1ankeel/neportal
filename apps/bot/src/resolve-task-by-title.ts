@@ -1,6 +1,6 @@
 import type { ApiTask, ApiUser } from "./api";
-import { fetchTasks } from "./api";
-import { findTaskByTitle } from "./hint-matchers";
+import { fetchProjects, fetchTasks } from "./api";
+import { findTaskByTitle, resolveProjectFromHint } from "./hint-matchers";
 import {
   apiTaskToCandidate,
   startPendingTaskSelection,
@@ -158,6 +158,7 @@ export async function resolveTaskByTitle(
     selectionPayload?: TaskSelectionPayload;
     assigneeFilterUserId?: string;
     assigneeFilterUserName?: string;
+    projectHint?: string;
   },
 ): Promise<ResolveTaskByTitleResult> {
   const trimmed = titleQuery.trim();
@@ -165,7 +166,18 @@ export async function resolveTaskByTitle(
     return { kind: "empty", message: emptyTitleMessage(purpose) };
   }
 
-  const tasks = await fetchTasks(user.id);
+  let projectId: string | undefined;
+  const projectHintTrimmed = options?.projectHint?.trim();
+  if (projectHintTrimmed) {
+    const projects = await fetchProjects(user.id);
+    const projectResult = resolveProjectFromHint(projects, projectHintTrimmed);
+    if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+      return { kind: "empty", message: projectResult.message };
+    }
+    projectId = projectResult.project.id;
+  }
+
+  const tasks = await fetchTasks(user.id, projectId);
   const match = findTaskByTitle(tasks, trimmed);
 
   if (match.kind === "not_found") {

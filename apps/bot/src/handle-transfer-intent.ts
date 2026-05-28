@@ -58,7 +58,11 @@ export async function handleTransferTaskIntent(
     linked,
     intent.payload.taskTitle,
     "transfer",
-    { telegramUserId, selectionPayload: taskSelectionPayload },
+    {
+      telegramUserId,
+      selectionPayload: taskSelectionPayload,
+      projectHint: intent.payload.projectHint,
+    },
   );
 
   if (resolution.kind !== "found") {

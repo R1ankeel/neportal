@@ -9,7 +9,7 @@ import {
 import { formatBudgetSelectionMessage } from "./budget-selection-format";
 import type { ApiBudget, ApiProject, ApiUser } from "./api";
 import { fetchBudgets, fetchProjects } from "./api";
-import { findProjectByHint } from "./hint-matchers";
+import { resolveProjectFromHint } from "./hint-matchers";
 import type { ResolvedCreateExpense } from "./intent-resolver";
 import { replyWithIntentPreview } from "./intent-preview";
 import { setPendingConfirmation } from "./pending-intent";
@@ -71,10 +71,11 @@ export async function resolveCreateExpense(
   projects?: ApiProject[],
 ): Promise<ResolveCreateExpenseResult> {
   const projectList = projects ?? (await fetchProjects(currentUser.id));
-  const project = findProjectByHint(projectList, params.projectHint);
-  if (!project) {
-    return { kind: "error", message: "Нет проектов. Сначала создайте проект в Web." };
+  const projectResult = resolveProjectFromHint(projectList, params.projectHint);
+  if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+    return { kind: "error", message: projectResult.message };
   }
+  const project = projectResult.project;
 
   const budgets = await fetchBudgets(project.id, currentUser.id);
   const budgetResult = resolveBudgetForExpense({

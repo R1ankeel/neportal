@@ -8,7 +8,7 @@ import {
 } from "./intent-resolver";
 import { setPendingConfirmation } from "./pending-intent";
 import type { PendingCreateTaskAssignee } from "./pending-create-task-assignee";
-import { findProjectByHint } from "./hint-matchers";
+import { resolveProjectFromHint } from "./hint-matchers";
 
 export function questionForCreateTaskAssignee(title: string): string {
   return `Кому назначить задачу «${title}»?\n\nНапишите имя сотрудника или «мне».`;
@@ -34,9 +34,9 @@ export async function confirmCreateTaskWithAssigneeId(
   assigneeId: string,
 ): Promise<void> {
   const projects = await fetchProjects(pending.creatorId);
-  const project = findProjectByHint(projects, pending.projectHint);
-  if (!project) {
-    await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+  const projectResult = resolveProjectFromHint(projects, pending.projectHint);
+  if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+    await ctx.reply(projectResult.message);
     return;
   }
 

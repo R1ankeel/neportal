@@ -1,10 +1,10 @@
 export const TASK_STATUS_PROMPT = `Intents: start_task, complete_task, cancel_task, set_task_deadline.
 
 Payload:
-- start_task: { taskTitle }
-- complete_task: { taskTitle, completionResult? }
-- cancel_task: { taskTitle, cancellationReason? }
-- set_task_deadline: { taskTitle, deadlineDate }
+- start_task: { projectHint?, taskTitle }
+- complete_task: { projectHint?, taskTitle, completionResult? }
+- cancel_task: { projectHint?, taskTitle, cancellationReason? }
+- set_task_deadline: { projectHint?, taskTitle, deadlineDate }
 
 Правила: taskTitle — без «задачу»; «закрыл/завершил/сделал/готово» → complete_task; текст после запятой → completionResult; «начал/беру в работу» → start_task; «отмени» → cancel_task.
 

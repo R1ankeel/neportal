@@ -42,19 +42,21 @@ Zod-схемы для ответа **LLM intent parser** (YandexGPT или Qwen 
 | `intent` | Ключевые поля `payload` |
 |----------|-------------------------|
 | `create_task` | `title`, `assigneeHint?`, `assigneeUserId?`, `projectHint?`, `deadlineDate?` (ISO) |
-| `create_note` | `text`, `projectHint?` |
+| `create_note` | `text` (без `projectHint`) |
 | `create_expense` | `amount`, `projectHint?`, `budgetHint?`, `description?` |
 | `create_budget` | `name`, `amount`, `projectHint?`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `type`, `endDate`, `userHint?`, `startDate?`, … |
 | `cancel_absence` | `userHint?`, `type?`, `cancellationReason?` |
-| `set_task_deadline` | `taskTitle`, `deadlineDate` |
-| `complete_task` | `taskTitle`, `completionResult?` |
-| `cancel_task` | `taskTitle`, `cancellationReason?` |
-| `start_task` | `taskTitle` |
-| `add_task_comment` | `taskTitle?`, `taskQuery?`, `comment?` |
-| `mention_in_task` | `userHint`, `taskTitle`, `text?` |
-| `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
-| `reassign_task` | `taskTitle`, `toUserHint`, `fromUserHint?`, `comment?` |
+| `set_task_deadline` | `projectHint?`, `taskTitle`, `deadlineDate` |
+| `complete_task` | `projectHint?`, `taskTitle`, `completionResult?` |
+| `cancel_task` | `projectHint?`, `taskTitle`, `cancellationReason?` |
+| `start_task` | `projectHint?`, `taskTitle` |
+| `add_task_comment` | `projectHint?`, `taskTitle?`, `taskQuery?`, `comment?` |
+| `mention_in_task` | `projectHint?`, `userHint`, `taskTitle`, `text?` |
+| `transfer_task` | `projectHint?`, `taskTitle`, `toUserHint`, `comment?` |
+| `reassign_task` | `projectHint?`, `taskTitle`, `toUserHint`, `fromUserHint?`, `comment?` |
+| `list_my_tasks` | `projectHint?` |
+| `list_user_tasks` | `projectHint?`, `userHint` |
 | `list_my_tasks` | `{}` |
 | `list_user_tasks` | `userHint` |
 | `list_pending_expenses` | `{}` |

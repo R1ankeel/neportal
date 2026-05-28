@@ -126,12 +126,15 @@ export async function loadIntentPromptContext(
   };
 
   switch (group) {
-    case "create-task-rich":
-    case "create-note": {
+    case "create-task-rich": {
       const users = await fetchUsers();
       const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
       const projects = actorId ? await fetchProjects(actorId) : [];
       return { ...empty, projects, users };
+    }
+    case "create-note": {
+      const users = await fetchUsers();
+      return { ...empty, users };
     }
     case "expense": {
       const users = await fetchUsers();
@@ -142,10 +145,15 @@ export async function loadIntentPromptContext(
       });
       return { ...empty, projects, budgets };
     }
-    case "absence":
-    case "task-list": {
+    case "absence": {
       const users = await fetchUsers();
       return { ...empty, users };
+    }
+    case "task-list": {
+      const users = await fetchUsers();
+      const actorId = options?.linkedUserId ?? pickDefaultActorUserId(users);
+      const projects = actorId ? await fetchProjects(actorId) : [];
+      return { ...empty, users, projects };
     }
     case "task-status": {
       const users = await fetchUsers();
@@ -154,6 +162,7 @@ export async function loadIntentPromptContext(
       const tasks = await loadActiveTasks(options?.linkedUserId, projects);
       return {
         ...empty,
+        projects,
         tasks: filterTasksForPrompt(tasks, options?.userText),
       };
     }
@@ -165,6 +174,7 @@ export async function loadIntentPromptContext(
       return {
         ...empty,
         users,
+        projects,
         tasks: filterTasksForPrompt(tasks, options?.userText),
       };
     }
@@ -232,7 +242,11 @@ export function formatPromptContextForModel(
   const lines: string[] = [`Текущая дата: ${ctx.currentDate}`];
 
   if (
-    (group === "create-task-rich" || group === "create-note" || group === "expense") &&
+    (group === "create-task-rich" ||
+      group === "expense" ||
+      group === "task-status" ||
+      group === "collaboration" ||
+      group === "task-list") &&
     ctx.projects.length > 0
   ) {
     lines.push("", "Проекты:", ...ctx.projects.map((p) => `- ${p.name}`));

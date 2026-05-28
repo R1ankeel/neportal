@@ -61,7 +61,11 @@ export async function handleMentionInTaskIntent(
     linked,
     intent.payload.taskTitle,
     "mention",
-    { telegramUserId, selectionPayload: taskSelectionPayload },
+    {
+      telegramUserId,
+      selectionPayload: taskSelectionPayload,
+      projectHint: intent.payload.projectHint,
+    },
   );
 
   if (resolution.kind !== "found") {

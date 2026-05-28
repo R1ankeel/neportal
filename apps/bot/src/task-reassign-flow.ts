@@ -126,6 +126,7 @@ export async function continueReassignAfterUsersResolved(
     selectionPayload: taskSelectionPayload,
     assigneeFilterUserId: fromUser?.id,
     assigneeFilterUserName: fromUser?.fullName,
+    projectHint: intent.payload.projectHint,
   });
 
   if (resolution.kind !== "found") {

@@ -452,10 +452,14 @@ export async function fetchTaskById(
   return res.json() as Promise<ApiTaskDetail>;
 }
 
+/** Must match API `GET /tasks/my` cap (see tasks.service listMyTasks). */
+export const MY_TASKS_LIST_MAX_LIMIT = 20;
+
 export async function fetchMyTasks(userId: string, limit = 5): Promise<ApiMyTask[]> {
+  const cappedLimit = Math.min(Math.max(limit, 1), MY_TASKS_LIST_MAX_LIMIT);
   const url = new URL(`${getApiBaseUrl()}/tasks/my`);
   url.searchParams.set("userId", userId);
-  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("limit", String(cappedLimit));
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

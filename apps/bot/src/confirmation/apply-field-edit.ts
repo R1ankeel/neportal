@@ -2,7 +2,7 @@ import type { AiIntent } from "../ai-contracts";
 import { parseAmount } from "../api";
 import { normalizeBasicTaskTitle } from "../ai/deterministic/basic-create-task-text";
 import { collapseSpaces } from "../validate-add-task-comment-payload";
-import { findProjectByHint } from "../hint-matchers";
+import { resolveProjectFromHint } from "../hint-matchers";
 import {
   coerceDeadlineDateLoose,
   parseRuDate,
@@ -365,10 +365,11 @@ export async function applyFieldEdit(
         return { ok: false, message: "Нет пользователей в системе." };
       }
       const projects = await fetchProjects(actorId);
-      const project = findProjectByHint(projects, value);
-      if (!project) {
-        return { ok: false, message: "Проект не найден. Укажите название из списка проектов." };
+      const projectResult = resolveProjectFromHint(projects, value);
+      if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+        return { ok: false, message: projectResult.message };
       }
+      const project = projectResult.project;
       switch (intent.intent) {
         case "create_task":
           return {

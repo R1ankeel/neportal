@@ -16,7 +16,7 @@ import type {
   UserSelectionPayload,
 } from "./pending-user-selection";
 import { getLinkedUserByTelegramId } from "./current-user";
-import { findProjectByHint } from "./hint-matchers";
+import { resolveProjectFromHint } from "./hint-matchers";
 import { todayIsoDate } from "./parse-ru-date";
 import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
@@ -79,9 +79,9 @@ export async function continueAfterUserSelection(
 
   if (payload.intent === "create_task") {
     const projects = await fetchProjects(linked.id);
-    const project = findProjectByHint(projects, payload.projectHint);
-    if (!project) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+    const projectResult = resolveProjectFromHint(projects, payload.projectHint);
+    if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+      await ctx.reply(projectResult.message);
       return;
     }
 

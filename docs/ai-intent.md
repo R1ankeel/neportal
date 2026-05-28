@@ -179,21 +179,22 @@ Legacy-поля `version`, `action`, `entity` **не используются**.
 | intent | payload |
 |--------|---------|
 | `create_task` | `projectHint?`, `assigneeHint?`, `assigneeUserId?` (в т.ч. `__self__`), `title`, `description?`, `deadlineDate?` (ISO) |
-| `create_note` | `projectHint?`, `text` (в тексте даты - **DD.MM.YYYY**) |
+| `create_note` | `text` (глобальная заметка; даты в тексте — **DD.MM.YYYY**; `projectHint` игнорируется preprocess) |
 | `create_expense` | `projectHint?`, `budgetHint?`, `amount`, `description?` |
 | `create_budget` | `projectHint?`, `name`, `amount`, `requiresReceipt?`, `matchingKeywords?` |
 | `create_absence` | `userHint?`, `type`: `SICK_LEAVE` \| `VACATION`, `startDate?`, `endDate`, `documentNumber?`, `comment?` |
 | `cancel_absence` | `userHint?`, `type?`: `SICK_LEAVE` \| `VACATION`, `cancellationReason?` |
-| `set_task_deadline` | `taskTitle`, `deadlineDate` (ISO) |
-| `complete_task` | `taskTitle`, `completionResult?` |
-| `cancel_task` | `taskTitle`, `cancellationReason?` |
-| `start_task` | `taskTitle` |
-| `add_task_comment` | `taskQuery?`, `taskTitle?`, `taskId?`, `comment?` (legacy `text?`) |
-| `mention_in_task` | `userHint`, `taskTitle`, `text?` |
-| `transfer_task` | `taskTitle`, `toUserHint`, `comment?` |
-| `reassign_task` | `taskTitle`, `fromUserHint?`, `toUserHint`, `comment?` |
-| `list_my_tasks` | `{}` (пустой) |
-| `list_user_tasks` | `userHint` (имя сотрудника; `__self__` → свои задачи) |
+| `set_task_deadline` | `projectHint?`, `taskTitle`, `deadlineDate` (ISO) |
+| `complete_task` | `projectHint?`, `taskTitle`, `completionResult?` |
+| `cancel_task` | `projectHint?`, `taskTitle`, `cancellationReason?` |
+| `start_task` | `projectHint?`, `taskTitle` |
+| `add_task_comment` | `projectHint?`, `taskQuery?`, `taskTitle?`, `taskId?`, `comment?` (legacy `text?`), `mentionUserHints?` |
+| `list_task_comments` | `projectHint?`, `taskQuery?`, `taskTitle?`, `taskId?` |
+| `mention_in_task` | `projectHint?`, `userHint`, `taskTitle`, `text?` |
+| `transfer_task` | `projectHint?`, `taskTitle`, `toUserHint`, `comment?` |
+| `reassign_task` | `projectHint?`, `taskTitle`, `fromUserHint?`, `toUserHint`, `comment?` |
+| `list_my_tasks` | `projectHint?` (если пользователь назвал проект) |
+| `list_user_tasks` | `projectHint?`, `userHint` |
 | `list_pending_expenses` | `{}` (пустой) |
 | `unknown` | `reason?` |
 

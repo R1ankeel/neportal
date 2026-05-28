@@ -15,4 +15,7 @@ Payload: { projectHint?, assigneeHint?, assigneeUserId?, title, description?, de
 → {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Маше","title":"Подготовить презентацию","deadlineDate":"2026-05-29"}}
 
 Пример: «создай задачу роме, пусть поедет к узбекским поставщикам, разберется, почему беспорядок, проверит качество на месте»
-→ {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"роме","title":"Поехать к узбекским поставщикам","description":"Разобраться, почему у поставщиков беспорядок. Проверить качество продукции на месте."}}`;
+→ {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"роме","title":"Поехать к узбекским поставщикам","description":"Разобраться, почему у поставщиков беспорядок. Проверить качество продукции на месте."}}
+
+Пример: «Создай задачу Мише сверстать презентацию в проекте Маркетинг»
+→ {"intent":"create_task","confidence":0.9,"requiresConfirmation":true,"payload":{"assigneeHint":"Мише","title":"Сверстать презентацию","projectHint":"Маркетинг"}}`;

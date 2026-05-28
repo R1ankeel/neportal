@@ -119,7 +119,11 @@ export async function handleAddTaskCommentIntent(
     linked,
     taskQuery,
     "comment",
-    { telegramUserId, selectionPayload },
+    {
+      telegramUserId,
+      selectionPayload,
+      projectHint: intent.payload.projectHint,
+    },
   );
 
   if (resolution.kind !== "found") {

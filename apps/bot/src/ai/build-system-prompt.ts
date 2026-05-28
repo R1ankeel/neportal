@@ -1,5 +1,5 @@
 import type { PromptGroup } from "./prompt-group-router";
-import { CORE_JSON_RULES, USER_HINT_RULES } from "./prompts/shared-rules";
+import { CORE_JSON_RULES, PROJECT_HINT_RULES, USER_HINT_RULES } from "./prompts/shared-rules";
 import { ABSENCE_PROMPT } from "./prompts/absence-prompt";
 import { CLASSIFIER_PROMPT } from "./prompts/classifier-prompt";
 import { CREATE_NOTE_PROMPT } from "./prompts/create-note-prompt";
@@ -22,9 +22,11 @@ const GROUP_PROMPTS: Record<Exclude<PromptGroup, "classifier">, string> = {
 const GROUP_SUFFIX: Partial<Record<PromptGroup, string>> = {
   classifier: "",
   absence: USER_HINT_RULES,
-  "task-list": USER_HINT_RULES,
-  "create-task-rich": USER_HINT_RULES,
-  collaboration: USER_HINT_RULES,
+  "task-list": `${USER_HINT_RULES}\n${PROJECT_HINT_RULES}`,
+  "create-task-rich": `${USER_HINT_RULES}\n${PROJECT_HINT_RULES}`,
+  expense: PROJECT_HINT_RULES,
+  "task-status": PROJECT_HINT_RULES,
+  collaboration: `${USER_HINT_RULES}\n${PROJECT_HINT_RULES}`,
   "create-note": USER_HINT_RULES,
 };
 

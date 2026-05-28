@@ -18,7 +18,7 @@ import { handleMentionInTaskIntent } from "./handle-mention-intent";
 import { handleReassignTaskIntent } from "./handle-reassign-intent";
 import { handleTransferTaskIntent } from "./handle-transfer-intent";
 import { handleTaskActionIntent } from "./handle-task-intent";
-import { findProjectByHint } from "./hint-matchers";
+import { resolveProjectFromHint } from "./hint-matchers";
 import {
   formatMyCompletedTasksReply,
   replyWithCompletedTasksForHint,
@@ -118,7 +118,7 @@ export async function routeParsedAiIntent(
 
   if (intent.intent === "list_my_tasks") {
     try {
-      const reply = await formatMyTasksReply(linked.id, 5);
+      const reply = await formatMyTasksReply(linked.id, 5, intent.payload.projectHint);
       await ctx.reply(reply);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -137,6 +137,7 @@ export async function routeParsedAiIntent(
         intent.payload.userHint,
         5,
         intent.payload.userId,
+        intent.payload.projectHint,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -209,9 +210,9 @@ export async function routeParsedAiIntent(
     createTaskAssigneeNeedsClarification(activeIntent.payload)
   ) {
     const projects = await fetchProjects(linked.id);
-    const project = findProjectByHint(projects, activeIntent.payload.projectHint);
-    if (!project) {
-      await ctx.reply("Нет проектов. Сначала создайте проект в Web.");
+    const projectResult = resolveProjectFromHint(projects, activeIntent.payload.projectHint);
+    if (projectResult.kind === "not_found" || projectResult.kind === "ambiguous") {
+      await ctx.reply(projectResult.message);
       return;
     }
     const allUsers = await fetchUsers();

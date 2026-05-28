@@ -190,19 +190,14 @@ Notes делаем ранним **privacy/global-user fix**:
 - **Web**: `CreateProjectForm` (OWNER), вкладка «Участники», `ProjectMembersPanel`
 - **Не делали**: backfill старых проектов без members; Bot/AI/Notes/Absences
 
-### Этап 5 — AI contracts minimal projectHint
+### Этап 5 — AI contracts minimal projectHint ✅ (реализован)
 - **Цель**: научить AI возвращать `projectHint` в проектных intent’ах.
-- **Модули/файлы**:
-  - `packages/ai-contracts/src/index.ts`
-  - bot prompts/context: `apps/bot/src/ai/prompts/*`, `intent-context.ts`
-- **Изменения**:
-  - добавить `projectHint?` в минимальный список intent payloads (см. выше)
-- **Проверки**:
-  - LLM возвращает projectHint, но код не принимает решений без валидаций
-- **Риски**:
-  - регрессии схем/валидации
-- **Готовность**:
-  - контракты готовы, но поведение ещё определяется кодом резолва
+- **Контракты** (`packages/ai-contracts`): `projectHint?` в create/task/budget/expense intents; убран из `create_note`; preprocess strip legacy `projectHint` для note.
+- **Промпты**: `PROJECT_HINT_RULES` в shared-rules; примеры в task/create prompts; список «Проекты» в context для task-status/collaboration/task-list/expense/create-task.
+- **Резолв** (`resolveProjectFromHint`): при непустом hint — strict (0 / 2+ → ошибка с перечислением); при пустом — `pickDefaultProject` + `TODO(stage6)`.
+- **Task search**: `resolveTaskByTitle` с `projectHint` → `GET /tasks?projectId=`.
+- **Списки задач**: `list_my_tasks` / `list_user_tasks` фильтруют по project после strict resolve.
+- **Не делали**: completed tasks filter, deterministic parser, project selection UX, Web/API/Prisma.
 
 ### Этап 6 — Bot project UX
 - **Цель**: проектный UX в Telegram: выбор проекта, удаление fallback “Реклама VK”, “Мои задачи” по проектам.

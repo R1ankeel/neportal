@@ -58,6 +58,7 @@ export async function handleTaskActionIntent(
   const resolution = await resolveTaskByTitle(linked, intent.payload.taskTitle, purpose, {
     telegramUserId,
     selectionPayload,
+    projectHint: intent.payload.projectHint,
   });
 
   if (resolution.kind !== "found") {

@@ -46,8 +46,11 @@ const intentBase = {
   requiresConfirmation: z.boolean(),
 };
 
+/** Optional project name hint when the user names a project explicitly. */
+const projectHintField = { projectHint: optionalAiString };
+
 export const CreateTaskPayloadSchema = z.object({
-  projectHint: optionalAiString,
+  ...projectHintField,
   assigneeHint: optionalAiString,
   assigneeUserId: optionalAiString,
   title: z.string().min(1),
@@ -56,19 +59,18 @@ export const CreateTaskPayloadSchema = z.object({
 });
 
 export const CreateNotePayloadSchema = z.object({
-  projectHint: optionalAiString,
   text: z.string().min(1),
 });
 
 export const CreateExpensePayloadSchema = z.object({
-  projectHint: optionalAiString,
+  ...projectHintField,
   budgetHint: optionalAiString,
   amount: z.number().positive(),
   description: optionalAiString,
 });
 
 export const CreateBudgetPayloadSchema = z.object({
-  projectHint: optionalAiString,
+  ...projectHintField,
   name: z.string().min(1),
   amount: z.number().positive(),
   requiresReceipt: z.boolean().optional(),
@@ -93,6 +95,7 @@ export const CancelAbsencePayloadSchema = z.object({
 });
 
 export const SetTaskDeadlinePayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
   deadlineDate: z
     .string()
@@ -100,20 +103,24 @@ export const SetTaskDeadlinePayloadSchema = z.object({
 });
 
 export const CompleteTaskPayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
   completionResult: optionalAiStringMin1,
 });
 
 export const CancelTaskPayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
   cancellationReason: optionalAiStringMin1,
 });
 
 export const StartTaskPayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
 });
 
 export const AddTaskCommentPayloadSchema = z.object({
+  ...projectHintField,
   taskQuery: optionalAiStringMin1,
   taskId: optionalAiString,
   taskTitle: optionalAiStringMin1,
@@ -126,12 +133,14 @@ export const AddTaskCommentPayloadSchema = z.object({
 });
 
 export const ListTaskCommentsPayloadSchema = z.object({
+  ...projectHintField,
   taskQuery: optionalAiStringMin1,
   taskId: optionalAiString,
   taskTitle: optionalAiStringMin1,
 });
 
 export const MentionInTaskPayloadSchema = z.object({
+  ...projectHintField,
   userHint: z.string().min(1),
   mentionedUserId: optionalAiString,
   taskTitle: z.string().min(1),
@@ -139,6 +148,7 @@ export const MentionInTaskPayloadSchema = z.object({
 });
 
 export const TransferTaskPayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
   toUserHint: z.string().min(1),
   toUserId: optionalAiString,
@@ -146,6 +156,7 @@ export const TransferTaskPayloadSchema = z.object({
 });
 
 export const ReassignTaskPayloadSchema = z.object({
+  ...projectHintField,
   taskTitle: z.string().min(1),
   fromUserHint: optionalAiStringMin1,
   fromUserId: optionalAiString,
@@ -154,9 +165,12 @@ export const ReassignTaskPayloadSchema = z.object({
   comment: optionalAiStringMin1,
 });
 
-export const ListMyTasksPayloadSchema = z.object({});
+export const ListMyTasksPayloadSchema = z.object({
+  ...projectHintField,
+});
 
 export const ListUserTasksPayloadSchema = z.object({
+  ...projectHintField,
   userHint: z.string().min(1),
   userId: optionalAiString,
 });
@@ -331,6 +345,17 @@ export function preprocessAiIntentInput(input: unknown): unknown {
 
   if (obj.requiresConfirmation === undefined) {
     obj.requiresConfirmation = true;
+  }
+
+  if (
+    obj.intent === "create_note" &&
+    typeof obj.payload === "object" &&
+    obj.payload !== null &&
+    !Array.isArray(obj.payload)
+  ) {
+    const payload = { ...(obj.payload as Record<string, unknown>) };
+    delete payload.projectHint;
+    obj.payload = payload;
   }
 
   return obj;
