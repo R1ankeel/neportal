@@ -181,6 +181,10 @@ export class BudgetExpensesService {
 
   async createAttachment(expenseId: string, dto: CreateBudgetExpenseAttachmentDto) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByExpenseId({
+      expenseId,
+      actorUserId: dto.uploadedById,
+    });
     const expense = await this.ensureExpenseInOrg(expenseId);
 
     if (expense.budget.status === BudgetStatus.ARCHIVED) {
@@ -224,6 +228,10 @@ export class BudgetExpensesService {
     uploadedById: string,
   ) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByExpenseId({
+      expenseId,
+      actorUserId: uploadedById,
+    });
     const expense = await this.ensureExpenseInOrg(expenseId);
 
     if (expense.budget.status !== BudgetStatus.ACTIVE) {

@@ -35,10 +35,8 @@ export class ProjectMembersService {
   }
 
   async list(projectId: string, actorUserId?: string) {
-    await this.projectAccess.assertActorCanAccessActiveProject(
-      this.projectAccess.requireActorId(actorUserId),
-      projectId,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, projectId);
 
     const members = await this.prisma.projectMember.findMany({
       where: { projectId },

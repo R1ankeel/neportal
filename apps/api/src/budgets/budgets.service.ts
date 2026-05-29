@@ -68,7 +68,7 @@ export class BudgetsService {
 
     let projectIds: string[];
     if (options.projectId) {
-      await this.projectAccess.assertActorCanAccessActiveProject(actorId, options.projectId);
+      await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, options.projectId);
       projectIds = [options.projectId];
     } else {
       projectIds = await this.projectAccess.getAccessibleActiveProjectIds(actorId);
@@ -127,10 +127,15 @@ export class BudgetsService {
   }
 
   async findOne(id: string, actorUserId?: string) {
-    await this.projectAccess.assertActorCanAccessBudget(
-      this.projectAccess.requireActorId(actorUserId),
-      id,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    const budgetRow = await this.prisma.budget.findFirst({
+      where: { id, organizationId: this.orgId() },
+      select: { id: true, projectId: true },
+    });
+    if (!budgetRow) {
+      throw new NotFoundException(`Budget with id "${id}" not found`);
+    }
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, budgetRow.projectId);
     const budget = await this.prisma.budget.findFirst({
       where: { id, organizationId: this.orgId() },
       include: {
@@ -311,10 +316,15 @@ export class BudgetsService {
   }
 
   async listExpenses(budgetId: string, actorUserId?: string) {
-    await this.projectAccess.assertActorCanAccessBudget(
-      this.projectAccess.requireActorId(actorUserId),
-      budgetId,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    const budgetRow = await this.prisma.budget.findFirst({
+      where: { id: budgetId, organizationId: this.orgId() },
+      select: { id: true, projectId: true },
+    });
+    if (!budgetRow) {
+      throw new NotFoundException(`Budget with id "${budgetId}" not found`);
+    }
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, budgetRow.projectId);
     await this.ensureBudgetInOrg(budgetId);
 
     return this.prisma.budgetExpense.findMany({
@@ -328,13 +338,18 @@ export class BudgetsService {
     const org = this.orgId();
     const budget = await this.ensureBudgetInOrg(budgetId);
 
+    const actorId = dto.actorUserId ?? dto.userId;
+    await this.projectAccess.assertProjectIsActiveForWriteByBudgetId({
+      budgetId,
+      actorUserId: actorId,
+    });
+
     if (budget.status === BudgetStatus.ARCHIVED) {
       throw new BadRequestException(
         `Бюджет «${budget.title}» в архиве. Расходы по нему запрещены.`,
       );
     }
 
-    const actorId = dto.actorUserId ?? dto.userId;
     await this.ensureUserCanAccessBudget(budgetId, actorId, budget.title);
 
     const user = await this.prisma.user.findFirst({

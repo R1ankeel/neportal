@@ -3,7 +3,7 @@ import { ProjectPageShell } from "@/components/projects/ProjectPageShell";
 import { apiGet } from "@/lib/api";
 import { withActorQuery } from "@/lib/actor-user";
 import { resolveProjectActor } from "@/lib/resolve-project-actor";
-import type { ApiBudget } from "@/lib/types";
+import type { ApiBudget, ApiProject } from "@/lib/types";
 import { BudgetCard } from "./BudgetCard";
 import { CreateBudgetForm } from "./CreateBudgetForm";
 
@@ -31,17 +31,22 @@ export default async function ProjectBudgetsPage({
   }
 
   let budgets: ApiBudget[] = [];
+  let project: ApiProject | null = null;
   let error: string | null = null;
 
   try {
-    budgets = await apiGet<ApiBudget[]>("/budgets", {
-      actorUserId,
-      projectId: id,
-      status: isArchivedTab ? "ARCHIVED" : "ACTIVE",
-    });
+    [budgets, project] = await Promise.all([
+      apiGet<ApiBudget[]>("/budgets", {
+        actorUserId,
+        projectId: id,
+        status: isArchivedTab ? "ARCHIVED" : "ACTIVE",
+      }),
+      apiGet<ApiProject>(`/projects/${id}`, { actorUserId }),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
+  const projectArchived = project?.status === "ARCHIVED";
 
   return (
     <ProjectPageShell projectId={id} actorUserId={actorUserId} users={users}>
@@ -77,7 +82,7 @@ export default async function ProjectBudgetsPage({
           </p>
         ) : null}
 
-        {!isArchivedTab ? (
+        {!isArchivedTab && !projectArchived ? (
           <CreateBudgetForm projectId={id} actorUserId={actorUserId} users={users} />
         ) : null}
 

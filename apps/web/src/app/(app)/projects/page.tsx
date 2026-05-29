@@ -34,11 +34,17 @@ export default async function ProjectsPage({
 
   const actorUser = users.find((u) => u.id === actorUserId);
   const isOwner = actorUser?.role === "OWNER";
+  const statusParam = typeof sp.status === "string" ? sp.status : undefined;
+  const normalizedStatus = statusParam?.trim().toUpperCase();
+  const viewingArchive = isOwner && normalizedStatus === "ARCHIVED";
 
   let projects: ApiProject[] = [];
   let error: string | null = null;
   try {
-    projects = await apiGet<ApiProject[]>("/projects", { actorUserId });
+    projects = await apiGet<ApiProject[]>("/projects", {
+      actorUserId,
+      ...(viewingArchive ? { status: "ARCHIVED" } : {}),
+    });
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
@@ -53,13 +59,38 @@ export default async function ProjectsPage({
         <ActorUserSelector users={users} actorUserId={actorUserId} />
       </header>
 
+      {isOwner ? (
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/projects?actorUserId=${encodeURIComponent(actorUserId)}`}
+            className={`rounded-xl px-4 py-2 text-base font-medium ${
+              !viewingArchive
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            }`}
+          >
+            Активные
+          </Link>
+          <Link
+            href={`/projects?actorUserId=${encodeURIComponent(actorUserId)}&status=ARCHIVED`}
+            className={`rounded-xl px-4 py-2 text-base font-medium ${
+              viewingArchive
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            }`}
+          >
+            Архив
+          </Link>
+        </div>
+      ) : null}
+
       {error ? (
         <p className="rounded-2xl bg-amber-50 p-4 text-lg text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
           {error}
         </p>
       ) : null}
 
-      {isOwner ? <CreateProjectForm actorUserId={actorUserId} /> : null}
+      {isOwner && !viewingArchive ? <CreateProjectForm actorUserId={actorUserId} /> : null}
 
       <ul className="space-y-3">
         {projects.length === 0 && !error ? (

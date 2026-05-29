@@ -57,6 +57,14 @@ export class CreateTaskDto {
 }
 
 export class UpdateTaskStatusDto {
+  @ApiPropertyOptional({
+    description:
+      "Кто выполняет действие (actorUserId). Нужен для корректного 409 для OWNER в archived проектах. Bot может не передавать.",
+  })
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
+
   @ApiProperty({ enum: TaskStatus })
   @IsEnum(TaskStatus)
   status!: TaskStatus;
@@ -73,6 +81,14 @@ export class UpdateTaskStatusDto {
 }
 
 export class UpdateTaskDto {
+  @ApiPropertyOptional({
+    description:
+      "Кто выполняет действие (actorUserId). Нужен для корректного 409 для OWNER в archived проектах.",
+  })
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
+
   @ApiPropertyOptional({ description: "Новое название задачи" })
   @IsOptional()
   @IsString()
@@ -90,6 +106,14 @@ export class UpdateTaskDto {
 }
 
 export class UpdateTaskAssigneeDto {
+  @ApiPropertyOptional({
+    description:
+      "Кто выполняет действие (actorUserId). Нужен для корректного 409 для OWNER в archived проектах.",
+  })
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
+
   @ApiProperty({ description: "Новый исполнитель (пользователь текущей организации)" })
   @IsString()
   @IsNotEmpty()
@@ -97,6 +121,14 @@ export class UpdateTaskAssigneeDto {
 }
 
 export class UpdateTaskDeadlineDto {
+  @ApiPropertyOptional({
+    description:
+      "Кто выполняет действие (actorUserId). Нужен для корректного 409 для OWNER в archived проектах.",
+  })
+  @IsOptional()
+  @IsString()
+  actorUserId?: string;
+
   @ApiPropertyOptional({
     description: "ISO date или datetime; для date-only — конец дня UTC. null — сбросить дедлайн",
     example: "2026-05-22",

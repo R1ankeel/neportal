@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { ProjectsService } from "./projects.service";
@@ -11,8 +11,9 @@ export class ProjectsController {
   @Get()
   @ApiOperation({ summary: "Список проектов (ACTIVE, доступные актору)" })
   @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
-  findAll(@Query("actorUserId") actorUserId?: string) {
-    return this.projectsService.findAll(actorUserId);
+  @ApiQuery({ name: "status", required: false, description: "Фильтр статуса (OWNER может ARCHIVED)" })
+  findAll(@Query("actorUserId") actorUserId?: string, @Query("status") status?: string) {
+    return this.projectsService.findAll(actorUserId, status);
   }
 
   @Post()
@@ -36,5 +37,21 @@ export class ProjectsController {
   @ApiQuery({ name: "actorUserId", required: true, description: "Текущий пользователь (MVP)" })
   findOne(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
     return this.projectsService.findOne(id, actorUserId);
+  }
+
+  @Patch(":id/archive")
+  @ApiOperation({ summary: "Архивировать проект (только OWNER, идемпотентно)" })
+  @ApiParam({ name: "id" })
+  @ApiQuery({ name: "actorUserId", required: true })
+  archive(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.projectsService.archive(id, actorUserId);
+  }
+
+  @Patch(":id/restore")
+  @ApiOperation({ summary: "Возобновить проект (только OWNER, идемпотентно)" })
+  @ApiParam({ name: "id" })
+  @ApiQuery({ name: "actorUserId", required: true })
+  restore(@Param("id") id: string, @Query("actorUserId") actorUserId?: string) {
+    return this.projectsService.restore(id, actorUserId);
   }
 }

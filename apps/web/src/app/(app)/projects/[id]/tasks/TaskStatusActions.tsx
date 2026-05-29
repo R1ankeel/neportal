@@ -10,7 +10,17 @@ const transitions: { label: string; status: string }[] = [
   { label: "Отмена", status: "CANCELLED" },
 ];
 
-export function TaskStatusActions({ taskId, projectId, current }: { taskId: string; projectId: string; current: string }) {
+export function TaskStatusActions({
+  taskId,
+  projectId,
+  current,
+  actorUserId,
+}: {
+  taskId: string;
+  projectId: string;
+  current: string;
+  actorUserId: string;
+}) {
   const [state, formAction, pending] = useActionState(updateTaskStatus, undefined);
 
   return (
@@ -23,6 +33,7 @@ export function TaskStatusActions({ taskId, projectId, current }: { taskId: stri
           <input type="hidden" name="taskId" value={taskId} />
           <input type="hidden" name="status" value={t.status} />
           <input type="hidden" name="projectId" value={projectId} />
+          <input type="hidden" name="actorUserId" value={actorUserId} />
           <button
             type="submit"
             disabled={pending || current === t.status}

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,8 @@ import { EntityStatus, PrismaService, UserRole } from "@neportal/database";
 import { OrganizationContextService } from "../organization/organization-context.service";
 
 const ACTIVE_PROJECT_STATUS = EntityStatus.ACTIVE;
+const ARCHIVED_PROJECT_STATUS = EntityStatus.ARCHIVED;
+const DELETED_PROJECT_STATUS = EntityStatus.DELETED;
 
 @Injectable()
 export class ProjectAccessService {
@@ -46,6 +49,18 @@ export class ProjectAccessService {
 
   private isManager(role: UserRole): boolean {
     return role === UserRole.MANAGER;
+  }
+
+  private isDeletedProject(status: EntityStatus): boolean {
+    return status === DELETED_PROJECT_STATUS;
+  }
+
+  private notFoundProject(pid: string): NotFoundException {
+    return new NotFoundException(`Project with id "${pid}" not found`);
+  }
+
+  private archivedWriteError(): ConflictException {
+    return new ConflictException("Project is archived");
   }
 
   /** Active projects in org visible to actor (OWNER: all ACTIVE; others: membership). */
@@ -99,7 +114,7 @@ export class ProjectAccessService {
         where: { id: pid, organizationId: org, status: ACTIVE_PROJECT_STATUS },
       });
       if (!project) {
-        throw new NotFoundException(`Project with id "${pid}" not found`);
+        throw this.notFoundProject(pid);
       }
       return project;
     }
@@ -113,9 +128,132 @@ export class ProjectAccessService {
       },
     });
     if (!membership?.project || membership.project.status !== ACTIVE_PROJECT_STATUS) {
-      throw new NotFoundException(`Project with id "${pid}" not found`);
+      throw this.notFoundProject(pid);
     }
     return membership.project;
+  }
+
+  /**
+   * Read-only access for Web:
+   * - OWNER: ACTIVE or ARCHIVED (DELETED always 404)
+   * - Non-owner: only ACTIVE via membership
+   */
+  async assertActorCanAccessProjectReadOnlyForWeb(actorUserId: string, projectId: string) {
+    const actor = await this.getActorOrThrow(actorUserId);
+    const org = this.orgId();
+    const pid = projectId?.trim();
+    if (!pid) {
+      throw new BadRequestException("projectId is required");
+    }
+
+    if (this.isOwner(actor.role)) {
+      const project = await this.prisma.project.findFirst({
+        where: {
+          id: pid,
+          organizationId: org,
+          status: { in: [ACTIVE_PROJECT_STATUS, ARCHIVED_PROJECT_STATUS] },
+        },
+      });
+      if (!project || this.isDeletedProject(project.status)) {
+        throw this.notFoundProject(pid);
+      }
+      return project;
+    }
+
+    return this.assertActorCanAccessActiveProject(actorUserId, pid);
+  }
+
+  /**
+   * Guard: block writes in archived project.
+   *
+   * - If project is ACTIVE: ok
+   * - If project is ARCHIVED:
+   *   - OWNER actor => 409 "Project is archived"
+   *   - non-owner or missing actor => 404
+   * - If project is DELETED or not found => 404
+   */
+  async assertProjectIsActiveForWrite(params: { projectId: string; actorUserId?: string }): Promise<void> {
+    const pid = params.projectId?.trim();
+    if (!pid) {
+      throw new BadRequestException("projectId is required");
+    }
+
+    const project = await this.prisma.project.findFirst({
+      where: { id: pid, organizationId: this.orgId() },
+      select: { id: true, status: true },
+    });
+    if (!project || this.isDeletedProject(project.status)) {
+      throw this.notFoundProject(pid);
+    }
+
+    if (project.status === ACTIVE_PROJECT_STATUS) {
+      return;
+    }
+
+    // ARCHIVED
+    const actorId = params.actorUserId?.trim();
+    if (!actorId) {
+      throw this.notFoundProject(pid);
+    }
+    const actor = await this.getActorOrThrow(actorId);
+    if (this.isOwner(actor.role)) {
+      throw this.archivedWriteError();
+    }
+    throw this.notFoundProject(pid);
+  }
+
+  async assertProjectIsActiveForWriteByTaskId(params: { taskId: string; actorUserId?: string }): Promise<void> {
+    const tid = params.taskId?.trim();
+    if (!tid) {
+      throw new BadRequestException("taskId is required");
+    }
+    const task = await this.prisma.task.findFirst({
+      where: { id: tid, organizationId: this.orgId() },
+      select: { id: true, projectId: true },
+    });
+    if (!task) {
+      throw new NotFoundException(`Task with id "${tid}" not found`);
+    }
+    await this.assertProjectIsActiveForWrite({
+      projectId: task.projectId,
+      actorUserId: params.actorUserId,
+    });
+  }
+
+  async assertProjectIsActiveForWriteByBudgetId(params: { budgetId: string; actorUserId?: string }): Promise<void> {
+    const bid = params.budgetId?.trim();
+    if (!bid) {
+      throw new BadRequestException("budgetId is required");
+    }
+    const budget = await this.prisma.budget.findFirst({
+      where: { id: bid, organizationId: this.orgId() },
+      select: { id: true, projectId: true },
+    });
+    if (!budget) {
+      throw new NotFoundException(`Budget with id "${bid}" not found`);
+    }
+    await this.assertProjectIsActiveForWrite({
+      projectId: budget.projectId,
+      actorUserId: params.actorUserId,
+    });
+  }
+
+  async assertProjectIsActiveForWriteByExpenseId(params: { expenseId: string; actorUserId?: string }): Promise<void> {
+    const eid = params.expenseId?.trim();
+    if (!eid) {
+      throw new BadRequestException("expenseId is required");
+    }
+    const expense = await this.prisma.budgetExpense.findFirst({
+      where: { id: eid, organizationId: this.orgId() },
+      select: { id: true, budgetId: true },
+    });
+    if (!expense) {
+      throw new NotFoundException(`Expense with id "${eid}" not found`);
+    }
+    await this.assertProjectIsActiveForWriteByBudgetId({
+      budgetId: expense.budgetId,
+      actorUserId: params.actorUserId,
+    });
   }
 
   async assertActorCanAccessTask(actorUserId: string, taskId: string) {
@@ -232,7 +370,7 @@ export class ProjectAccessService {
       throw new ForbiddenException("You cannot manage project members");
     }
 
-    throw new NotFoundException(`Project with id "${projectId}" not found`);
+    throw this.notFoundProject(projectId);
   }
 
   async getPendingExpenseProjectIds(actorUserId: string, targetUserId: string): Promise<string[]> {

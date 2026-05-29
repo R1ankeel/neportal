@@ -186,10 +186,15 @@ export class TasksService {
   }
 
   async findOne(id: string, actorUserId?: string) {
-    await this.projectAccess.assertActorCanAccessTask(
-      this.projectAccess.requireActorId(actorUserId),
-      id,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    const taskRow = await this.prisma.task.findFirst({
+      where: { id, organizationId: this.orgId() },
+      select: { id: true, projectId: true },
+    });
+    if (!taskRow) {
+      throw new NotFoundException(`Task with id "${id}" not found`);
+    }
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, taskRow.projectId);
     const task = await this.prisma.task.findFirst({
       where: { id, organizationId: this.orgId() },
       include: this.taskDetailInclude,
@@ -212,6 +217,10 @@ export class TasksService {
 
   async createComment(taskId: string, dto: CreateTaskCommentDto) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId,
+      actorUserId: dto.authorId,
+    });
     await this.assertTaskInOrg(taskId);
 
     const author = await this.prisma.user.findFirst({
@@ -269,6 +278,10 @@ export class TasksService {
 
   async updateComment(taskId: string, commentId: string, dto: UpdateTaskCommentDto) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId,
+      actorUserId: dto.editorId,
+    });
     await this.assertTaskInOrg(taskId);
 
     const editor = await this.prisma.user.findFirst({
@@ -490,6 +503,10 @@ export class TasksService {
 
   async createCommentMention(taskId: string, dto: CreateTaskCommentMentionDto) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId,
+      actorUserId: dto.authorId,
+    });
     await this.assertTaskInOrg(taskId);
 
     const author = await this.prisma.user.findFirst({
@@ -588,7 +605,7 @@ export class TasksService {
   async findAll(actorUserId?: string, projectId?: string) {
     const actorId = this.projectAccess.requireActorId(actorUserId);
     if (projectId) {
-      await this.projectAccess.assertActorCanAccessActiveProject(actorId, projectId);
+      await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, projectId);
     }
 
     const accessibleIds = projectId
@@ -667,6 +684,11 @@ export class TasksService {
         "projectId is required: задачи создаются только внутри проекта",
       );
     }
+
+    await this.projectAccess.assertProjectIsActiveForWrite({
+      projectId,
+      actorUserId: dto.creatorId,
+    });
 
     const creator = await this.prisma.user.findFirst({
       where: { id: dto.creatorId, organizationId: org },
@@ -849,6 +871,10 @@ export class TasksService {
   }
 
   async updateStatus(id: string, dto: UpdateTaskStatusDto) {
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId: id,
+      actorUserId: dto.actorUserId,
+    });
     const existing = await this.prisma.task.findFirst({
       where: { id, organizationId: this.orgId() },
     });
@@ -911,6 +937,10 @@ export class TasksService {
   }
 
   async update(id: string, dto: UpdateTaskDto) {
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId: id,
+      actorUserId: dto.actorUserId,
+    });
     const hasTitle = dto.title !== undefined;
     const hasDescription = dto.description !== undefined;
     if (!hasTitle && !hasDescription) {
@@ -1010,6 +1040,10 @@ export class TasksService {
   }
 
   async updateAssignee(id: string, dto: UpdateTaskAssigneeDto) {
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId: id,
+      actorUserId: dto.actorUserId,
+    });
     const org = this.orgId();
     const existing = await this.prisma.task.findFirst({
       where: { id, organizationId: org },
@@ -1105,6 +1139,10 @@ export class TasksService {
   }
 
   async updateDeadline(id: string, dto: UpdateTaskDeadlineDto) {
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId: id,
+      actorUserId: dto.actorUserId,
+    });
     const existing = await this.prisma.task.findFirst({
       where: { id, organizationId: this.orgId() },
       include: {
@@ -1182,6 +1220,10 @@ export class TasksService {
 
   async createTransfer(taskId: string, dto: CreateTaskTransferDto) {
     const org = this.orgId();
+    await this.projectAccess.assertProjectIsActiveForWriteByTaskId({
+      taskId,
+      actorUserId: dto.requestedById,
+    });
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, organizationId: org },
     });

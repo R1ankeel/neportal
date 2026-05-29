@@ -7,6 +7,7 @@ export async function updateTaskStatus(_prev: unknown, formData: FormData) {
   const taskId = String(formData.get("taskId") ?? "");
   const status = String(formData.get("status") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
+  const actorUserId = String(formData.get("actorUserId") ?? "").trim();
   if (!taskId || !status || !projectId) {
     return { ok: false as const, message: "Некорректные данные" };
   }
@@ -14,7 +15,7 @@ export async function updateTaskStatus(_prev: unknown, formData: FormData) {
   const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...(actorUserId ? { actorUserId } : {}) }),
   });
 
   if (!res.ok) {

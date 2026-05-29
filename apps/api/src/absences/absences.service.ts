@@ -146,7 +146,7 @@ export class AbsencesService {
     if (!actorUserId?.trim()) {
       throw new BadRequestException("actorUserId is required when projectId is set");
     }
-    await this.projectAccess.assertActorCanAccessActiveProject(actorUserId.trim(), projectId);
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorUserId.trim(), projectId);
   }
 
   private async getMemberProjectIds(userId: string): Promise<string[]> {

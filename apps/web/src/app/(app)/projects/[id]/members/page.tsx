@@ -2,7 +2,7 @@ import { ProjectPageShell } from "@/components/projects/ProjectPageShell";
 import { ProjectMembersPanel } from "@/components/projects/ProjectMembersPanel";
 import { apiGet } from "@/lib/api";
 import { resolveProjectActor } from "@/lib/resolve-project-actor";
-import type { ApiProjectMember, ApiUser } from "@/lib/types";
+import type { ApiProject, ApiProjectMember, ApiUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +33,17 @@ export default async function ProjectMembersPage({
   const actor = users.find((u) => u.id === actorUserId);
 
   let members: ApiProjectMember[] = [];
+  let project: ApiProject | null = null;
   let error: string | null = null;
   try {
-    members = await apiGet<ApiProjectMember[]>(`/projects/${id}/members`, { actorUserId });
+    [members, project] = await Promise.all([
+      apiGet<ApiProjectMember[]>(`/projects/${id}/members`, { actorUserId }),
+      apiGet<ApiProject>(`/projects/${id}`, { actorUserId }),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
+  const readOnly = project?.status === "ARCHIVED";
 
   return (
     <ProjectPageShell projectId={id} actorUserId={actorUserId} users={users}>
@@ -54,7 +59,7 @@ export default async function ProjectMembersPage({
             actorUserId={actorUserId}
             members={members}
             users={users}
-            canManage={canManageMembers(actor)}
+            canManage={!readOnly && canManageMembers(actor)}
           />
         )}
       </div>

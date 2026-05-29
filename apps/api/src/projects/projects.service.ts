@@ -28,48 +28,75 @@ export class ProjectsService {
     return this.organization.getOrganizationId();
   }
 
-  async findAll(actorUserId?: string) {
-    const accessible = await this.projectAccess.listActiveProjectsForActor(
-      this.projectAccess.requireActorId(actorUserId),
-    );
-    const ids = accessible.map((p) => p.id);
-    if (ids.length === 0) {
-      return [];
+  async findAll(actorUserId?: string, status?: string) {
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    const actor = await this.projectAccess.getActorOrThrow(actorId);
+
+    const normalizedStatus = status?.trim().toUpperCase();
+    const wantsArchived = normalizedStatus === EntityStatus.ARCHIVED;
+
+    // DELETED must never be listed.
+    if (wantsArchived) {
+      if (actor.role !== "OWNER") {
+        // Do not reveal archived to non-owner.
+        return [];
+      }
+      return this.prisma.project.findMany({
+        where: {
+          organizationId: this.orgId(),
+          status: EntityStatus.ARCHIVED,
+        },
+        orderBy: { updatedAt: "desc" },
+        include: { createdBy: { select: { id: true, fullName: true, email: true } } },
+      });
     }
+
+    const accessible = await this.projectAccess.listActiveProjectsForActor(actorId);
+    const ids = accessible.map((p) => p.id);
+    if (ids.length === 0) return [];
+
     return this.prisma.project.findMany({
-      where: { organizationId: this.orgId(), id: { in: ids } },
+      where: {
+        organizationId: this.orgId(),
+        id: { in: ids },
+        status: { not: EntityStatus.DELETED },
+      },
       orderBy: { updatedAt: "desc" },
       include: { createdBy: { select: { id: true, fullName: true, email: true } } },
     });
   }
 
   async findOne(id: string, actorUserId?: string) {
-    await this.projectAccess.assertActorCanAccessActiveProject(
-      this.projectAccess.requireActorId(actorUserId),
-      id,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, id);
     const project = await this.prisma.project.findFirst({
-      where: { id, organizationId: this.orgId(), status: "ACTIVE" },
+      where: {
+        id,
+        organizationId: this.orgId(),
+        status: { in: [EntityStatus.ACTIVE, EntityStatus.ARCHIVED] },
+      },
       include: {
         createdBy: { select: { id: true, fullName: true, email: true, role: true } },
         members: { include: { user: { select: { id: true, fullName: true, email: true } } } },
       },
     });
-    if (!project) {
+    if (!project || project.status === EntityStatus.DELETED) {
       throw new NotFoundException(`Project with id "${id}" not found`);
     }
     return project;
   }
 
   async getSummary(projectId: string, actorUserId?: string): Promise<ProjectSummaryDto> {
-    await this.projectAccess.assertActorCanAccessActiveProject(
-      this.projectAccess.requireActorId(actorUserId),
-      projectId,
-    );
+    const actorId = this.projectAccess.requireActorId(actorUserId);
+    await this.projectAccess.assertActorCanAccessProjectReadOnlyForWeb(actorId, projectId);
     const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId: this.orgId(), status: "ACTIVE" },
+      where: {
+        id: projectId,
+        organizationId: this.orgId(),
+        status: { in: [EntityStatus.ACTIVE, EntityStatus.ARCHIVED] },
+      },
     });
-    if (!project) {
+    if (!project || project.status === EntityStatus.DELETED) {
       throw new NotFoundException(`Project with id "${projectId}" not found`);
     }
 
@@ -171,6 +198,50 @@ export class ProjectsService {
       });
 
       return project;
+    });
+  }
+
+  async archive(projectId: string, actorUserId?: string) {
+    await this.projectAccess.assertActorIsOwner(this.projectAccess.requireActorId(actorUserId));
+
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        organizationId: this.orgId(),
+        status: { in: [EntityStatus.ACTIVE, EntityStatus.ARCHIVED] },
+      },
+    });
+    if (!project || project.status === EntityStatus.DELETED) {
+      throw new NotFoundException(`Project with id "${projectId}" not found`);
+    }
+    if (project.status === EntityStatus.ARCHIVED) {
+      return project;
+    }
+    return this.prisma.project.update({
+      where: { id: project.id },
+      data: { status: EntityStatus.ARCHIVED },
+    });
+  }
+
+  async restore(projectId: string, actorUserId?: string) {
+    await this.projectAccess.assertActorIsOwner(this.projectAccess.requireActorId(actorUserId));
+
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        organizationId: this.orgId(),
+        status: { in: [EntityStatus.ACTIVE, EntityStatus.ARCHIVED] },
+      },
+    });
+    if (!project || project.status === EntityStatus.DELETED) {
+      throw new NotFoundException(`Project with id "${projectId}" not found`);
+    }
+    if (project.status === EntityStatus.ACTIVE) {
+      return project;
+    }
+    return this.prisma.project.update({
+      where: { id: project.id },
+      data: { status: EntityStatus.ACTIVE },
     });
   }
 }

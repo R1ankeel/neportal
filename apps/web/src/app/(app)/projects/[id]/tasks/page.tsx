@@ -3,7 +3,7 @@ import { ProjectPageShell } from "@/components/projects/ProjectPageShell";
 import { apiGet } from "@/lib/api";
 import { resolveProjectActor } from "@/lib/resolve-project-actor";
 import { formatDate, taskStatusLabel } from "@/lib/format";
-import type { ApiTask } from "@/lib/types";
+import type { ApiProject, ApiTask } from "@/lib/types";
 import { TaskStatusActions } from "./TaskStatusActions";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +28,17 @@ export default async function ProjectTasksPage({
   }
 
   let tasks: ApiTask[] = [];
+  let project: ApiProject | null = null;
   let error: string | null = null;
   try {
-    tasks = await apiGet<ApiTask[]>("/tasks", { actorUserId, projectId: id });
+    [tasks, project] = await Promise.all([
+      apiGet<ApiTask[]>("/tasks", { actorUserId, projectId: id }),
+      apiGet<ApiProject>(`/projects/${id}`, { actorUserId }),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Ошибка";
   }
+  const readOnly = project?.status === "ARCHIVED";
 
   return (
     <ProjectPageShell projectId={id} actorUserId={actorUserId} users={users}>
@@ -78,7 +83,11 @@ export default async function ProjectTasksPage({
                     <td className="hidden px-4 py-3 align-top lg:table-cell">{t.assignee?.fullName ?? "—"}</td>
                     <td className="px-4 py-3 align-top">{formatDate(t.deadlineAt)}</td>
                     <td className="px-4 py-3 align-top">
-                      <TaskStatusActions taskId={t.id} projectId={id} current={t.status} />
+                      {readOnly ? (
+                        <span className="text-sm text-zinc-500">Только просмотр</span>
+                      ) : (
+                        <TaskStatusActions taskId={t.id} projectId={id} current={t.status} actorUserId={actorUserId} />
+                      )}
                     </td>
                   </tr>
                 ))
